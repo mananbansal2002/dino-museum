@@ -187,8 +187,27 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
   }
 
   /* ------------------------------------------------------------ drawing */
+  const hasImage = (f) => f.rec.status === "ok";
+  let grainPattern = null;
+  function grain() {
+    if (!grainPattern) {
+      const c = makeCanvas(128, 128);
+      const g = c.getContext("2d");
+      const img = g.createImageData(128, 128);
+      let seed = 1337;
+      for (let i = 0; i < img.data.length; i += 4) {
+        seed = (seed * 16807) % 2147483647;
+        const v = seed % 255;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+        img.data[i + 3] = 22;
+      }
+      g.putImageData(img, 0, 0);
+      grainPattern = ctx.createPattern(c, "repeat");
+    }
+    return grainPattern;
+  }
   // draw the image to cover (x,y,w,h); zoom >= 1, pan in -1..1 within the slack
-  function drawCover(f, x, y, w, h, zoom, px, py) {
+  function drawCover(f, x, y, w, h, zoom, px, py, vis) {
     const img = f.rec.img;
     if (f.rec.status === "ok" && img.naturalWidth) {
       const iw = img.naturalWidth;
@@ -200,18 +219,59 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
       const dy = y + (h - dh) / 2 + ((dh - h) / 2) * clamp(py, -1, 1);
       ctx.drawImage(img, dx, dy, dw, dh);
     } else {
-      // no image (yet): a moving gradient in the species colours; the name
-      // tag drawn on top of every shot says who it is
-      const cx = x + w / 2 + px * w * 0.25;
-      const cy = y + h / 2 + py * h * 0.25;
-      const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(w, h) * 0.75 * zoom);
-      g.addColorStop(0, f.color);
-      g.addColorStop(1, f.accent);
-      ctx.fillStyle = g;
-      ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.fillRect(x, y, w, h);
+      drawPlaceholder(f, x, y, w, h, zoom, px, vis);
     }
+  }
+
+  // Shown while a photo is missing: a dark, grainy card lit by a soft glow in
+  // the species colour, with the name set to fit inside its own visible area
+  // (`vis` = [x, width] of the part of the panel the viewer can see).
+  function drawPlaceholder(f, x, y, w, h, zoom, px, vis) {
+    const [vx, vw] = vis || [x, w];
+    ctx.fillStyle = "#0e1319";
+    ctx.fillRect(x, y, w, h);
+    const cx = vx + vw / 2 + px * vw * 0.12;
+    const cy = y + h * 0.48;
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(vw, h) * 0.7 * zoom);
+    glow.addColorStop(0, withAlpha(f.color, 0.42));
+    glow.addColorStop(0.55, withAlpha(f.accent, 0.16));
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(x, y, w, h);
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = grain();
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+
+    // name: shrink to fit, wrap onto two lines when it is long
+    const maxW = Math.max(80, vw - 70);
+    let size = 64;
+    let lines = [f.name];
+    for (; size >= 26; size -= 2) {
+      ctx.font = `800 ${size}px Inter, system-ui, sans-serif`;
+      if (ctx.measureText(f.name).width <= maxW) {
+        lines = [f.name];
+        break;
+      }
+      const two = splitName(f.name);
+      if (two && two.every((l) => ctx.measureText(l).width <= maxW)) {
+        lines = two;
+        break;
+      }
+    }
+    ctx.font = `800 ${size}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(255,243,214,0.92)";
+    ctx.shadowColor = "rgba(0,0,0,0.6)";
+    ctx.shadowBlur = 12;
+    const lh = size * 1.08;
+    lines.forEach((l, i) => ctx.fillText(l, cx, cy + (i - (lines.length - 1) / 2) * lh, maxW));
+    ctx.shadowBlur = 0;
+    ctx.font = "600 15px Inter, system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillText("ARTWORK COMING SOON", cx, cy + (lines.length / 2) * lh + 14, maxW);
   }
 
   const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
@@ -225,13 +285,13 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
     };
   }
 
-  function drawPanel(f, x, y, w, h, k, t, extraZoom = 0) {
+  function drawPanel(f, x, y, w, h, k, t, extraZoom = 0, vis = null) {
     const p = kb(k, t);
     ctx.save();
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
-    drawCover(f, x, y, w, h, Math.max(1, p.z + extraZoom), p.px, p.py);
+    drawCover(f, x, y, w, h, Math.max(1, p.z + extraZoom), p.px, p.py, vis);
     if (f.dim > 0.01) {
       ctx.fillStyle = `rgba(20,14,8,${f.dim * 0.62})`;
       ctx.fillRect(x, y, w, h);
@@ -310,14 +370,14 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
     if (fa.gone < 0.999) {
       ctx.save();
       clipSide(pts, 0);
-      drawPanel(fa, -drive * 30, 0, mid + slant + 40, H, s.kb, local, extra);
+      drawPanel(fa, -drive * 30, 0, mid + slant + 40, H, s.kb, local, extra, [0, Math.max(0, mid - 60)]);
       ctx.restore();
     }
     if (fb.gone < 0.999) {
       ctx.save();
       clipSide(pts, W);
       const bx = mid - slant - 40 + drive * 30;
-      drawPanel(fb, bx, 0, W - bx, H, s.kb2, local, extra);
+      drawPanel(fb, bx, 0, W - bx, H, s.kb2, local, extra, [mid + 60, Math.max(0, W - mid - 60)]);
       ctx.restore();
     }
 
@@ -329,8 +389,8 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
     ctx.stroke();
     ctx.restore();
 
-    if (fa.gone < 0.6) label(fa.name, 22, LABEL_Y);
-    if (fb.gone < 0.6) label(fb.name, W - 22, LABEL_Y, "right");
+    if (fa.gone < 0.6 && hasImage(fa)) label(fa.name, 22, LABEL_Y);
+    if (fb.gone < 0.6 && hasImage(fb)) label(fb.name, W - 22, LABEL_Y, "right");
     if (fa.gone < 0.5 && fb.gone < 0.5) vsBadge(mid, H / 2 - 10, 1 + punch * 0.25 + (s.jagged ? 0.1 : 0));
   }
 
@@ -360,7 +420,7 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
       }
       ctx.restore();
     }
-    label(f.name, 22, LABEL_Y);
+    if (hasImage(f)) label(f.name, 22, LABEL_Y);
   }
 
   function drawAlternate(s, t) {
@@ -376,7 +436,7 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
       drawPanel(fighters[1 - who], 0, 0, W, H, kenBurns(shotSeq * 13 + n - 1), 1);
       ctx.restore();
     }
-    label(f.name, 22, LABEL_Y);
+    if (hasImage(f)) label(f.name, 22, LABEL_Y);
   }
 
   function drawShot(s) {
@@ -646,6 +706,25 @@ export function createCinema({ renderer, screenMat, battles, onLine, onProgress,
     canvas,
     texture: tex,
   };
+}
+
+function withAlpha(hexColor, a) {
+  const n = parseInt(hexColor.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// "Tyrannosaurus rex" -> ["Tyrannosaurus", "rex"]; long one-word names split near a vowel
+function splitName(name) {
+  const words = name.split(" ");
+  if (words.length > 1) {
+    const half = Math.ceil(words.length / 2);
+    return [words.slice(0, half).join(" "), words.slice(half).join(" ")];
+  }
+  if (name.length < 11) return null;
+  const suffix = name.match(/(saurus|raptor|ceratops|nychus|odon|don)$/);
+  if (suffix && suffix.index >= 4) return [`${name.slice(0, suffix.index)}-`, suffix[0]];
+  const mid = Math.round(name.length / 2);
+  return [`${name.slice(0, mid)}-`, name.slice(mid)];
 }
 
 function hex(n) {

@@ -8,7 +8,9 @@ import { speciesImageUrl, loadImageManifest, imageManifest, imageCredit } from "
  *   const picker = createBattlePicker({
  *     battles,                      // BATTLES (each may carry videos: [{id,title,channel}])
  *     extra,                        // EXTRA_SCREENINGS: [{id,title,channel,matchup}]
- *     onPlay3D(battleId),           // start the in-engine screening
+ *     videosUrl,                    // default "/data/videos.json"; fetched once on first open()
+ *                                   // and merged into battle.videos / extra (null to skip)
+ *     onPlay3D(battleId),           // start the theatre screening ("▶ Screen in theatre")
  *     onPlayVideo(video, battle),   // battle is null for an extra screening
  *     onSearch(query, battle),      // optional: shown when a battle has no videos
  *     onClose(),
@@ -16,7 +18,7 @@ import { speciesImageUrl, loadImageManifest, imageManifest, imageCredit } from "
  *   picker.open(); picker.close(); picker.isOpen();
  *
  * `battles` / `extra` are read on every open(), so videos merged in later show up.
- * Keyboard: arrows move between cards, Enter plays (3D for battle cards),
+ * Keyboard: arrows move between cards, Enter plays (theatre screening for battle cards),
  * Tab reaches each card's buttons, Esc closes. Styles live in /css/media.css.
  */
 
@@ -37,11 +39,57 @@ function fighterName(id) {
   return SPECIES[id]?.name || id || "?";
 }
 
+/* ------------------------------------------------------------------ */
+/* video catalogue: /data/videos.json                                   */
+/*   { battles: { <battleId>: [{id,title,channel}] }, extra: [{id,title,channel,matchup}] } */
+/* ------------------------------------------------------------------ */
+const catalogues = new Map();
+
+/** Fetches a video catalogue once per URL; resolves to {} on any failure. */
+export function fetchVideoCatalogue(url = "/data/videos.json") {
+  if (!catalogues.has(url)) {
+    catalogues.set(
+      url,
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({}))
+        .then((d) => (d && typeof d === "object" ? d : {}))
+    );
+  }
+  return catalogues.get(url);
+}
+
+/** Adds catalogue clips to battle.videos and to the extra list, skipping duplicates and bad ids. */
+export function mergeVideos(battles, extra, data = {}) {
+  for (const b of battles || []) {
+    const list = data.battles?.[b.id];
+    if (!Array.isArray(list)) continue;
+    if (!Array.isArray(b.videos)) b.videos = [];
+    for (const v of list) {
+      if (isYouTubeId(v?.id) && !b.videos.some((x) => x.id === v.id)) b.videos.push({ ...v });
+    }
+  }
+  if (Array.isArray(extra)) {
+    for (const v of data.extra || []) {
+      if (isYouTubeId(v?.id) && !extra.some((x) => x.id === v.id)) extra.push({ ...v });
+    }
+  }
+}
+
 function hex(n) {
   return `#${(n >>> 0).toString(16).padStart(6, "0").slice(-6)}`;
 }
 
-export function createBattlePicker({ battles = [], extra = [], onPlay3D, onPlayVideo, onSearch, onClose } = {}) {
+export function createBattlePicker({
+  battles = [],
+  extra = [],
+  videosUrl = "/data/videos.json",
+  onPlay3D,
+  onPlay, // alias of onPlay3D
+  onPlayVideo,
+  onSearch,
+  onClose,
+} = {}) {
   const root = el("div", "media-overlay bp-overlay hidden");
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-modal", "true");
@@ -210,7 +258,7 @@ export function createBattlePicker({ battles = [], extra = [], onPlay3D, onPlayV
 
   function choose3D(b) {
     close();
-    onPlay3D?.(b.id);
+    (onPlay || onPlay3D)?.(b.id);
   }
 
   function chooseVideo(v, b) {
@@ -241,17 +289,28 @@ export function createBattlePicker({ battles = [], extra = [], onPlay3D, onPlayV
     }
   }
 
+  // merge the verified YouTube catalogue into the arrays we were given (once)
+  let videosMerged = false;
+  function loadVideos() {
+    if (videosMerged || !videosUrl) return Promise.resolve();
+    return fetchVideoCatalogue(videosUrl).then((data) => {
+      videosMerged = true;
+      mergeVideos(battles, extra, data);
+    });
+  }
+
   function openPicker() {
     if (!mounted) {
       document.body.appendChild(root);
       mounted = true;
     }
     render();
-    const hadManifest = imageManifest() !== null;
-    loadImageManifest().then(() => {
+    const fresh = imageManifest() === null || !videosMerged;
+    Promise.all([loadImageManifest(), loadVideos()]).then(() => {
       if (!open) return;
-      // the manifest may name different files: rebuild once it is known
-      if (!hadManifest) {
+      // the manifest may name different files and the catalogue adds
+      // YouTube buttons: rebuild once both are known
+      if (fresh) {
         render();
         focusCard(focusIndex);
       }
