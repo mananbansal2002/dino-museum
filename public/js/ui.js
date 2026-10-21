@@ -34,6 +34,15 @@ const TOPPING_ICONS = { sprinkles: "🌈", chocolate: "🍫", cherry: "🍒" };
 
 const $ = (id) => document.getElementById(id);
 
+let imageManifest = null;
+/** Credits for the exhibit photos, fetched once (see public/images/species). */
+export function speciesImages() {
+  imageManifest ??= fetch("/images/species/manifest.json")
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => ({}));
+  return imageManifest;
+}
+
 /** Panels need a visible cursor, so drop pointer lock when one opens. */
 function releaseMouse() {
   if (document.pointerLockElement) document.exitPointerLock?.();
@@ -681,6 +690,10 @@ export function createUI(callbacks = {}) {
           <button class="chip" id="closeExhibit">close ✕</button>
         </div>
       </div>
+      <figure class="exHero" id="exHero">
+        <img src="/images/species/${encodeURIComponent(ex.id)}.jpg" alt="${escapeHtml(ex.title)} life restoration" />
+        <figcaption id="exCredit"></figcaption>
+      </figure>
       <p class="lead">${escapeHtml(ex.blurb || "")}</p>
       <div class="exGrid">
         <div class="stat"><span>Period</span><b>${escapeHtml(ex.period || "—")}</b></div>
@@ -701,6 +714,15 @@ export function createUI(callbacks = {}) {
     `;
     $("closeExhibit").onclick = hideExhibit;
     $("exhibitVideos").onclick = () => callbacks.onExhibitVideos?.(ex);
+    const hero = $("exHero");
+    hero.querySelector("img").onerror = () => hero.remove();
+    speciesImages().then((m) => {
+      const info = m[ex.id];
+      const cap = $("exCredit");
+      if (info && cap && document.body.contains(cap)) {
+        cap.textContent = `Image: ${info.credit || "Unknown"} · ${info.license || ""}`;
+      }
+    });
     releaseMouse();
     $("exhibitCard").classList.remove("hidden");
   }

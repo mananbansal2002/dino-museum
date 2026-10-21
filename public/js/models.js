@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 
 /**
- * Rigged glTF models (CC0, Quaternius via poly.pizza — see public/models/CREDITS.md).
+ * Rigged glTF visitor avatars (CC0, Quaternius via poly.pizza — see public/models/CREDITS.md).
  *
  * Every model is loaded once and cloned per instance. Callers always get a
  * procedural fallback first; the glTF swaps in when it has loaded, so the
@@ -26,48 +26,6 @@ export function loadGLB(url) {
 export const HUMAN_MODELS = {
   male: { url: "/models/humans/male.glb", prefix: "Man_", fileHeight: 4.84, height: 1.8 },
   female: { url: "/models/humans/female.glb", prefix: "Female_", fileHeight: 4.65, height: 1.72 },
-};
-
-/** fileLength is the nose-to-tail length in file units, length the target in metres. */
-export const DINO_MODELS = {
-  trex: { url: "/models/dinos/t_rex.glb", prefix: "TRex_", fileLength: 31 },
-  triceratops: { url: "/models/dinos/triceratops.glb", prefix: "Triceratops_", fileLength: 22.5 },
-  stegosaurus: { url: "/models/dinos/stegosaurus.glb", prefix: "Stegosaurus_", fileLength: 23 },
-  velociraptor: { url: "/models/dinos/velociraptor.glb", prefix: "Velociraptor_", fileLength: 13.3 },
-  apatosaurus: { url: "/models/dinos/apatosaurus.glb", prefix: "Apatosaurus_", fileLength: 49.7 },
-  parasaurolophus: {
-    url: "/models/dinos/parasaurolophus.glb",
-    prefix: "Parasaurolophus_",
-    fileLength: 12.5,
-  },
-};
-
-/** Which rigged body stands in for which species id (see species.js). */
-export const SPECIES_MODEL = {
-  trex: "trex",
-  allo: "trex",
-  torvo: "trex",
-  carchar: "trex",
-  giganoto: "trex",
-  mapu: "trex",
-  acro: "trex",
-  trike: "triceratops",
-  styraco: "triceratops",
-  centro: "triceratops",
-  stego: "stegosaurus",
-  kentrosaurus: "stegosaurus",
-  wuerho: "stegosaurus",
-  raptor: "velociraptor",
-  utahraptor: "velociraptor",
-  deinonychus: "velociraptor",
-  brachio: "apatosaurus",
-  diplod: "apatosaurus",
-  apo: "apatosaurus",
-  camarasaurus: "apatosaurus",
-  barosaurus: "apatosaurus",
-  para: "parasaurolophus",
-  edmont: "parasaurolophus",
-  iguanodon: "parasaurolophus",
 };
 
 /** Turns a glTF clip name like "Armature|TRex_Walk" into "Walk". */
@@ -297,62 +255,10 @@ export async function upgradeCharacter(character) {
   return true;
 }
 
-/* ------------------------------------------------------------------ */
-/* dinosaurs                                                            */
-/* ------------------------------------------------------------------ */
-
-/**
- * Animated dinosaur. `length` is the target nose-to-tail length in metres.
- * Returns { group, rig, ready, setAnim(name), update(dt) }. The group is
- * empty until the glTF has loaded.
- */
-export function createDinoModel(kind, { length = 10, tint = null } = {}) {
-  const spec = DINO_MODELS[kind];
-  const group = new THREE.Group();
-  const api = {
-    group,
-    rig: null,
-    kind,
-    anim: "Idle",
-    setAnim(name, opts = {}) {
-      api.anim = name;
-      api.rig?.play(name, opts);
-    },
-    update(dt) {
-      api.rig?.update(dt);
-    },
-    ready: null,
-  };
-  if (!spec) {
-    api.ready = Promise.resolve(false);
-    return api;
-  }
-  api.ready = loadGLB(spec.url).then(
-    (gltf) => {
-      const rig = createRig(gltf, spec.prefix, length / spec.fileLength);
-      if (tint) {
-        for (const m of rig.materials.values()) m.color.lerp(new THREE.Color(tint), 0.35);
-      }
-      group.add(rig.model);
-      api.rig = rig;
-      rig.play(api.anim, { fade: 0 });
-      // de-sync idle loops between instances
-      const a = rig.actions[api.anim];
-      if (a) a.time = Math.random() * a.getClip().duration;
-      return true;
-    },
-    (err) => {
-      console.warn(`[models] dinosaur ${kind} failed to load:`, err?.message || err);
-      return false;
-    }
-  );
-  return api;
-}
-
 /** Start downloading the common models early. */
 export function preloadModels(kinds = ["male", "female"]) {
   for (const k of kinds) {
-    const spec = HUMAN_MODELS[k] || DINO_MODELS[k];
+    const spec = HUMAN_MODELS[k];
     if (spec) loadGLB(spec.url).catch(() => {});
   }
 }

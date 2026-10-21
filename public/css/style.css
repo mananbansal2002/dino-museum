@@ -944,3 +944,31 @@ button.ghost:active {
     justify-content: center;
   }
 }
+
+.exHero {
+  margin: 14px 0 4px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #1b1a17;
+  position: relative;
+}
+.exHero img {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: cover;
+}
+.exHero figcaption {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.exHero figcaption:empty {
+  display: none;
+}

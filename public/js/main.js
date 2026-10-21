@@ -10,6 +10,9 @@ import { createUI, makeIceCream, FLAVOURS } from "./ui.js";
 import { createNet } from "./net.js";
 import { exhibitById, battleById, BATTLES, FACTS, EXHIBITS } from "./exhibits.js";
 import { makeBubble } from "./util.js";
+import { upgradeCharacter, preloadModels } from "./models.js";
+
+preloadModels(["male", "female"]);
 
 /* ------------------------------------------------------------------ */
 /* renderer + scene                                                     */
@@ -254,6 +257,7 @@ async function startGame(opts) {
       name: S.name,
       color: S.color,
     });
+    upgradeCharacter(S.player.character);
     S.player.state.x = world.spawn.x;
     S.player.state.z = world.spawn.z;
     S.player.state.ry = world.spawn.ry;
@@ -667,9 +671,19 @@ function animate() {
   const dt = Math.min(0.05, clock.getDelta());
 
   if (S.joined && S.player) {
-    const wantInput = !(ui.isChatOpen() || anyPanelOpen());
-    if (S.player.inputEnabled !== wantInput) S.player.setInputEnabled(wantInput);
+    // only react to panels opening/closing so other callers can still gate input
+    const blocked = ui.isChatOpen() || anyPanelOpen();
+    if (blocked !== S.inputBlocked) {
+      S.inputBlocked = blocked;
+      S.player.setInputEnabled(!blocked);
+    }
     S.player.update(dt);
+    for (const r of remote.list) {
+      if (!r.upgraded) {
+        r.upgraded = true;
+        upgradeCharacter(r.character);
+      }
+    }
     remote.update(dt);
     S.digCooldown = Math.max(0, S.digCooldown - dt);
 
