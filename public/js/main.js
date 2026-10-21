@@ -148,12 +148,40 @@ function connect(payload) {
   return new Promise((resolve, reject) => {
     S.net = createNet({
       onStatus: (status, detail) => {
+        if (S.joined) {
+          if (status === "reconnecting" || status === "offline") {
+            if (!S.offlineToastShown) ui.toast("Connection lost — reconnecting…");
+            S.offlineToastShown = true;
+          }
+          return;
+        }
         if (status === "connecting") ui.showStatus("Connecting to the museum…");
+        if (status === "reconnecting") ui.showStatus("Reconnecting…");
         if (status === "error") ui.showStatus(`Connection problem: ${detail || ""}`);
         if (status === "online") ui.showStatus("Connected! Loading the museum…");
       },
+      onRejoined: (res) => {
+        S.myId = res.id;
+        S.room = res.room;
+        if (res.color) S.color = res.color;
+        const ids = new Set((res.players || []).map((p) => p.id));
+        for (const r of remote.list) if (!ids.has(r.id)) remote.remove(r.id);
+        for (const p of res.players || []) {
+          if (p.id === S.myId) continue;
+          remote.upsert(p.id, p);
+          remote.setState(p.id, p);
+        }
+        ui.setRoom(res.room);
+        S.offlineToastShown = false;
+        ui.chat({ system: true, text: "Reconnected to the museum ✅" });
+      },
+      look: (l) => remote.upsert(l.id, { look: l.look }),
+      rateLimited: (r) => {
+        if (r?.type === "chat") ui.toast("Slow down a little 🙂");
+      },
       playerJoined: (p) => {
         remote.upsert(p.id, p);
+        remote.setState(p.id, p);
         ui.chat({ system: true, text: `${p.name} joined the museum 🦖` });
         ui.toast(`${p.name} arrived`);
       },
@@ -191,8 +219,8 @@ function connect(payload) {
       .join({
         name: payload.name,
         room: payload.room,
-        color: 0xffc857,
         look: payload.look,
+        state: { x: world.spawn.x, y: 0, z: world.spawn.z, ry: world.spawn.ry },
       })
       .then(resolve)
       .catch(reject);
@@ -217,13 +245,14 @@ async function startGame(opts) {
     S.room = res.room;
     S.look = opts.look;
     S.name = opts.name || "Visitor";
+    if (res.color) S.color = res.color;
 
     S.player = createPlayer({
       scene,
       camera,
       look: opts.look,
       name: S.name,
-      color: "#ffc857",
+      color: S.color,
     });
     S.player.state.x = world.spawn.x;
     S.player.state.z = world.spawn.z;
@@ -233,7 +262,9 @@ async function startGame(opts) {
     ui.setHall(roomNameAt(world.spawn.x, world.spawn.z));
     ui.setCounters({ discovered: 0, total: EXHIBITS.length });
     for (const p of res.players || []) {
-      if (p.id !== S.myId) remote.upsert(p.id, p);
+      if (p.id === S.myId) continue;
+      remote.upsert(p.id, p);
+      remote.setState(p.id, p);
     }
     ui.setPlayers(res.players || [], S.myId);
     ui.enterGame();
@@ -447,6 +478,7 @@ function dig() {
   S.score += 5;
   ui.setCounters({ fossils: S.fossils });
   ui.toast(`You dug up ${find}`, "good");
+  ui.chat({ system: true, text: `You dug up ${find}` });
   S.net?.emit("action", { type: "dig", payload: {} });
   S.net?.emit("action", { type: "score", payload: 5 });
 }
@@ -694,7 +726,7 @@ function animate() {
     if (rosterTimer <= 0) {
       rosterTimer = 0.35;
       const roster = [
-        { id: S.myId, name: S.name, color: "#ffc857" },
+        { id: S.myId, name: S.name, color: S.color },
         ...remote.list.map((r) => ({ id: r.id, name: r.name, color: r.color })),
       ];
       ui.setPlayers(roster, S.myId);

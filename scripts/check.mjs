@@ -28,7 +28,7 @@ function warn(msg) {
 /* ------------------------------------------------------------------ */
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === ".git" || entry === ".vercel") continue;
+    if (["node_modules", ".git", ".vercel", ".claude"].includes(entry)) continue;
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) walk(full, out);
@@ -329,11 +329,15 @@ for (const file of clientFiles) {
   const full = join(clientDir, file);
   const src = readFileSync(full, "utf8");
   for (const m of src.matchAll(/import\s+(?:([\w$]+)\s*,\s*)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
-    const target = join(clientDir, m[3].replace(/^\.\//, ""));
+    // bare "three/addons/..." specifiers map to the vendored copy (see the importmap)
+    const target = m[3].startsWith("three/addons/")
+      ? join(root, "public", "vendor", "three", "addons", m[3].slice("three/addons/".length))
+      : join(clientDir, m[3].replace(/^\.\//, ""));
     if (!existsSync(target)) {
       fail(`${file} imports "${m[3]}" which does not exist`);
       continue;
     }
+    if (!exportCache.has(target)) exportCache.set(target, exportsOf(target));
     const available = exportCache.get(target);
     for (const part of m[2].split(",")) {
       const name = part.split(/\s+as\s+/)[0].trim();
