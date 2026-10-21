@@ -102,30 +102,38 @@
 
         <div class="look">
           <div class="lookPreview">
-            <canvas id="lookPreview" width="220" height="300"></canvas>
-            <button class="chip" id="randomLook">🎲 random</button>
+            <canvas id="lookPreview" width="400" height="560" aria-label="Character preview"></canvas>
+            <button class="chip" id="randomLook" type="button">🎲 random</button>
           </div>
           <div class="lookControls">
-            <label>
-              <span>Skin</span>
-              <div class="swatches" id="swSkin"></div>
-            </label>
-            <label>
-              <span>Shirt</span>
-              <div class="swatches" id="swShirt"></div>
-            </label>
-            <label>
-              <span>Pants</span>
-              <div class="swatches" id="swPants"></div>
-            </label>
-            <label>
-              <span>Hair</span>
-              <div class="swatches" id="swHair"></div>
-            </label>
-            <label>
-              <span>Accessory</span>
-              <div class="swatches" id="swAcc"></div>
-            </label>
+            <div class="lookRow">
+              <span class="lookLabel">Body</span>
+              <div class="swatches bodySeg" id="swBody" role="group" aria-label="Body type"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Skin</span>
+              <div class="swatches" id="swSkin" role="group" aria-label="Skin tone"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Shirt</span>
+              <div class="swatches" id="swShirt" role="group" aria-label="Shirt colour"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Pants</span>
+              <div class="swatches" id="swPants" role="group" aria-label="Pants colour"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Hair</span>
+              <div class="swatches" id="swHair" role="group" aria-label="Hair style"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Hair colour</span>
+              <div class="swatches" id="swHairColor" role="group" aria-label="Hair colour"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Extra</span>
+              <div class="swatches" id="swAcc" role="group" aria-label="Accessory"></div>
+            </div>
           </div>
         </div>
 
