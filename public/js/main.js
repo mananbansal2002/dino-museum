@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { buildWorld, roomNameAt, roomAt } from "./world.js";
+import { buildWorld, roomNameAt, roomAt, COURT } from "./world.js";
 import { createPlayer } from "./player.js";
 import { createRemotePlayers } from "./remote.js";
 import { createMinimap } from "./minimap.js";
@@ -11,6 +11,8 @@ import { createNet } from "./net.js";
 import { exhibitById, battleById, BATTLES, FACTS, EXHIBITS } from "./exhibits.js";
 import { makeBubble } from "./util.js";
 import { upgradeCharacter, preloadModels } from "./models.js";
+import { SIT_SEAT_OFFSET, createCharacter } from "./character.js";
+import { createEraView } from "./eraview.js";
 
 preloadModels(["male", "female"]);
 
@@ -48,6 +50,48 @@ const fx = createFX(scene);
 const audio = createAudio();
 const remote = createRemotePlayers(scene);
 const minimap = createMinimap(document.getElementById("minimap"));
+const eraView = createEraView({ renderer });
+
+/* ------------------------------------------------------------------ */
+/* the ice cream vendor behind the counter                              */
+/* ------------------------------------------------------------------ */
+const vendor = (() => {
+  const character = createCharacter(
+    {
+      body: "female",
+      skin: "#c98c5f",
+      shirt: "#f4ead5",
+      pants: "#3f6fb5",
+      hair: "bun",
+      hairColor: "#2b1d12",
+      accessory: "cap",
+    },
+    { name: "Scoops 🍦", tagColor: "#ff8fab" }
+  );
+  // the counter runs along x at COURT.stallZ; customers queue on the -z side
+  character.group.position.set(COURT.stallX, 0, COURT.stallZ + 0.75);
+  character.group.rotation.y = Math.PI;
+  scene.add(character.group);
+  upgradeCharacter(character);
+  let greeted = false;
+  return {
+    character,
+    update(dt, player) {
+      character.update(dt, { speed: 0, anim: "idle" });
+      if (!player) return;
+      const d = Math.hypot(player.x - COURT.stallX, player.z - COURT.stallZ);
+      if (d < 9 && !greeted) {
+        greeted = true;
+        character.playAction("wave", 1.6);
+      } else if (d > 14) {
+        greeted = false;
+      }
+    },
+    celebrate() {
+      character.playAction("cheer", 1.4);
+    },
+  };
+})();
 
 const cinema = createCinema({
   renderer,
@@ -110,6 +154,7 @@ const ui = createUI({
     S.scoops++;
     ui.setCounters({ scoops: S.scoops });
     audio.slurp();
+    vendor.celebrate();
     ui.toast(`${flavourName(payload.flavour)} — enjoy! 🍦`, "good");
     fx.burst("confetti", S.player.state.x, S.player.state.y + 1.6, S.player.state.z, 26);
   },
@@ -405,8 +450,24 @@ function interact(it) {
       showExit();
       break;
     }
-    case "holo": {
-      roar(it.exhibitId);
+    case "seat": {
+      const seat = it.seat;
+      // the character's seat contact sits SIT_SEAT_OFFSET above its root
+      if (S.player.sit({ x: seat.x, z: seat.z, ry: seat.ry, y: Math.max(0, seat.y - SIT_SEAT_OFFSET) })) {
+        S.net?.emit("action", { type: "sit", payload: {} });
+        ui.toast(
+          it.area === "theatre"
+            ? "Enjoy the show 🍿 — press E at the console to pick a fight, W to stand"
+            : "Taking a rest… press W to stand up"
+        );
+      }
+      break;
+    }
+    case "era": {
+      ui.setPrompt(null);
+      eraView.open(it.era);
+      document.body.classList.add("immersive");
+      audio.duck(true);
       break;
     }
     default:
@@ -604,7 +665,8 @@ window.addEventListener("keydown", (e) => {
   }
   switch (e.code) {
     case "KeyE":
-      interact(nearestInteractable());
+      if (S.player.isSitting) S.player.stand();
+      else interact(nearestInteractable());
       break;
     case "KeyV":
       roar();
@@ -647,7 +709,7 @@ window.addEventListener("keydown", (e) => {
 });
 
 function anyPanelOpen() {
-  return ui.isModalOpen() || ui.isCardOpen() || ui.isIceOpen();
+  return ui.isModalOpen() || ui.isCardOpen() || ui.isIceOpen() || eraView.isOpen();
 }
 
 canvas.addEventListener("click", () => {
@@ -698,7 +760,7 @@ function animate() {
     }
 
     // interaction prompt
-    const it = nearestInteractable();
+    const it = S.player.isSitting ? null : nearestInteractable();
     if (it) {
       ui.setPrompt(it.label, it.key);
     } else {
@@ -722,6 +784,8 @@ function animate() {
       });
     }
   }
+
+  vendor.update(dt, S.player?.state);
 
   // animated exhibits
   for (const a of world.animated) {
@@ -753,12 +817,22 @@ function animate() {
     }
   }
 
-  renderFrame();
+  renderFrame(dt);
 }
 
-function renderFrame() {
+function renderFrame(dt = 0) {
+  if (eraView.isOpen()) {
+    eraView.update(dt);
+    eraView.render();
+    return;
+  }
   renderer.render(scene, camera);
 }
+
+window.addEventListener("eraview:close", () => {
+  document.body.classList.remove("immersive");
+  audio.duck(false);
+});
 
 animate();
 

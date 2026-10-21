@@ -567,7 +567,7 @@ export function createUI(callbacks = {}) {
   function setCounters({ discovered, total, fossils, scoops }) {
     if (discovered != null) {
       $("statDiscovered").textContent = discovered;
-      $("statTotal").textContent = total;
+      if (total != null) $("statTotal").textContent = total;
     }
     if (fossils != null) $("statFossils").textContent = fossils;
     if (scoops != null) $("statScoops").textContent = scoops;

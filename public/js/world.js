@@ -358,7 +358,7 @@ export const PLACEMENTS = [
 export const SPAWN = { x: 0, z: g2z(21.5), ry: Math.PI };
 
 /** Ice Cream Court furniture: x 48..90, z 48..84; visitors enter at the north-east corner. */
-const COURT = { stallX: 66, stallZ: 76, exitX: 48.2, exitZ: 79 };
+export const COURT = { stallX: 66, stallZ: 76, exitX: 48.2, exitZ: 79 };
 
 /** The cinema screen hangs on the north wall of the theatre. */
 export const SCREEN = { x: 0, y: 6.4, z: g2z(1) - CELL / 2 + 0.9, w: 22, h: 11 };

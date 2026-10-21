@@ -286,7 +286,7 @@ export const SPECIES = {
     thigh: 0.95, shin: 0.9, foot: 0.6, legs: 0.7, r: [1.05, 1.1, 0.5, 0.22],
     color: 0x7d7a55, belly: 0xb5b087, accent: 0x4c4a2e,
     features: { plates: true, spikes: true },
-    hall: "jurassic",
+    hall: "cretaceous",
     info: {
       era: "Early Cretaceous", period: "c. 130–112 million years ago",
       habitat: "Tugulu Group, Xinjiang, China",
@@ -595,7 +595,7 @@ export const SPECIES = {
     thigh: 1.05, shin: 1.0, foot: 0.7, legs: 0.9, r: [1.3, 1.35, 0.58, 0.26],
     color: 0x8a8071, belly: 0xbdb2a0, accent: 0x554e43,
     features: { club: true, clubSpikes: true, armor: true },
-    hall: "cretaceous",
+    hall: "rotunda",
     info: {
       era: "Pleistocene (Ice Age)", period: "c. 0.8 million – 11,000 years ago",
       habitat: "Pampas of Argentina & Uruguay",
@@ -1085,7 +1085,7 @@ export const SPECIES = {
     thigh: 1.05, shin: 1.0, foot: 0.7, legs: 0.85, r: [1.2, 1.25, 0.55, 0.25],
     color: 0x7a5a4a, belly: 0xa78c74, accent: 0x4a3428, headType: "theropod",
     features: { sail: true, teeth: true },
-    hall: "cretaceous",
+    hall: "rotunda",
     info: {
       era: "Early Permian", period: "c. 295–272 million years ago",
       habitat: "Texas & Oklahoma, USA",
