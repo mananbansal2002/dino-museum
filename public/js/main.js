@@ -22,7 +22,6 @@ const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
   powerPreference: "high-performance",
-  preserveDrawingBuffer: true,
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -37,7 +36,7 @@ scene.background = new THREE.Color(0x0b1016);
 scene.fog = new THREE.Fog(0x0b1016, 120, 320);
 
 const camera = new THREE.PerspectiveCamera(
-  70,
+  55,
   window.innerWidth / window.innerHeight,
   0.1,
   420
@@ -258,6 +257,8 @@ async function startGame(opts) {
       color: S.color,
     });
     upgradeCharacter(S.player.character);
+    // your own name tag would just float in the middle of the view
+    S.player.character.tag.visible = false;
     S.player.state.x = world.spawn.x;
     S.player.state.z = world.spawn.z;
     S.player.state.ry = world.spawn.ry;
@@ -529,6 +530,8 @@ function takePhoto() {
   audio.click(880);
   setTimeout(() => {
     try {
+      // no preserveDrawingBuffer: draw a frame and read it back in the same task
+      renderFrame();
       const url = renderer.domElement.toDataURL("image/jpeg", 0.75);
       const others = remote.list.filter(
         (r) => Math.hypot(r.x - S.player.state.x, r.z - S.player.state.z) < 14
@@ -702,7 +705,9 @@ function animate() {
       ui.setPrompt(null);
     }
 
-    ui.setHall(roomNameAt(S.player.state.x, S.player.state.z));
+    const hallName = roomNameAt(S.player.state.x, S.player.state.z);
+    ui.setHall(hallName);
+    audio.setZone(hallName);
 
     // network state
     const now = performance.now();
@@ -748,6 +753,10 @@ function animate() {
     }
   }
 
+  renderFrame();
+}
+
+function renderFrame() {
   renderer.render(scene, camera);
 }
 
