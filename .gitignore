@@ -7,3 +7,4 @@ npm-cache/
 .env.*
 .claude/
 public/models/staging/
+prof-*/

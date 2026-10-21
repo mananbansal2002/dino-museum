@@ -29,8 +29,15 @@ function warn(msg) {
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
     if (["node_modules", ".git", ".vercel", ".claude"].includes(entry)) continue;
+    // headless Chrome profiles from test runs are not project code
+    if (entry.startsWith("prof-")) continue;
     const full = join(dir, entry);
-    const st = statSync(full);
+    let st;
+    try {
+      st = statSync(full);
+    } catch {
+      continue; // dangling symlink or a file deleted mid-walk
+    }
     if (st.isDirectory()) walk(full, out);
     else if (extname(full) === ".js" || extname(full) === ".mjs") out.push(full);
   }
