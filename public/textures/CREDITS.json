@@ -1,0 +1,15 @@
+{
+  "license": "CC0 1.0 Universal (public domain) — https://polyhaven.com/license",
+  "source": "Poly Haven (https://polyhaven.com), 1k JPG maps (diffuse, normal GL, roughness), resized/recompressed with sips",
+  "textures": {
+    "stone_floor": { "polyhaven": "marble_01", "url": "https://polyhaven.com/a/marble_01", "authors": ["Rob Tuytel"], "sizeMeters": 1.5 },
+    "terrazzo": { "polyhaven": "terrazzo_tiles", "url": "https://polyhaven.com/a/terrazzo_tiles", "authors": ["Amal Kumar"], "sizeMeters": 2.0 },
+    "parquet": { "polyhaven": "herringbone_parquet", "url": "https://polyhaven.com/a/herringbone_parquet", "authors": ["Jenelle van Heerden", "Sergej Majboroda"], "sizeMeters": 3.4 },
+    "plaster": { "polyhaven": "plastered_wall_04", "url": "https://polyhaven.com/a/plastered_wall_04", "authors": ["Rob Tuytel"], "sizeMeters": 3.2 },
+    "wood": { "polyhaven": "dark_wood", "url": "https://polyhaven.com/a/dark_wood", "authors": ["Dario Barresi", "Dimitrios Savva", "Rico Cilliers"], "sizeMeters": 2.0 },
+    "plinth": { "polyhaven": "brushed_concrete", "url": "https://polyhaven.com/a/brushed_concrete", "authors": ["Dario Barresi", "Dimitrios Savva"], "sizeMeters": 2.5 }
+  },
+  "environment": {
+    "env/hall_of_mammals_512.hdr": { "polyhaven": "hall_of_mammals", "url": "https://polyhaven.com/a/hall_of_mammals", "authors": ["Oliksiy Yakovlyev"], "note": "1k HDRI box-downsampled to 512x256 flat RGBE" }
+  }
+}
