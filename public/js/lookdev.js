@@ -616,6 +616,102 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     if (parent.children.length) scene.add(parent);
   }
 
+  /* ---------------- authored light effects ---------------- */
+  // world.js fakes exhibit spotlights with additive open cones. They are
+  // restyled here (not by tag): half the strength, fading out within the top
+  // 60% of the beam, and only one cone per spot.
+  const beamTex = (() => {
+    const c = document.createElement("canvas");
+    c.width = 4;
+    c.height = 128;
+    const ctx = c.getContext("2d");
+    const g = ctx.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.3, "rgba(255,255,255,0.35)");
+    g.addColorStop(0.6, "rgba(255,255,255,0)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 128);
+    return new THREE.CanvasTexture(c);
+  })();
+  const tamedMats = new WeakSet();
+  const beamSpots = [];
+  function tameBeam(mesh) {
+    const g = mesh.geometry;
+    const m = mesh.material;
+    if (!g || g.type !== "CylinderGeometry" || !(g.parameters && g.parameters.openEnded)) return;
+    if (!m || !m.isMeshBasicMaterial || m.blending !== THREE.AdditiveBlending) return;
+    if (!tamedMats.has(m)) {
+      tamedMats.add(m);
+      m.opacity *= 0.5;
+      m.map = beamTex;
+      m.needsUpdate = true;
+    }
+    mesh.getWorldPosition(tmpV);
+    if (beamSpots.some((p) => Math.hypot(p.x - tmpV.x, p.z - tmpV.z) < 2.2)) {
+      mesh.visible = false;
+      stats.beamsHidden = (stats.beamsHidden || 0) + 1;
+    } else beamSpots.push({ x: tmpV.x, z: tmpV.z });
+  }
+
+  // festoon lights (an instanced string of small emissive spheres): warm
+  // filament bulbs hung on a thin dark wire instead of loose coloured dots
+  function stringLights(mesh) {
+    if (!mesh.isInstancedMesh || mesh.userData.lkDone || mesh.count < 8) return;
+    const g = mesh.geometry;
+    if (!g || g.type !== "SphereGeometry" || (g.parameters && g.parameters.radius > 0.3)) return;
+    if (!mesh.material || !mesh.material.isMeshBasicMaterial) return;
+    const m4 = new THREE.Matrix4();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    const c = new THREE.Color();
+    const warm = [0xffd9a0, 0xffe6bf, 0xffcf8a];
+    const runs = [];
+    let run = [];
+    let prev = null;
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, m4);
+      m4.premultiply(mesh.matrixWorld);
+      m4.decompose(p, q, sc);
+      if (prev && prev.distanceTo(p) > 4.5) {
+        runs.push(run);
+        run = [];
+      }
+      run.push(p.clone());
+      prev = p.clone();
+      // smaller, warm bulbs
+      mesh.getMatrixAt(i, m4);
+      m4.decompose(p, q, sc);
+      sc.multiplyScalar(0.6);
+      m4.compose(p, q, sc);
+      mesh.setMatrixAt(i, m4);
+      if (mesh.instanceColor) mesh.setColorAt(i, c.set(warm[i % warm.length]));
+    }
+    if (run.length) runs.push(run);
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    const tubes = [];
+    for (const r of runs) {
+      if (r.length < 2) continue;
+      // the wire sags slightly between bulbs and the bulbs hang just below it
+      const pts = [];
+      for (let i = 0; i < r.length; i++) {
+        pts.push(r[i].clone().add(new THREE.Vector3(0, 0.12, 0)));
+        if (i < r.length - 1) pts.push(r[i].clone().lerp(r[i + 1], 0.5).add(new THREE.Vector3(0, 0.02, 0)));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts);
+      tubes.push(new THREE.TubeGeometry(curve, pts.length * 4, 0.012, 4, false));
+    }
+    if (tubes.length) {
+      const wire = new THREE.Mesh(mergeGeometries(tubes, false), lib.blackMetal);
+      wire.userData.lkDone = true;
+      fx.add(wire);
+      tubes.forEach((t) => t.dispose());
+    }
+    stats.stringLights = (stats.stringLights || 0) + mesh.count;
+  }
+
   /* ---------------- scene scan ---------------- */
   function scan(root = scene) {
     root.updateMatrixWorld(true);
@@ -623,7 +719,11 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     root.traverse((o) => {
       if ((o.isMesh || o.isInstancedMesh) && !o.userData.lkDone) meshes.push(o);
     });
-    for (const m of meshes) upgradeMesh(m);
+    for (const m of meshes) {
+      tameBeam(m);
+      stringLights(m);
+      upgradeMesh(m);
+    }
     // every remaining standard material gets a sensible env response
     root.traverse((o) => {
       if (!o.isMesh || !o.material) return;
@@ -686,7 +786,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    uniforms: { uStrength: { value: 0.22 } },
+    uniforms: { uStrength: { value: 0.1 } },
     vertexShader: `
       uniform float uStrength; varying float vA;
       void main() {
@@ -846,9 +946,15 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
       }
       if (room.id === "theater" || isPassage(room)) continue;
       if (room.id === "rotunda" || room.id === "lobby") {
-        const sp = 4;
-        const depth = 0.7;
+        // slimmer ribs with a fillet under each one read as moulded plaster
+        // coffers rather than joists; the lower atrium gets a finer grid
+        const grand = room.id === "rotunda";
+        const sp = grand ? 4 : 3;
+        const depth = grand ? 0.5 : 0.3;
+        const rib = grand ? 0.32 : 0.22;
         const y = h - depth / 2;
+        const fy = h - depth - 0.025;
+        const fw = rib + 0.14;
         const holeR = room.id === "rotunda" ? 7.2 : 0;
         const lantern = room.id === "lobby" ? { hx: Math.min(20, W * 0.3), hz: Math.min(5, D * 0.22) } : null;
         const skip = (x, z) =>
@@ -857,13 +963,19 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
         for (let x = b.x0 + sp; x < b.x1 - 0.5; x += sp) {
           for (let z = b.z0; z < b.z1 - 0.01; z += sp) {
             const zc = z + sp / 2;
-            if (!skip(x, zc)) mould.add(x, y, zc, 0.45, depth, sp + 0.45);
+            if (!skip(x, zc)) {
+              mould.add(x, y, zc, rib, depth, sp + rib);
+              mould.add(x, fy, zc, fw, 0.05, sp + fw);
+            }
           }
         }
         for (let z = b.z0 + sp; z < b.z1 - 0.5; z += sp) {
           for (let x = b.x0; x < b.x1 - 0.01; x += sp) {
             const xc = x + sp / 2;
-            if (!skip(xc, z)) mould.add(xc, y, z, sp + 0.45, depth, 0.45);
+            if (!skip(xc, z)) {
+              mould.add(xc, y, z, sp + rib, depth, rib);
+              mould.add(xc, fy, z, sp + fw, 0.05, fw);
+            }
           }
         }
         if (holeR) {
