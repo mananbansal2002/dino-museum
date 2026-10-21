@@ -1414,8 +1414,8 @@ export function buildWorld(scene) {
   }
   // aisle step lights along the centre aisle and both block edges
   const stepLights = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.5, 0.06, 0.18),
-    new THREE.MeshBasicMaterial({ color: 0x59d4e6, toneMapped: false }),
+    new THREE.BoxGeometry(0.3, 0.025, 0.06),
+    new THREE.MeshBasicMaterial({ color: 0x8a5a1c }),
     7 * 4
   );
   let sl = 0;
