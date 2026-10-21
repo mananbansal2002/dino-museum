@@ -600,6 +600,11 @@ button.ghost:active {
   flex-wrap: wrap;
 }
 
+.exActions {
+  display: flex;
+  gap: 8px;
+}
+
 .exTitle {
   font-size: 30px;
   font-weight: 800;

@@ -166,7 +166,11 @@ function connect(payload) {
         ui.chat({ name: c.name, text: c.text });
       },
       action: (a) => {
-        if (a.type === "battle") {
+        if (a.id === S.myId) return;
+        if (a.type === "wave") {
+          remote.action(a.id, "wave", 1.2);
+          bubble(remote.players.get(a.id), "👋", remote.players.get(a.id)?.color);
+        } else if (a.type === "battle") {
           const id = a.payload?.id;
           if (!(cinema.playing && S.currentBattleId === id)) startBattle(id);
         } else if (a.type === "iceCream") {
@@ -199,9 +203,15 @@ function connect(payload) {
 /* game flow                                                           */
 /* ------------------------------------------------------------------ */
 async function startGame(opts) {
-  ui.showStatus("Connecting to the museum…");
+  if (S.joined || S.joining) return;
+  S.joining = true;
+  ui.showStatus(opts.solo ? "Opening the doors…" : "Connecting to the museum…");
   try {
-    const res = await connect(opts);
+    // Solo visits never touch the network, so they work without a server.
+    const res = opts.solo
+      ? { id: "solo", room: "SOLO", players: [], color: S.color }
+      : await connect(opts);
+    S.solo = !!opts.solo;
     S.joined = true;
     S.myId = res.id;
     S.room = res.room;
@@ -235,11 +245,25 @@ async function startGame(opts) {
     audio.ambient(true);
     const lock = document.body.requestPointerLock?.();
     if (lock && typeof lock.catch === "function") lock.catch(() => {});
-    history.replaceState(null, "", `?room=${res.room}`);
+    if (!S.solo) history.replaceState(null, "", `?room=${res.room}`);
   } catch (err) {
     console.error("Could not join the museum:", err);
-    ui.showStatus(`Could not join: ${err.message}. Is the server running?`);
+    ui.showStatus(
+      `Could not join: ${err.message}. Check your connection, or choose "Explore alone".`
+    );
     S.net?.close();
+    S.net = null;
+  } finally {
+    S.joining = false;
+  }
+}
+
+// invite links look like /?room=ABCD
+{
+  const invited = new URLSearchParams(location.search).get("room");
+  const input = document.getElementById("roomInput");
+  if (invited && input && !input.value) {
+    input.value = invited.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   }
 }
 
@@ -298,8 +322,9 @@ function interact(it) {
       const fact = FACTS[Math.floor(Math.random() * FACTS.length)];
       ui.modal(`
         <h2>🎟️ Museum Guide</h2>
-        <p class="quote">Welcome to the Dinosaur Museum! There are ${S.visited.size} skeletons to
-        discover, a screening theatre, a dig site and an ice cream court through the exit passage.
+        <p class="quote">Welcome to the Dinosaur Museum! You have found ${S.visited.size} of
+        ${EXHIBITS.length} skeletons so far. There is also a screening theatre with comfy seats, a dig site — and a little surprise
+        waiting at the very end of the tour.
         <span class="who">— Guide</span></p>
         <p class="lead" style="margin-top:16px">Did you know?</p>
         <p class="quote">${fact}</p>
@@ -333,23 +358,7 @@ function interact(it) {
       break;
     }
     case "puzzle": {
-      ui.modal(`
-        <h2>🦴 Bone Assembly</h2>
-        <p class="lead">Rearrange the bones into a skeleton. Click the bones in order — from
-        the tail to the skull — to rebuild the Coelophysis.</p>
-        <div class="row actions">
-          <button class="primary" id="puzzleSolve">Show me the answer</button>
-          <button class="ghost" id="puzzleClose">Close</button>
-        </div>
-      `);
-      document.getElementById("puzzleClose").onclick = () => ui.closeModal();
-      document.getElementById("puzzleSolve").onclick = () => {
-        ui.closeModal();
-        S.score += 25;
-        ui.toast("Skeleton assembled! +25 points 🏆", "good");
-        audio.chime(660);
-        fx.burst("sparkle", -78, 2, 34, 30);
-      };
+      openPuzzle();
       break;
     }
     case "icecream": {
@@ -366,6 +375,53 @@ function interact(it) {
     }
     default:
       break;
+  }
+}
+
+const PUZZLE_BONES = ["Tail", "Hips", "Back", "Ribs", "Neck", "Skull"];
+
+function openPuzzle() {
+  const order = [...PUZZLE_BONES].sort(() => Math.random() - 0.5);
+  let next = 0;
+  ui.modal(`
+    <h2>🦴 Bone Assembly</h2>
+    <p class="lead">Rebuild the Coelophysis! Click the bones in order — from the tail to
+    the skull.</p>
+    <div class="row puzzleBones" id="puzzleBones">
+      ${order.map((b) => `<button class="chip" data-bone="${b}">${b}</button>`).join("")}
+    </div>
+    <p class="quote" id="puzzleProgress">Placed: —</p>
+    <div class="row actions"><button class="ghost" id="puzzleClose">Close</button></div>
+  `);
+  document.getElementById("puzzleClose").onclick = () => ui.closeModal();
+  const progress = document.getElementById("puzzleProgress");
+  for (const btn of document.querySelectorAll("#puzzleBones button")) {
+    btn.onclick = () => {
+      if (btn.dataset.bone === PUZZLE_BONES[next]) {
+        next++;
+        btn.disabled = true;
+        btn.classList.add("active");
+        progress.textContent = `Placed: ${PUZZLE_BONES.slice(0, next).join(" → ")}`;
+        audio.click(440 + next * 60);
+        if (next === PUZZLE_BONES.length) {
+          ui.closeModal();
+          S.score += 25;
+          S.net?.emit("action", { type: "score", payload: 25 });
+          ui.toast("Skeleton assembled! +25 points 🏆", "good");
+          audio.chime(660);
+          const p = S.player.state;
+          fx.burst("sparkle", p.x, 2, p.z, 30);
+        }
+      } else {
+        next = 0;
+        for (const b of document.querySelectorAll("#puzzleBones button")) {
+          b.disabled = false;
+          b.classList.remove("active");
+        }
+        progress.textContent = `Not quite — a ${btn.dataset.bone.toLowerCase()} doesn't go there. Start again from the tail.`;
+        audio.click(180);
+      }
+    };
   }
 }
 
@@ -514,6 +570,11 @@ window.addEventListener("keydown", (e) => {
     case "KeyV":
       roar();
       break;
+    case "KeyB":
+      S.player.playAction("wave", 1.2);
+      bubble(S.player, "👋", S.color);
+      S.net?.emit("action", { type: "wave", payload: {} });
+      break;
     case "KeyF": {
       const it = nearestInteractable();
       if (it?.type === "dig") {
@@ -546,6 +607,10 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+function anyPanelOpen() {
+  return ui.isModalOpen() || ui.isCardOpen() || ui.isIceOpen();
+}
+
 canvas.addEventListener("click", () => {
   if (!S.joined) return;
   if (ui.isModalOpen() || ui.isCardOpen() || ui.isIceOpen()) return;
@@ -570,6 +635,7 @@ function animate() {
   const dt = Math.min(0.05, clock.getDelta());
 
   if (S.joined && S.player) {
+    S.player.setInputEnabled?.(!(ui.isChatOpen() || anyPanelOpen()));
     S.player.update(dt);
     remote.update(dt);
     S.digCooldown = Math.max(0, S.digCooldown - dt);

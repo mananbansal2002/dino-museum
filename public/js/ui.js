@@ -27,7 +27,14 @@ export const TOPPINGS = [
   { id: "cherry", name: "Cherry", color: 0xd7263d },
 ];
 
+const TOPPING_ICONS = { sprinkles: "🌈", chocolate: "🍫", cherry: "🍒" };
+
 const $ = (id) => document.getElementById(id);
+
+/** Panels need a visible cursor, so drop pointer lock when one opens. */
+function releaseMouse() {
+  if (document.pointerLockElement) document.exitPointerLock?.();
+}
 
 /* ------------------------------------------------------------------ */
 /* little 2D paper-doll preview for the character customiser          */
@@ -372,7 +379,10 @@ export function createUI(callbacks = {}) {
           <div class="exEra">${escapeHtml(ex.era || "")}</div>
           <h2 class="exTitle">${escapeHtml(ex.title)}</h2>
         </div>
-        <button class="chip" id="closeExhibit">close ✕</button>
+        <div class="exActions">
+          <button class="chip" id="exhibitVideos">▶ videos</button>
+          <button class="chip" id="closeExhibit">close ✕</button>
+        </div>
       </div>
       <p class="lead">${escapeHtml(ex.blurb || "")}</p>
       <div class="exGrid">
@@ -393,6 +403,8 @@ export function createUI(callbacks = {}) {
       }
     `;
     $("closeExhibit").onclick = hideExhibit;
+    $("exhibitVideos").onclick = () => callbacks.onExhibitVideos?.(ex);
+    releaseMouse();
     $("exhibitCard").classList.remove("hidden");
   }
   function hideExhibit() {
@@ -452,21 +464,30 @@ export function createUI(callbacks = {}) {
       };
       styleSeg.appendChild(b);
     }
-    const top = document.createElement("button");
-    top.textContent = "🍫 toppings";
-    top.onclick = () => {
-      const cur = ice.toppings;
-      const next = cur.includes("sprinkles")
-        ? cur.filter((t) => t !== "sprinkles")
-        : [...cur, "sprinkles"];
-      ice.toppings = next;
-      toast(next.length ? "Added sprinkles 🍓" : "Removed sprinkles");
-    };
-    styleSeg.appendChild(top);
+
+    const topSeg = $("toppingSeg");
+    if (topSeg) {
+      topSeg.innerHTML = "";
+      for (const t of TOPPINGS) {
+        const on = ice.toppings.includes(t.id);
+        const b = document.createElement("button");
+        b.textContent = `${TOPPING_ICONS[t.id] || ""} ${t.name}`;
+        b.className = on ? "active" : "";
+        b.setAttribute("aria-pressed", String(on));
+        b.onclick = () => {
+          ice.toppings = on
+            ? ice.toppings.filter((x) => x !== t.id)
+            : [...ice.toppings, t.id];
+          renderIce();
+        };
+        topSeg.appendChild(b);
+      }
+    }
   }
   renderIce();
 
   function openIce() {
+    releaseMouse();
     $("iceCream").classList.remove("hidden");
   }
   function closeIce() {
@@ -502,6 +523,7 @@ export function createUI(callbacks = {}) {
   // ---------------- modal ----------------
   function modal(html) {
     $("modalBody").innerHTML = html;
+    releaseMouse();
     $("modal").classList.remove("hidden");
   }
   function closeModal() {
@@ -587,13 +609,48 @@ export function makeIceCream(order) {
     g.add(cup);
   }
 
-  if (order.toppings?.includes("sprinkles")) {
-    const spr = new THREE.Mesh(
-      new THREE.SphereGeometry(0.02, 6, 5),
-      new THREE.MeshStandardMaterial({ color: 0xff6b9d, roughness: 0.6 })
+  const topY = 0.34 + (order.scoops - 1) * 0.2;
+  const toppings = order.toppings || [];
+  if (toppings.includes("chocolate")) {
+    const sauce = new THREE.Mesh(
+      new THREE.SphereGeometry(0.136, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.38),
+      new THREE.MeshStandardMaterial({ color: 0x4a2c17, roughness: 0.35 })
     );
-    spr.position.set(0.05, 0.44 + (order.scoops - 1) * 0.2, 0.04);
-    g.add(spr);
+    sauce.position.y = topY;
+    g.add(sauce);
+  }
+  if (toppings.includes("sprinkles")) {
+    const colors = [0xff6b9d, 0xffd166, 0x7de2fc, 0xa0e77d, 0xffffff];
+    const geo = new THREE.CylinderGeometry(0.008, 0.008, 0.04, 5);
+    const mats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 }));
+    for (let i = 0; i < 18; i++) {
+      // golden-angle spiral over the cap of the top scoop
+      const a = i * 2.39996;
+      const r = 0.02 + (i % 6) * 0.016;
+      const spr = new THREE.Mesh(geo, mats[i % mats.length]);
+      spr.position.set(
+        Math.cos(a) * r,
+        topY + Math.sqrt(Math.max(0, 0.0169 - r * r)) + 0.004,
+        Math.sin(a) * r
+      );
+      spr.rotation.set(a, a * 0.7, 0);
+      g.add(spr);
+    }
+  }
+  if (toppings.includes("cherry")) {
+    const cherry = new THREE.Mesh(
+      new THREE.SphereGeometry(0.04, 12, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd7263d, roughness: 0.25 })
+    );
+    cherry.position.y = topY + 0.16;
+    g.add(cherry);
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.004, 0.004, 0.07, 4),
+      new THREE.MeshStandardMaterial({ color: 0x3d5a1e })
+    );
+    stem.position.set(0.01, topY + 0.22, 0);
+    stem.rotation.z = -0.3;
+    g.add(stem);
   }
 
   g.rotation.x = -0.35;
