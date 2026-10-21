@@ -535,10 +535,15 @@ button.ghost:active {
 }
 
 /* ---------------- look customiser ---------------- */
+#join .card {
+  width: min(720px, 100%);
+}
+
 .look {
   display: flex;
-  gap: 20px;
+  gap: 18px;
   margin-bottom: 16px;
+  align-items: flex-start;
 }
 
 .lookPreview {
@@ -546,26 +551,46 @@ button.ghost:active {
   flex-direction: column;
   gap: 8px;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 #lookPreview {
-  background: linear-gradient(180deg, #1b2733, #121a22);
+  width: 200px;
+  height: 280px;
+  background: radial-gradient(circle at 50% 35%, #233444, #121a22 75%);
   border: 1px solid var(--line);
   border-radius: 14px;
 }
 
 .lookControls {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.lookRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 16px;
-  align-content: start;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.lookLabel {
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .swatches {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .sw {
@@ -574,6 +599,18 @@ button.ghost:active {
   border-radius: 9px;
   border: 2px solid rgba(255, 255, 255, 0.18);
   padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.sw:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.sw:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .sw.active {
@@ -584,11 +621,49 @@ button.ghost:active {
 .sw.txt {
   width: auto;
   min-width: 34px;
+  height: 26px;
   padding: 0 9px;
   font-size: 11.5px;
   color: var(--text);
   background: rgba(255, 255, 255, 0.08);
   border-radius: 8px;
+  white-space: nowrap;
+}
+
+.sw.txt.active {
+  background: rgba(255, 200, 87, 0.18);
+  color: #fff3d6;
+}
+
+.bodySeg {
+  flex-wrap: nowrap;
+}
+
+.sw.body {
+  width: auto;
+  flex: 1 1 0;
+  max-width: 150px;
+  height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+}
+
+.sw.body .ico {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.sw.body.active {
+  background: linear-gradient(180deg, rgba(255, 209, 102, 0.28), rgba(245, 165, 36, 0.18));
+  color: #fff3d6;
 }
 
 /* ---------------- exhibit card ---------------- */
@@ -598,6 +673,11 @@ button.ghost:active {
   align-items: flex-start;
   gap: 18px;
   flex-wrap: wrap;
+}
+
+.exActions {
+  display: flex;
+  gap: 8px;
 }
 
 .exTitle {
@@ -857,5 +937,43 @@ button.ghost:active {
   }
   .look {
     flex-direction: column;
+    align-items: stretch;
   }
+  .lookPreview {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+.exHero {
+  margin: 14px 0 4px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #1b1a17;
+  position: relative;
+}
+.exHero img {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: cover;
+}
+.exHero figcaption {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.exHero figcaption:empty {
+  display: none;
+}
+
+/* full-screen viewers (era window) hide the game HUD */
+body.immersive #hud {
+  display: none;
 }

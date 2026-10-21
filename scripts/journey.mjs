@@ -191,35 +191,124 @@ try {
   const start = await evaluate("JSON.stringify(window.__museum.player.state)");
   log(`spawned at ${start}`);
 
-  /* walk forward — software rendering is slow, so hold the key for a while */
-  await send("Input.dispatchKeyEvent", {
-    type: "keyDown",
-    code: "KeyW",
-    key: "w",
-    text: "w",
-    windowsVirtualKeyCode: 87,
-  });
-  let speed = 0;
-  for (let i = 0; i < 20; i++) {
-    await sleep(300);
-    speed = await evaluate("window.__museum.player.state.speed");
-    if (speed > 1) break;
-  }
-  await send("Input.dispatchKeyEvent", {
-    type: "keyUp",
-    code: "KeyW",
-    key: "w",
-    windowsVirtualKeyCode: 87,
-  });
-  await sleep(400);
-  const after = await evaluate("JSON.stringify(window.__museum.player.state)");
+  /* ---------------- movement ---------------- */
+  /* Software rendering runs at ~3-10 fps, so everything here is time based. */
+  const keyDown = (code, keyName, vk) =>
+    send("Input.dispatchKeyEvent", { type: "keyDown", code, key: keyName, text: keyName.length === 1 ? keyName : "", windowsVirtualKeyCode: vk });
+  const keyUp = (code, keyName, vk) =>
+    send("Input.dispatchKeyEvent", { type: "keyUp", code, key: keyName, windowsVirtualKeyCode: vk });
+  const pstate = async () => JSON.parse(await evaluate("JSON.stringify(window.__museum.player.state)"));
+  const waitFrames = (n) =>
+    evaluate(`new Promise((resolve) => {
+      const r = window.__museum.renderer;
+      const want = r.info.render.frame + ${n};
+      const t0 = performance.now();
+      (function tick() {
+        if (r.info.render.frame >= want || performance.now() - t0 > 8000) resolve(true);
+        else setTimeout(tick, 30);
+      })();
+    })`);
+  /** Is the camera inside a hall and at least `margin` away from any wall cell? */
+  const cameraClear = (margin = 0.1) =>
+    evaluate(`import('/js/world.js').then((w) => {
+      const c = window.__museum.camera.position;
+      const [x, z] = w.resolveCollision(c.x, c.z, ${margin});
+      return JSON.stringify({
+        x: c.x, y: c.y, z: c.z,
+        inRoom: !!w.roomAt(c.x, c.z),
+        clear: Math.abs(x - c.x) < 1e-4 && Math.abs(z - c.z) < 1e-4,
+      });
+    })`).then((s) => JSON.parse(s));
+  /** Teleport the player (and point both body + camera along `yaw`). */
+  const teleport = (x, z, yaw) =>
+    evaluate(`(() => {
+      const p = window.__museum.player;
+      p.stand?.();
+      Object.assign(p.state, { x: ${x}, z: ${z}, y: 0, vx: 0, vz: 0, vy: 0, ry: ${yaw}, camYaw: ${yaw}, pitch: -0.12 });
+      return true;
+    })()`);
+
+  // 1. hold W for ~2 s: the visitor must cover real distance
   const a = JSON.parse(start);
-  const b = JSON.parse(after);
+  await keyDown("KeyW", "w", 87);
+  let speed = 0;
+  const holdStart = Date.now();
+  while (Date.now() - holdStart < 2000) {
+    await sleep(250);
+    speed = Math.max(speed, await evaluate("window.__museum.player.state.speed"));
+  }
+  await keyUp("KeyW", "w", 87);
+  await sleep(500);
+  const b = await pstate();
   const moved = Math.hypot(b.x - a.x, b.z - a.z);
-  if (!(speed > 1)) fail(`the visitor never picked up speed (${speed})`);
-  else log(`the visitor walks (speed ${speed.toFixed(1)} m/s)`);
-  if (moved < 0.2) fail(`the visitor did not move (${moved.toFixed(2)} m)`);
-  else log(`the visitor walked ${moved.toFixed(1)} m`);
+  if (!(speed > 3)) fail(`the visitor never picked up walking speed (${speed.toFixed(2)} m/s)`);
+  else log(`the visitor walks (top speed ${speed.toFixed(1)} m/s)`);
+  if (!(moved > 2)) fail(`holding W for 2 s only moved ${moved.toFixed(2)} m`);
+  else log(`holding W for 2 s walked ${moved.toFixed(1)} m`);
+  // W is "away from the camera": spawn camera looks along ry=PI (-z)
+  if (!(b.z < a.z - 1)) fail(`W did not move away from the camera (z ${a.z.toFixed(1)} -> ${b.z.toFixed(1)})`);
+  await waitFrames(2);
+  const cam1 = await cameraClear();
+  if (!cam1.inRoom || !cam1.clear) fail(`the camera is inside a wall after walking (${JSON.stringify(cam1)})`);
+  else log("the camera stays inside the hall while following");
+
+  // 2. sprint straight into the lobby's west wall (x = -42): no tunnelling
+  await teleport(-37, 42, -Math.PI / 2);
+  await waitFrames(2);
+  await keyDown("ShiftLeft", "Shift", 16);
+  await keyDown("KeyW", "w", 87);
+  await sleep(1800);
+  await keyUp("KeyW", "w", 87);
+  await keyUp("ShiftLeft", "Shift", 16);
+  await sleep(300);
+  const w = await pstate();
+  const inHall = await evaluate(`!!window.__museum.roomAt(${w.x}, ${w.z})`);
+  if (!(w.x > -42) || !inHall) fail(`sprinting into a wall tunnelled through it (x ${w.x.toFixed(2)})`);
+  else if (!(w.x < -40.5)) fail(`the sprint never reached the wall (x ${w.x.toFixed(2)})`);
+  else log(`sprinting into a wall stops at it (x ${w.x.toFixed(2)})`);
+
+  // 3. back to the wall, camera behind the player would be inside it
+  await teleport(-40.6, 42, Math.PI / 2);
+  await evaluate("window.__museum.player.state.camDist = 9, true");
+  await waitFrames(3);
+  const cam2 = await cameraClear();
+  if (!cam2.inRoom || !cam2.clear) fail(`the camera clipped into the wall behind the player (${JSON.stringify(cam2)})`);
+  else log(`the camera is pulled in front of the wall (x ${cam2.x.toFixed(2)})`);
+  await evaluate("window.__museum.player.state.camDist = 4.6, true");
+
+  // 4. input gating: no movement while disabled
+  if (await evaluate("typeof window.__museum.player.setInputEnabled === 'function'")) {
+    await teleport(0, 42, Math.PI);
+    await waitFrames(2);
+    const g0 = await pstate();
+    await evaluate("window.__museum.player.setInputEnabled(false), true");
+    await keyDown("KeyW", "w", 87);
+    await sleep(1000);
+    await keyUp("KeyW", "w", 87);
+    const g1 = await pstate();
+    await evaluate("window.__museum.player.setInputEnabled(true), true");
+    const gm = Math.hypot(g1.x - g0.x, g1.z - g0.z);
+    if (gm > 0.05) fail(`the visitor moved ${gm.toFixed(2)} m with input disabled`);
+    else log("no movement while input is disabled");
+  } else fail("player.setInputEnabled is missing");
+
+  // 5. sitting: anim "sit" while seated, a movement key stands back up
+  if (await evaluate("typeof window.__museum.player.sit === 'function'")) {
+    await evaluate("window.__museum.player.sit({ x: 0, z: 40, ry: Math.PI, y: 0.45 }), true");
+    await waitFrames(2);
+    const s1 = await pstate();
+    const seated = await evaluate("window.__museum.player.isSitting");
+    if (s1.anim !== "sit" || !seated || Math.abs(s1.y - 0.45) > 1e-3) {
+      fail(`sit() did not seat the visitor (${JSON.stringify({ anim: s1.anim, seated, y: s1.y })})`);
+    } else log("sit() seats the visitor");
+    await keyDown("KeyW", "w", 87);
+    await sleep(150);
+    await keyUp("KeyW", "w", 87);
+    await waitFrames(2);
+    const s2 = await pstate();
+    if (s2.sitting || s2.anim === "sit" || s2.y > 0.01) fail(`a movement key did not stand the visitor up (${s2.anim})`);
+    else log("a movement key stands the visitor back up");
+  } else fail("player.sit is missing");
 
   /* the room has to still be around us */
   const inRoom = await evaluate(

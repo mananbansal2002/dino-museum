@@ -5,3 +5,5 @@ npm-cache/
 *.log
 .env
 .env.*
+.claude/
+public/models/staging/

@@ -1,0 +1,51 @@
+{
+  "description": "Cube-map skyboxes (px,nx,py,ny,pz,nz; 1024x1024 JPEG, three.js CubeTextureLoader order) built from equirectangular panoramas published by Poly Haven. Faces are oriented so a CubeTexture scene.background renders identically to the source equirect with EquirectangularReflectionMapping.",
+  "license": "CC0 1.0 Universal (public domain) - https://polyhaven.com/license",
+  "eras": {
+    "triassic": {
+      "assetId": "rogland_sunset",
+      "name": "Rogland Sunset",
+      "authors": { "Greg Zaal": "All" },
+      "page": "https://polyhaven.com/a/rogland_sunset",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/rogland_sunset.jpg",
+      "license": "CC0",
+      "edits": "none"
+    },
+    "jurassic": {
+      "assetId": "mossy_forest",
+      "name": "Mossy Forest",
+      "authors": { "Greg Zaal": "All" },
+      "page": "https://polyhaven.com/a/mossy_forest",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/mossy_forest.jpg",
+      "license": "CC0",
+      "edits": "rotated 90 degrees about the vertical axis so the mossy stream faces +z and the stone-slab footpath is out of the default view"
+    },
+    "cretaceous": {
+      "assetId": "plains_sunset",
+      "name": "Plains Sunset",
+      "authors": { "Dimitrios Savva": "Photography", "Jarod Guest": "Processing" },
+      "page": "https://polyhaven.com/a/plains_sunset",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/plains_sunset.jpg",
+      "license": "CC0",
+      "edits": "retouched out small radio masts on the distant mesa"
+    },
+    "marine": {
+      "assetId": "aristea_wreck_puresky",
+      "name": "Aristea Wreck (Pure Sky)",
+      "authors": { "Greg Zaal": "Original", "Jarod Guest": "Sky edits" },
+      "page": "https://polyhaven.com/a/aristea_wreck_puresky",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/aristea_wreck_puresky.jpg",
+      "license": "CC0",
+      "edits": "real coastal sky; everything below the horizon replaced by a procedurally synthesized open sea that reflects this sky (no clean Poly Haven ocean panorama without buildings/roads/wrecks was available)"
+    },
+    "iceage": {
+      "assetId": "horn-koppe_snow",
+      "name": "Horn-koppe Snow",
+      "authors": { "Grzegorz Wronkowski": "All" },
+      "page": "https://polyhaven.com/a/horn-koppe_snow",
+      "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/horn-koppe_snow.jpg",
+      "license": "CC0",
+      "edits": "retouched out a small hut roof and a thin overhead wire at the forest edge"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { buildWorld, roomNameAt, roomAt } from "./world.js";
+import { buildWorld, roomNameAt, roomAt, COURT } from "./world.js";
 import { createPlayer } from "./player.js";
 import { createRemotePlayers } from "./remote.js";
 import { createMinimap } from "./minimap.js";
@@ -10,6 +10,11 @@ import { createUI, makeIceCream, FLAVOURS } from "./ui.js";
 import { createNet } from "./net.js";
 import { exhibitById, battleById, BATTLES, FACTS, EXHIBITS } from "./exhibits.js";
 import { makeBubble } from "./util.js";
+import { upgradeCharacter, preloadModels } from "./models.js";
+import { SIT_SEAT_OFFSET, createCharacter } from "./character.js";
+import { createEraView } from "./eraview.js";
+
+preloadModels(["male", "female"]);
 
 /* ------------------------------------------------------------------ */
 /* renderer + scene                                                     */
@@ -19,7 +24,6 @@ const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
   powerPreference: "high-performance",
-  preserveDrawingBuffer: true,
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -34,7 +38,7 @@ scene.background = new THREE.Color(0x0b1016);
 scene.fog = new THREE.Fog(0x0b1016, 120, 320);
 
 const camera = new THREE.PerspectiveCamera(
-  70,
+  55,
   window.innerWidth / window.innerHeight,
   0.1,
   420
@@ -46,6 +50,48 @@ const fx = createFX(scene);
 const audio = createAudio();
 const remote = createRemotePlayers(scene);
 const minimap = createMinimap(document.getElementById("minimap"));
+const eraView = createEraView({ renderer });
+
+/* ------------------------------------------------------------------ */
+/* the ice cream vendor behind the counter                              */
+/* ------------------------------------------------------------------ */
+const vendor = (() => {
+  const character = createCharacter(
+    {
+      body: "female",
+      skin: "#c98c5f",
+      shirt: "#f4ead5",
+      pants: "#3f6fb5",
+      hair: "bun",
+      hairColor: "#2b1d12",
+      accessory: "cap",
+    },
+    { name: "Scoops 🍦", tagColor: "#ff8fab" }
+  );
+  // the counter runs along x at COURT.stallZ; customers queue on the -z side
+  character.group.position.set(COURT.stallX, 0, COURT.stallZ + 0.75);
+  character.group.rotation.y = Math.PI;
+  scene.add(character.group);
+  upgradeCharacter(character);
+  let greeted = false;
+  return {
+    character,
+    update(dt, player) {
+      character.update(dt, { speed: 0, anim: "idle" });
+      if (!player) return;
+      const d = Math.hypot(player.x - COURT.stallX, player.z - COURT.stallZ);
+      if (d < 9 && !greeted) {
+        greeted = true;
+        character.playAction("wave", 1.6);
+      } else if (d > 14) {
+        greeted = false;
+      }
+    },
+    celebrate() {
+      character.playAction("cheer", 1.4);
+    },
+  };
+})();
 
 const cinema = createCinema({
   renderer,
@@ -108,6 +154,7 @@ const ui = createUI({
     S.scoops++;
     ui.setCounters({ scoops: S.scoops });
     audio.slurp();
+    vendor.celebrate();
     ui.toast(`${flavourName(payload.flavour)} — enjoy! 🍦`, "good");
     fx.burst("confetti", S.player.state.x, S.player.state.y + 1.6, S.player.state.z, 26);
   },
@@ -148,12 +195,40 @@ function connect(payload) {
   return new Promise((resolve, reject) => {
     S.net = createNet({
       onStatus: (status, detail) => {
+        if (S.joined) {
+          if (status === "reconnecting" || status === "offline") {
+            if (!S.offlineToastShown) ui.toast("Connection lost — reconnecting…");
+            S.offlineToastShown = true;
+          }
+          return;
+        }
         if (status === "connecting") ui.showStatus("Connecting to the museum…");
+        if (status === "reconnecting") ui.showStatus("Reconnecting…");
         if (status === "error") ui.showStatus(`Connection problem: ${detail || ""}`);
         if (status === "online") ui.showStatus("Connected! Loading the museum…");
       },
+      onRejoined: (res) => {
+        S.myId = res.id;
+        S.room = res.room;
+        if (res.color) S.color = res.color;
+        const ids = new Set((res.players || []).map((p) => p.id));
+        for (const r of remote.list) if (!ids.has(r.id)) remote.remove(r.id);
+        for (const p of res.players || []) {
+          if (p.id === S.myId) continue;
+          remote.upsert(p.id, p);
+          remote.setState(p.id, p);
+        }
+        ui.setRoom(res.room);
+        S.offlineToastShown = false;
+        ui.chat({ system: true, text: "Reconnected to the museum ✅" });
+      },
+      look: (l) => remote.upsert(l.id, { look: l.look }),
+      rateLimited: (r) => {
+        if (r?.type === "chat") ui.toast("Slow down a little 🙂");
+      },
       playerJoined: (p) => {
         remote.upsert(p.id, p);
+        remote.setState(p.id, p);
         ui.chat({ system: true, text: `${p.name} joined the museum 🦖` });
         ui.toast(`${p.name} arrived`);
       },
@@ -166,7 +241,11 @@ function connect(payload) {
         ui.chat({ name: c.name, text: c.text });
       },
       action: (a) => {
-        if (a.type === "battle") {
+        if (a.id === S.myId) return;
+        if (a.type === "wave") {
+          remote.action(a.id, "wave", 1.2);
+          bubble(remote.players.get(a.id), "👋", remote.players.get(a.id)?.color);
+        } else if (a.type === "battle") {
           const id = a.payload?.id;
           if (!(cinema.playing && S.currentBattleId === id)) startBattle(id);
         } else if (a.type === "iceCream") {
@@ -187,8 +266,8 @@ function connect(payload) {
       .join({
         name: payload.name,
         room: payload.room,
-        color: 0xffc857,
         look: payload.look,
+        state: { x: world.spawn.x, y: 0, z: world.spawn.z, ry: world.spawn.ry },
       })
       .then(resolve)
       .catch(reject);
@@ -199,22 +278,32 @@ function connect(payload) {
 /* game flow                                                           */
 /* ------------------------------------------------------------------ */
 async function startGame(opts) {
-  ui.showStatus("Connecting to the museum…");
+  if (S.joined || S.joining) return;
+  S.joining = true;
+  ui.showStatus(opts.solo ? "Opening the doors…" : "Connecting to the museum…");
   try {
-    const res = await connect(opts);
+    // Solo visits never touch the network, so they work without a server.
+    const res = opts.solo
+      ? { id: "solo", room: "SOLO", players: [], color: S.color }
+      : await connect(opts);
+    S.solo = !!opts.solo;
     S.joined = true;
     S.myId = res.id;
     S.room = res.room;
     S.look = opts.look;
     S.name = opts.name || "Visitor";
+    if (res.color) S.color = res.color;
 
     S.player = createPlayer({
       scene,
       camera,
       look: opts.look,
       name: S.name,
-      color: "#ffc857",
+      color: S.color,
     });
+    upgradeCharacter(S.player.character);
+    // your own name tag would just float in the middle of the view
+    S.player.character.tag.visible = false;
     S.player.state.x = world.spawn.x;
     S.player.state.z = world.spawn.z;
     S.player.state.ry = world.spawn.ry;
@@ -223,7 +312,9 @@ async function startGame(opts) {
     ui.setHall(roomNameAt(world.spawn.x, world.spawn.z));
     ui.setCounters({ discovered: 0, total: EXHIBITS.length });
     for (const p of res.players || []) {
-      if (p.id !== S.myId) remote.upsert(p.id, p);
+      if (p.id === S.myId) continue;
+      remote.upsert(p.id, p);
+      remote.setState(p.id, p);
     }
     ui.setPlayers(res.players || [], S.myId);
     ui.enterGame();
@@ -235,11 +326,25 @@ async function startGame(opts) {
     audio.ambient(true);
     const lock = document.body.requestPointerLock?.();
     if (lock && typeof lock.catch === "function") lock.catch(() => {});
-    history.replaceState(null, "", `?room=${res.room}`);
+    if (!S.solo) history.replaceState(null, "", `?room=${res.room}`);
   } catch (err) {
     console.error("Could not join the museum:", err);
-    ui.showStatus(`Could not join: ${err.message}. Is the server running?`);
+    ui.showStatus(
+      `Could not join: ${err.message}. Check your connection, or choose "Explore alone".`
+    );
     S.net?.close();
+    S.net = null;
+  } finally {
+    S.joining = false;
+  }
+}
+
+// invite links look like /?room=ABCD
+{
+  const invited = new URLSearchParams(location.search).get("room");
+  const input = document.getElementById("roomInput");
+  if (invited && input && !input.value) {
+    input.value = invited.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   }
 }
 
@@ -298,8 +403,9 @@ function interact(it) {
       const fact = FACTS[Math.floor(Math.random() * FACTS.length)];
       ui.modal(`
         <h2>🎟️ Museum Guide</h2>
-        <p class="quote">Welcome to the Dinosaur Museum! There are ${S.visited.size} skeletons to
-        discover, a screening theatre, a dig site and an ice cream court through the exit passage.
+        <p class="quote">Welcome to the Dinosaur Museum! You have found ${S.visited.size} of
+        ${EXHIBITS.length} skeletons so far. There is also a screening theatre with comfy seats, a dig site — and a little surprise
+        waiting at the very end of the tour.
         <span class="who">— Guide</span></p>
         <p class="lead" style="margin-top:16px">Did you know?</p>
         <p class="quote">${fact}</p>
@@ -333,23 +439,7 @@ function interact(it) {
       break;
     }
     case "puzzle": {
-      ui.modal(`
-        <h2>🦴 Bone Assembly</h2>
-        <p class="lead">Rearrange the bones into a skeleton. Click the bones in order — from
-        the tail to the skull — to rebuild the Coelophysis.</p>
-        <div class="row actions">
-          <button class="primary" id="puzzleSolve">Show me the answer</button>
-          <button class="ghost" id="puzzleClose">Close</button>
-        </div>
-      `);
-      document.getElementById("puzzleClose").onclick = () => ui.closeModal();
-      document.getElementById("puzzleSolve").onclick = () => {
-        ui.closeModal();
-        S.score += 25;
-        ui.toast("Skeleton assembled! +25 points 🏆", "good");
-        audio.chime(660);
-        fx.burst("sparkle", -78, 2, 34, 30);
-      };
+      openPuzzle();
       break;
     }
     case "icecream": {
@@ -360,12 +450,75 @@ function interact(it) {
       showExit();
       break;
     }
-    case "holo": {
-      roar(it.exhibitId);
+    case "seat": {
+      const seat = it.seat;
+      // the character's seat contact sits SIT_SEAT_OFFSET above its root
+      if (S.player.sit({ x: seat.x, z: seat.z, ry: seat.ry, y: Math.max(0, seat.y - SIT_SEAT_OFFSET) })) {
+        S.net?.emit("action", { type: "sit", payload: {} });
+        ui.toast(
+          it.area === "theatre"
+            ? "Enjoy the show 🍿 — press E at the console to pick a fight, W to stand"
+            : "Taking a rest… press W to stand up"
+        );
+      }
+      break;
+    }
+    case "era": {
+      ui.setPrompt(null);
+      eraView.open(it.era);
+      document.body.classList.add("immersive");
+      audio.duck(true);
       break;
     }
     default:
       break;
+  }
+}
+
+const PUZZLE_BONES = ["Tail", "Hips", "Back", "Ribs", "Neck", "Skull"];
+
+function openPuzzle() {
+  const order = [...PUZZLE_BONES].sort(() => Math.random() - 0.5);
+  let next = 0;
+  ui.modal(`
+    <h2>🦴 Bone Assembly</h2>
+    <p class="lead">Rebuild the Coelophysis! Click the bones in order — from the tail to
+    the skull.</p>
+    <div class="row puzzleBones" id="puzzleBones">
+      ${order.map((b) => `<button class="chip" data-bone="${b}">${b}</button>`).join("")}
+    </div>
+    <p class="quote" id="puzzleProgress">Placed: —</p>
+    <div class="row actions"><button class="ghost" id="puzzleClose">Close</button></div>
+  `);
+  document.getElementById("puzzleClose").onclick = () => ui.closeModal();
+  const progress = document.getElementById("puzzleProgress");
+  for (const btn of document.querySelectorAll("#puzzleBones button")) {
+    btn.onclick = () => {
+      if (btn.dataset.bone === PUZZLE_BONES[next]) {
+        next++;
+        btn.disabled = true;
+        btn.classList.add("active");
+        progress.textContent = `Placed: ${PUZZLE_BONES.slice(0, next).join(" → ")}`;
+        audio.click(440 + next * 60);
+        if (next === PUZZLE_BONES.length) {
+          ui.closeModal();
+          S.score += 25;
+          S.net?.emit("action", { type: "score", payload: 25 });
+          ui.toast("Skeleton assembled! +25 points 🏆", "good");
+          audio.chime(660);
+          const p = S.player.state;
+          fx.burst("sparkle", p.x, 2, p.z, 30);
+        }
+      } else {
+        next = 0;
+        for (const b of document.querySelectorAll("#puzzleBones button")) {
+          b.disabled = false;
+          b.classList.remove("active");
+        }
+        progress.textContent = `Not quite — a ${btn.dataset.bone.toLowerCase()} doesn't go there. Start again from the tail.`;
+        audio.click(180);
+      }
+    };
   }
 }
 
@@ -391,6 +544,7 @@ function dig() {
   S.score += 5;
   ui.setCounters({ fossils: S.fossils });
   ui.toast(`You dug up ${find}`, "good");
+  ui.chat({ system: true, text: `You dug up ${find}` });
   S.net?.emit("action", { type: "dig", payload: {} });
   S.net?.emit("action", { type: "score", payload: 5 });
 }
@@ -437,6 +591,8 @@ function takePhoto() {
   audio.click(880);
   setTimeout(() => {
     try {
+      // no preserveDrawingBuffer: draw a frame and read it back in the same task
+      renderFrame();
       const url = renderer.domElement.toDataURL("image/jpeg", 0.75);
       const others = remote.list.filter(
         (r) => Math.hypot(r.x - S.player.state.x, r.z - S.player.state.z) < 14
@@ -509,10 +665,16 @@ window.addEventListener("keydown", (e) => {
   }
   switch (e.code) {
     case "KeyE":
-      interact(nearestInteractable());
+      if (S.player.isSitting) S.player.stand();
+      else interact(nearestInteractable());
       break;
     case "KeyV":
       roar();
+      break;
+    case "KeyB":
+      S.player.playAction("wave", 1.2);
+      bubble(S.player, "👋", S.color);
+      S.net?.emit("action", { type: "wave", payload: {} });
       break;
     case "KeyF": {
       const it = nearestInteractable();
@@ -546,6 +708,10 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+function anyPanelOpen() {
+  return ui.isModalOpen() || ui.isCardOpen() || ui.isIceOpen() || eraView.isOpen();
+}
+
 canvas.addEventListener("click", () => {
   if (!S.joined) return;
   if (ui.isModalOpen() || ui.isCardOpen() || ui.isIceOpen()) return;
@@ -570,7 +736,19 @@ function animate() {
   const dt = Math.min(0.05, clock.getDelta());
 
   if (S.joined && S.player) {
+    // only react to panels opening/closing so other callers can still gate input
+    const blocked = ui.isChatOpen() || anyPanelOpen();
+    if (blocked !== S.inputBlocked) {
+      S.inputBlocked = blocked;
+      S.player.setInputEnabled(!blocked);
+    }
     S.player.update(dt);
+    for (const r of remote.list) {
+      if (!r.upgraded) {
+        r.upgraded = true;
+        upgradeCharacter(r.character);
+      }
+    }
     remote.update(dt);
     S.digCooldown = Math.max(0, S.digCooldown - dt);
 
@@ -582,14 +760,16 @@ function animate() {
     }
 
     // interaction prompt
-    const it = nearestInteractable();
+    const it = S.player.isSitting ? null : nearestInteractable();
     if (it) {
       ui.setPrompt(it.label, it.key);
     } else {
       ui.setPrompt(null);
     }
 
-    ui.setHall(roomNameAt(S.player.state.x, S.player.state.z));
+    const hallName = roomNameAt(S.player.state.x, S.player.state.z);
+    ui.setHall(hallName);
+    audio.setZone(hallName);
 
     // network state
     const now = performance.now();
@@ -604,6 +784,8 @@ function animate() {
       });
     }
   }
+
+  vendor.update(dt, S.player?.state);
 
   // animated exhibits
   for (const a of world.animated) {
@@ -628,15 +810,29 @@ function animate() {
     if (rosterTimer <= 0) {
       rosterTimer = 0.35;
       const roster = [
-        { id: S.myId, name: S.name, color: "#ffc857" },
+        { id: S.myId, name: S.name, color: S.color },
         ...remote.list.map((r) => ({ id: r.id, name: r.name, color: r.color })),
       ];
       ui.setPlayers(roster, S.myId);
     }
   }
 
+  renderFrame(dt);
+}
+
+function renderFrame(dt = 0) {
+  if (eraView.isOpen()) {
+    eraView.update(dt);
+    eraView.render();
+    return;
+  }
   renderer.render(scene, camera);
 }
+
+window.addEventListener("eraview:close", () => {
+  document.body.classList.remove("immersive");
+  audio.duck(false);
+});
 
 animate();
 
