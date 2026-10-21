@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "functions": {
+    "api/socket.js": {
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/api/socket/socket.io/:path*", "destination": "/api/socket" },
+    { "source": "/((?!api/|socket\\.io/).*)", "destination": "/api/socket" }
+  ]
+}

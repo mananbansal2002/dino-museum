@@ -1,0 +1,7 @@
+node_modules/
+npm-cache/
+.vercel/
+.DS_Store
+*.log
+.env
+.env.*

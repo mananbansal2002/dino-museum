@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#0b1016" />
+    <title>Dinosaur Museum — Multiplayer Hall</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>"
+    />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <!-- ============================ HUD ============================ -->
+    <div id="hud" class="hidden">
+      <div id="crosshair"><span></span></div>
+
+      <div id="topleft" class="panel">
+        <div class="hall" id="hallName">Grand Gallery</div>
+        <div class="sub">
+          <span id="roomCode">----</span>
+          <button class="chip" id="copyRoom" title="Copy invite code">copy link</button>
+        </div>
+        <div class="counters">
+          <span title="Dinosaurs discovered">🦕 <b id="statDiscovered">0</b>/<b id="statTotal">0</b></span>
+          <span title="Fossils dug">🪨 <b id="statFossils">0</b></span>
+          <span title="Scoops eaten">🍦 <b id="statScoops">0</b></span>
+        </div>
+      </div>
+
+      <div id="topright">
+        <canvas id="minimap" width="260" height="240"></canvas>
+        <div id="playerList" class="panel"></div>
+      </div>
+
+      <div id="prompt" class="hidden">
+        <b id="promptKey">E</b><span id="promptText"></span>
+      </div>
+
+      <div id="toasts"></div>
+
+      <div id="bottomleft">
+        <div class="panel keys" id="keyHelp">
+          <div class="khead">
+            <span>Controls</span>
+            <button class="chip" id="toggleKeys">hide</button>
+          </div>
+          <div class="kbody">
+            <div><b>W A S D</b> move</div>
+            <div><b>Shift</b> run</div>
+            <div><b>Space</b> jump</div>
+            <div><b>Mouse</b> look (click to lock)</div>
+            <div><b>E</b> interact</div>
+            <div><b>V</b> roar</div>
+            <div><b>F</b> feed / dig</div>
+            <div><b>G</b> group photo</div>
+            <div><b>C</b> camera</div>
+            <div><b>M</b> minimap size</div>
+            <div><b>T</b> chat</div>
+            <div><b>Esc</b> release mouse</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="bottomright">
+        <div id="chatLog"></div>
+        <input id="chatInput" maxlength="240" placeholder="Press T to chat…" autocomplete="off" />
+      </div>
+
+      <div id="loading" class="panel">
+        <div class="spin"></div>
+        <span id="loadingText">Building the museum…</span>
+      </div>
+    </div>
+
+    <!-- ============================ JOIN ============================ -->
+    <div id="join" class="overlay">
+      <div class="card">
+        <h1>🦖 Dinosaur Museum</h1>
+        <p class="lead">
+          A shared 3D museum for you and your friends. Wander the halls, meet 56 dinosaurs,
+          watch battle screenings, dig for fossils and finish with an ice cream.
+        </p>
+
+        <div class="row">
+          <label>
+            <span>Your name</span>
+            <input id="nameInput" maxlength="18" placeholder="Visitor" />
+          </label>
+          <label>
+            <span>Room code <small>(leave blank to create)</small></span>
+            <input id="roomInput" maxlength="8" placeholder="e.g. FOSSIL" />
+          </label>
+        </div>
+
+        <div class="look">
+          <div class="lookPreview">
+            <canvas id="lookPreview" width="220" height="300"></canvas>
+            <button class="chip" id="randomLook">🎲 random</button>
+          </div>
+          <div class="lookControls">
+            <label>
+              <span>Skin</span>
+              <div class="swatches" id="swSkin"></div>
+            </label>
+            <label>
+              <span>Shirt</span>
+              <div class="swatches" id="swShirt"></div>
+            </label>
+            <label>
+              <span>Pants</span>
+              <div class="swatches" id="swPants"></div>
+            </label>
+            <label>
+              <span>Hair</span>
+              <div class="swatches" id="swHair"></div>
+            </label>
+            <label>
+              <span>Accessory</span>
+              <div class="swatches" id="swAcc"></div>
+            </label>
+          </div>
+        </div>
+
+        <div class="row actions">
+          <button class="primary" id="enterBtn">Enter the museum</button>
+          <button class="ghost" id="soloBtn">Explore alone</button>
+        </div>
+        <p class="status" id="joinStatus"></p>
+      </div>
+    </div>
+
+    <!-- ============================ EXHIBIT CARD ============================ -->
+    <div id="exhibitCard" class="overlay hidden">
+      <div class="card wide" id="exhibitCardBody"></div>
+    </div>
+
+    <!-- ============================ ICE CREAM ============================ -->
+    <div id="iceCream" class="overlay hidden">
+      <div class="card">
+        <h2>🍦 Prehistoric Scoop</h2>
+        <p class="lead">Pick a flavour, a scoop count and a cone or cup.</p>
+        <div class="flavours" id="flavourList"></div>
+        <div class="row">
+          <div class="picker">
+            <span>Scoops</span>
+            <div class="seg" id="scoopSeg"></div>
+          </div>
+          <div class="picker">
+            <span>Style</span>
+            <div class="seg" id="styleSeg"></div>
+          </div>
+        </div>
+        <div class="row actions">
+          <button class="primary" id="orderBtn">Order it</button>
+          <button class="ghost" id="cancelIce">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================ BATTLE ============================ -->
+    <div id="battleOverlay" class="hidden">
+      <div class="battleTop">
+        <div class="battleTitle" id="battleTitle"></div>
+        <div class="battleSub" id="battleSub"></div>
+        <div class="bar"><i id="battleBar"></i></div>
+      </div>
+      <div class="battleCaption" id="battleCaption"></div>
+      <div class="battleFacts" id="battleFacts"></div>
+      <button class="chip" id="stopBattle">leave screening</button>
+    </div>
+
+    <!-- ============================ TOASTS / DIALOG ============================ -->
+    <div id="modal" class="overlay hidden">
+      <div class="card" id="modalBody"></div>
+    </div>
+
+    <script src="/vendor/socket.io.min.js"></script>
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three/three.module.js" } }
+    </script>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
