@@ -17,15 +17,16 @@
 
     <!-- ============================ HUD ============================ -->
     <div id="hud" class="hidden">
-      <div id="crosshair"><span></span></div>
+      <div id="crosshair" aria-hidden="true"><span></span></div>
 
       <div id="topleft" class="panel">
+        <div class="eyebrow">Now exploring</div>
         <div class="hall" id="hallName">Grand Gallery</div>
         <div class="sub">
-          <span id="roomCode">----</span>
+          <span id="roomCode" title="Room code">----</span>
           <button class="chip" id="copyRoom" title="Copy invite code">copy link</button>
         </div>
-        <div class="counters">
+        <div class="counters" aria-label="Your progress">
           <span title="Dinosaurs discovered">🦕 <b id="statDiscovered">0</b>/<b id="statTotal">0</b></span>
           <span title="Fossils dug">🪨 <b id="statFossils">0</b></span>
           <span title="Scoops eaten">🍦 <b id="statScoops">0</b></span>
@@ -33,27 +34,28 @@
       </div>
 
       <div id="topright">
-        <canvas id="minimap" width="260" height="240"></canvas>
-        <div id="playerList" class="panel"></div>
+        <canvas id="minimap" width="260" height="240" role="img" aria-label="Museum map"></canvas>
+        <div id="playerList" class="panel" aria-label="Visitors in this room"></div>
       </div>
 
-      <div id="prompt" class="hidden">
+      <div id="prompt" class="hidden" role="status">
         <b id="promptKey">E</b><span id="promptText"></span>
       </div>
 
-      <div id="toasts"></div>
+      <div id="toasts" role="status" aria-live="polite"></div>
 
       <div id="bottomleft">
-        <div class="panel keys" id="keyHelp">
+        <div class="panel keys" id="keyHelp" role="region" aria-label="Keyboard controls">
           <div class="khead">
             <span>Controls</span>
-            <button class="chip" id="toggleKeys">hide</button>
+            <button class="chip" id="toggleKeys" type="button" aria-controls="keyHelp">hide</button>
           </div>
           <div class="kbody">
             <div><b>W A S D</b> move</div>
             <div><b>Shift</b> run</div>
             <div><b>Space</b> jump</div>
-            <div><b>Mouse</b> look (click to lock)</div>
+            <div><b>Mouse</b> look</div>
+            <div><b>Click</b> lock mouse</div>
             <div><b>E</b> interact</div>
             <div><b>V</b> roar</div>
             <div><b>F</b> feed / dig</div>
@@ -64,19 +66,21 @@
             <div><b>B</b> wave</div>
             <div><b>L</b> sound on/off</div>
             <div><b>Wheel</b> zoom</div>
-            <div><b>Esc</b> release mouse</div>
+            <div><b>Esc</b> free mouse</div>
           </div>
         </div>
       </div>
 
       <div id="bottomright">
-        <div id="chatLog"></div>
-        <input id="chatInput" maxlength="240" placeholder="Press T to chat…" autocomplete="off" />
+        <div id="chatLog" role="log" aria-live="polite" aria-label="Chat"></div>
+        <input id="chatInput" maxlength="240" placeholder="Press T to chat…" autocomplete="off" enterkeyhint="send" aria-label="Chat message" />
       </div>
 
-      <div id="loading" class="panel">
-        <div class="spin"></div>
-        <span id="loadingText">Building the museum…</span>
+      <div id="loading" class="panel" role="progressbar" aria-label="Loading the museum">
+        <div class="spin" aria-hidden="true"></div>
+        <div class="ltitle">Building the museum…</div>
+        <span id="loadingText">Unpacking fossils and lighting the halls</span>
+        <div class="lbar" aria-hidden="true"><i id="loadingBar"></i></div>
       </div>
     </div>
 
