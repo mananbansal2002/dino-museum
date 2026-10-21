@@ -972,3 +972,8 @@ button.ghost:active {
 .exHero figcaption:empty {
   display: none;
 }
+
+/* full-screen viewers (era window) hide the game HUD */
+body.immersive #hud {
+  display: none;
+}

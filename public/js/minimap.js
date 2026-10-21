@@ -1,11 +1,17 @@
-import { ROOMS, PLACEMENTS, CELL, GRID_W, GRID_H, g2w, g2z, isSolid } from "./world.js";
+import { ROOMS, PLACEMENTS, CELL, GRID_W, GRID_H, g2w, g2z, isSolid, roomAt } from "./world.js";
 
 /**
  * Top-down minimap. The static floor plan is rendered once into an offscreen
  * canvas; every frame we blit it and draw the visitors on top.
  */
-export function createMinimap(canvas, { exhibits = [] } = {}) {
+export function createMinimap(canvas, { exhibits = [], revealAll = false } = {}) {
   const ctx = canvas.getContext("2d");
+
+  // "secret" rooms (exit passage + ice cream court) stay off the map until a
+  // visitor walks into them — the court is the surprise at the end of the tour
+  const revealed = new Set(revealAll ? ROOMS.map((r) => r.id) : ROOMS.filter((r) => !r.secret).map((r) => r.id));
+  const shown = (room) => !!room && revealed.has(room.id);
+  const cellShown = (c, r) => !isSolid(c, r) && shown(roomAt(g2w(c), g2z(r)));
   const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
 
   const worldW = GRID_W * CELL;
@@ -29,6 +35,7 @@ export function createMinimap(canvas, { exhibits = [] } = {}) {
     bctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for (const room of ROOMS) {
+      if (!shown(room)) continue;
       const x0 = toX(g2w(room.cols[0]) - CELL / 2);
       const x1 = toX(g2w(room.cols[1]) + CELL / 2);
       const z0 = toY(g2z(room.rows[0]) - CELL / 2);
@@ -52,29 +59,29 @@ export function createMinimap(canvas, { exhibits = [] } = {}) {
     bctx.lineWidth = 1.4;
     for (let r = 0; r < GRID_H; r++) {
       for (let c = 0; c < GRID_W; c++) {
-        if (isSolid(c, r)) continue;
+        if (!cellShown(c, r)) continue;
         const x0 = toX(g2w(c) - CELL / 2);
         const z0 = toY(g2z(r) - CELL / 2);
         const w = CELL * scale;
-        if (isSolid(c - 1, r)) {
+        if (!cellShown(c - 1, r)) {
           bctx.beginPath();
           bctx.moveTo(x0 + 0.5, z0);
           bctx.lineTo(x0 + 0.5, z0 + w);
           bctx.stroke();
         }
-        if (isSolid(c + 1, r)) {
+        if (!cellShown(c + 1, r)) {
           bctx.beginPath();
           bctx.moveTo(x0 + w - 0.5, z0);
           bctx.lineTo(x0 + w - 0.5, z0 + w);
           bctx.stroke();
         }
-        if (isSolid(c, r - 1)) {
+        if (!cellShown(c, r - 1)) {
           bctx.beginPath();
           bctx.moveTo(x0, z0 + 0.5);
           bctx.lineTo(x0 + w, z0 + 0.5);
           bctx.stroke();
         }
-        if (isSolid(c, r + 1)) {
+        if (!cellShown(c, r + 1)) {
           bctx.beginPath();
           bctx.moveTo(x0, z0 + w - 0.5);
           bctx.lineTo(x0 + w, z0 + w - 0.5);
@@ -86,11 +93,13 @@ export function createMinimap(canvas, { exhibits = [] } = {}) {
     // exhibits
     bctx.fillStyle = "rgba(255,200,87,0.9)";
     for (const p of PLACEMENTS) {
+      if (!shown(roomAt(p.x, p.z))) continue;
       bctx.beginPath();
       bctx.arc(toX(p.x), toY(p.z), 1.9, 0, Math.PI * 2);
       bctx.fill();
     }
     for (const e of exhibits) {
+      if (!shown(roomAt(e.x, e.z))) continue;
       bctx.fillStyle = "rgba(126,224,129,0.95)";
       bctx.beginPath();
       bctx.arc(toX(e.x), toY(e.z), 2.4, 0, Math.PI * 2);
@@ -118,6 +127,8 @@ export function createMinimap(canvas, { exhibits = [] } = {}) {
     }
 
     if (local) {
+      const here = roomAt(local.x, local.z);
+      if (here && !revealed.has(here.id)) reveal(here.id);
       const x = toX(local.x);
       const y = toY(local.z);
       ctx.save();
@@ -153,7 +164,15 @@ export function createMinimap(canvas, { exhibits = [] } = {}) {
     }
   }
 
-  return { draw, redraw: drawStatic };
+  /** Reveal a secret room on the map. Returns true when it was hidden. */
+  function reveal(id) {
+    if (revealed.has(id)) return false;
+    revealed.add(id);
+    drawStatic();
+    return true;
+  }
+
+  return { draw, redraw: drawStatic, reveal, isRevealed: (id) => revealed.has(id) };
 }
 
 function hexA(hex, a) {
