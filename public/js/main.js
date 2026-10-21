@@ -667,7 +667,8 @@ function animate() {
   const dt = Math.min(0.05, clock.getDelta());
 
   if (S.joined && S.player) {
-    S.player.setInputEnabled?.(!(ui.isChatOpen() || anyPanelOpen()));
+    const wantInput = !(ui.isChatOpen() || anyPanelOpen());
+    if (S.player.inputEnabled !== wantInput) S.player.setInputEnabled(wantInput);
     S.player.update(dt);
     remote.update(dt);
     S.digCooldown = Math.max(0, S.digCooldown - dt);
