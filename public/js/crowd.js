@@ -1672,6 +1672,8 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
     update,
     npcs,
     ready,
+    /** test hook: make an npc walk again (used by scripts/live.mjs --crowd) */
+    requestPath,
     dispose,
     root,
     nav,

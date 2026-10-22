@@ -6,7 +6,11 @@
  * It prints a timeline so intermittent stalls (dropped sockets, frozen loop,
  * failed re-joins) are visible.
  *
- *   node scripts/live.mjs [url] [seconds]
+ *   node scripts/live.mjs [url] [seconds] [--crowd]
+ *
+ * --crowd additionally forces every visitor to re-path to the spot it is
+ * already standing on, which is what used to make crowd.js throw "undefined
+ * is not iterable" and freeze the render loop.
  */
 
 import { spawn } from "node:child_process";
@@ -17,6 +21,8 @@ import { join } from "node:path";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const url = process.argv[2] || "https://dino-museum-ten.vercel.app/";
 const duration = Number(process.argv[3] || 360) * 1000;
+const crowdProbe = process.argv.includes("--crowd");
+let exceptions = 0;
 
 if (!existsSync(CHROME)) {
   console.error("✗ no Chrome found");
@@ -88,6 +94,7 @@ try {
     }
     if (m.method === "Runtime.exceptionThrown") {
       const d = m.params.exceptionDetails;
+      exceptions++;
       log(`EXCEPTION ${d.exception?.description || d.text}`);
     }
     if (m.method === "Log.entryAdded" && m.params.entry.level === "error") {
@@ -139,12 +146,43 @@ try {
     });
   })()`);
 
+  if (crowdProbe) {
+    for (let i = 0; i < 80; i++) {
+      if (await ev("(window.__museum?.crowd?.npcs?.length || 0) > 0")) break;
+      await sleep(500);
+    }
+    const wps = await ev(`(() => {
+      const c = window.__museum?.crowd;
+      const n = c?.npcs?.[0];
+      return n ? c.nav.findPath(n.x, n.z, n.x, n.z).length : null;
+    })()`);
+    log(`crowd probe: findPath(self) -> ${wps} waypoints (empty is the trigger)`);
+  }
+
   let prev = "";
   let lastBeat = 0;
   let lastFrame = 0;
   let frameStalls = 0;
   while (Date.now() - t0 < duration) {
     await sleep(2000);
+    if (crowdProbe) {
+      const forced = await ev(`(() => {
+        const c = window.__museum?.crowd;
+        if (!c || !c.npcs.length) return 0;
+        let k = 0;
+        for (const n of c.npcs) {
+          // (a) path to the exact spot it already stands on: solvePath gets an
+          //     empty waypoint list
+          n.goal = { kind: "wander", x: n.x, z: n.z };
+          c.requestPath(n);
+          // (b) a waypoint index past the end of a path: the steer guard
+          if (k % 2) { n.path = []; n.pathPending = false; n.wp = 0; }
+          k++;
+        }
+        return k;
+      })()`);
+      if (!forced) log("crowd probe: no visitors to force");
+    }
     const raw = await probe();
     const s = JSON.parse(raw);
     const { frame: _frame, ...rest } = s;
@@ -166,6 +204,17 @@ try {
       lastBeat = Date.now();
       log(`heartbeat ${raw}`);
     }
+  }
+  const ambient = await ev("Array.from(window.__museum?.S?.ambientErrors || [])");
+  if (ambient?.length) {
+    log(`swallowed ambient failures: ${ambient.join(", ")}`);
+    exceptions += ambient.length;
+  }
+  if (exceptions) {
+    console.error(`✗ ${exceptions} page error(s) during the run`);
+    process.exitCode = 1;
+  } else {
+    log("no page errors");
   }
   ws.close();
 } catch (err) {
