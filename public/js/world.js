@@ -431,10 +431,9 @@ export const SPAWN = { x: 0, z: g2z(21.5), ry: Math.PI };
 export const COURT = { stallX: 78, stallZ: 75, exitX: 66.2, exitZ: 70 };
 
 /**
- * Wayfinding to the Ice Cream Court, museum style: directional signs hung
- * from the ceiling (or fixed high on a wall) at each junction of the way
- * there, plus an illuminated EXIT · ICE CREAM lightbox over the exit doorway
- * in the Jurassic Hall's east wall. All of them are well above head height
+ * Wayfinding, museum style: signs hung from the ceiling, fixed high on a wall
+ * or backlit over a doorway. The ice cream court stays a secret, so the only
+ * one is an illuminated EXIT lightbox over the Jurassic Hall's exit doorway. All of them are well above head height
  * and none has a collider, so they never block a path (scripts/check.mjs).
  *
  *   kind: "hang" (two cables up to the ceiling), "wall" (flat on a wall or
@@ -445,24 +444,10 @@ export const COURT = { stallX: 78, stallZ: 75, exitX: 66.2, exitZ: 70 };
  *   dest: where the signs lead ("court")
  */
 const EXIT_DOOR = [g2w(29) + CELL / 2, (g2z(18) + g2z(19)) / 2]; // Jurassic Hall -> Exit Passage
-const WAY_TITLE = "EXIT · ICE CREAM COURT 🍦";
 export const WAYFINDING = [
-  // atrium: over the way into the South Corridor, seen from the spawn point
-  { id: "way-atrium", room: "lobby", kind: "hang", x: 0, y: 6.6, z: 34.5, ry: 0, w: 6.6, h: 1.35, to: [0, g2z(19) + CELL / 2], title: WAY_TITLE, sub: "Straight on · Grand Gallery → Jurassic Hall", dest: "court" },
-  // Grand Gallery: seen through the South Corridor (under its lintel), off the centrepieces' sightline, pointing right to the east doorway
-  { id: "way-gallery", room: "rotunda", kind: "hang", x: 17, y: 4.3, z: 10, ry: 0, w: 5.8, h: 1.2, to: [g2w(19) + CELL / 2, 9], title: WAY_TITLE, sub: "East Corridor · Jurassic Hall", dest: "court" },
-  // Grand Gallery: on the lintel over the east doorway, above its name sign
-  { id: "way-gallery-door", room: "rotunda", kind: "wall", x: g2w(19) + CELL / 2 - 0.26, y: 6.75, z: 6, ry: -Math.PI / 2, w: 6.4, h: 1.1, to: [g2w(21), 6], title: WAY_TITLE, sub: "Through the Jurassic Hall", dest: "court" },
-  // East Corridor
-  { id: "way-ecorridor", room: "ecorridor", kind: "hang", x: 35, y: 4.35, z: 6, ry: -Math.PI / 2, w: 4.8, h: 1.0, to: [g2w(23) + CELL / 2, 6], title: WAY_TITLE, sub: "Through the Jurassic Hall", dest: "court" },
-  // Jurassic Link (the way in from the Marine Reptile Hall)
-  { id: "way-jlink", room: "ec2", kind: "hang", x: 60, y: 4.35, z: -29, ry: Math.PI, w: 4.8, h: 1.0, to: [60, g2z(11) + CELL / 2], title: WAY_TITLE, sub: "Through the Jurassic Hall", dest: "court" },
-  // Jurassic Hall: inside each way in, and over the aisle leading to the exit
-  { id: "way-jurassic-north", room: "jurassic", kind: "hang", x: 60, y: 4.2, z: -14.5, ry: Math.PI, w: 5.4, h: 1.15, to: EXIT_DOOR, title: WAY_TITLE, sub: "Far end of this hall", dest: "court" },
-  { id: "way-jurassic-west", room: "jurassic", kind: "hang", x: 52, y: 4.2, z: 2.5, ry: -Math.PI / 2, w: 5.4, h: 1.15, to: EXIT_DOOR, title: WAY_TITLE, sub: "Far end of this hall", dest: "court" },
-  { id: "way-jurassic-aisle", room: "jurassic", kind: "hang", x: 72, y: 4.2, z: 13.5, ry: Math.PI, w: 5.0, h: 1.05, to: EXIT_DOOR, title: WAY_TITLE, sub: "This way out", dest: "court" },
-  // the lightbox over the exit doorway itself
-  { id: "way-exit-lightbox", room: "jurassic", kind: "lightbox", x: EXIT_DOOR[0] - 0.46, y: 7.0, z: EXIT_DOOR[1], ry: -Math.PI / 2, w: 6.6, h: 1.4, to: [EXIT_DOOR[0] + 3, EXIT_DOOR[1]], title: "EXIT", sub: "ICE CREAM 🍦", dest: "court" },
+  // the ice cream court is a surprise at the end of the tour: the way out is
+  // marked only as an exit
+  { id: "way-exit-lightbox", room: "jurassic", kind: "lightbox", x: EXIT_DOOR[0] - 0.46, y: 7.0, z: EXIT_DOOR[1], ry: -Math.PI / 2, w: 6.6, h: 1.4, to: [EXIT_DOOR[0] + 3, EXIT_DOOR[1]], title: "EXIT", sub: "WAY OUT", dest: "court" },
 ];
 
 /**
@@ -1173,7 +1158,9 @@ export function buildWorld(scene) {
       if (!isPassage(to)) return to.name;
       const beyond = [...neighboursOf(to)].filter((r) => r !== from && !isPassage(r));
       const name = beyond.length ? beyond.map((r) => r.name).join(" · ") : to.name;
-      return to.id === "xpassage" && from.id !== "court" ? `Exit · ${name}` : name;
+      // the ice cream court is the tour's secret ending: from inside the museum
+      // its doorway just says Exit
+      return to.id === "xpassage" && from.id !== "court" ? "Exit" : name;
     };
     for (const d of doors.values()) {
       const n = d.cells.length;
@@ -1833,18 +1820,6 @@ export function buildWorld(scene) {
 
   // ---------------- exit passage ----------------
   // the way out leaves the far (east) wall of the Jurassic Hall
-  const bendSign = new THREE.Mesh(
-    new THREE.PlaneGeometry(4.6, 1.5),
-    new THREE.MeshBasicMaterial({
-      map: makeTextTexture("ICE CREAM  →", {
-        width: 768, height: 250, fontSize: 92, color: "#ff8fab", bg: "#1a1216",
-      }),
-    })
-  );
-  bendSign.position.set(g2w(30) + CELL / 2 - 0.25, 3.2, (g2z(18) + g2z(19)) / 2);
-  bendSign.rotation.y = -Math.PI / 2;
-  group.add(bendSign);
-  tag(bendSign, "skip");
 
   // ---------------- wayfinding to the ice cream court ----------------
   {
@@ -2283,7 +2258,7 @@ function wayfindingTexture(s) {
   return tex;
 }
 
-/** The backlit exit lightbox: green EXIT panel, pink ICE CREAM panel. */
+/** The backlit exit lightbox: a standard green EXIT panel with a running figure side. */
 function lightboxTexture(s) {
   const W = 1024;
   const H = Math.round((W * s.h) / s.w);
@@ -2292,7 +2267,7 @@ function lightboxTexture(s) {
   const split = Math.round(W * 0.4);
   ctx.fillStyle = "#1fae5b";
   ctx.fillRect(0, 0, split, H);
-  ctx.fillStyle = "#ffa3bb";
+  ctx.fillStyle = "#16934c";
   ctx.fillRect(split, 0, W - split, H);
   ctx.fillStyle = "#fffdf5";
   ctx.fillRect(split - 3, 0, 6, H);
@@ -2301,7 +2276,7 @@ function lightboxTexture(s) {
   ctx.fillStyle = "#ffffff";
   fitWayFont(ctx, s.title, 900, Math.round(H * 0.56), split - 60);
   ctx.fillText(s.title, split / 2, H * 0.53);
-  ctx.fillStyle = "#3a0f1e";
+  ctx.fillStyle = "#ffffff";
   fitWayFont(ctx, s.sub, 900, Math.round(H * 0.46), W - split - 70);
   ctx.fillText(s.sub, split + (W - split) / 2, H * 0.53);
   const tex = new THREE.CanvasTexture(c);
