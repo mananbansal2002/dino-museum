@@ -1,279 +1,1548 @@
 {
   "species": {
     "eoraptor": [
-      {"id":"aNkkWUYMtxo","title":"Dawn of the Dinosaurs | A Day with Eoraptor, One of the First Dinosaurs | EP 3","channel":"OURS HISTORY"},
-      {"id":"O4HWhC0Gr0U","title":"The Life Journey of Eoraptor lunensis | From Hatchling to Early Dinosaur Pioneer","channel":"PREHISTORIC WORLDS"}
+      {
+        "id": "eLGsuchUGQU",
+        "title": "Dinosaur Revolution | Eoraptor Mating Crasher",
+        "channel": "DrawingDinosaurs"
+      },
+      {
+        "id": "gmu6LHl_NxY",
+        "title": "Eoraptors Mating Season | Dinosaur Revolution | Discovery Channel",
+        "channel": "Documentary J.I"
+      },
+      {
+        "id": "aNkkWUYMtxo",
+        "title": "Dawn of the Dinosaurs | A Day with Eoraptor, One of the First Dinosaurs | EP 3",
+        "channel": "OURS HISTORY"
+      },
+      {
+        "id": "O4HWhC0Gr0U",
+        "title": "The Life Journey of Eoraptor lunensis | From Hatchling to Early Dinosaur Pioneer",
+        "channel": "PREHISTORIC WORLDS"
+      }
     ],
     "herrerasaurus": [
-      {"id":"uYnKONIwzKc","title":"What on Earth Was Herrerasaurus?","channel":"Ben G Thomas"},
-      {"id":"cjedhjwOx7Q","title":"Herrerasaurus: The Car Sized Meat Eating Lizard | Dinosaur Documentary","channel":"Dinosaur Discovery "}
+      {
+        "id": "uYnKONIwzKc",
+        "title": "What on Earth Was Herrerasaurus?",
+        "channel": "Ben G Thomas"
+      },
+      {
+        "id": "09wn5R0Lrpk",
+        "title": "Herrerasaurus: Your Dinosaurs Are Wrong",
+        "channel": "Your Dinosaurs Are Wrong"
+      },
+      {
+        "id": "cjedhjwOx7Q",
+        "title": "Herrerasaurus: The Car Sized Meat Eating Lizard | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "riojasaurus": [
-      {"id":"o7XrNH8-fgM","title":"Prehistoric Facts Special #209: Riojasaurus","channel":"Prehistoric Facts with Dino Chris"},
-      {"id":"sKyJEJzaiRs","title":"Riojasaurus: Dinosaur of the Day","channel":"I Know Dino: The Big Dinosaur Podcast"}
+      {
+        "id": "sKyJEJzaiRs",
+        "title": "Riojasaurus: Dinosaur of the Day",
+        "channel": "I Know Dino: The Big Dinosaur Podcast"
+      },
+      {
+        "id": "faIHCPBJ27s",
+        "title": "Riojasaurus and Mussaurus. Early Sauropodomorphs from South America",
+        "channel": "Thundercliff93 (Thundercliff93)"
+      },
+      {
+        "id": "8MDjF2K1N2w",
+        "title": "Riojasaurus Facts",
+        "channel": "WILDLIFE & NATURE EDUCATION"
+      },
+      {
+        "id": "o7XrNH8-fgM",
+        "title": "Prehistoric Facts Special #209: Riojasaurus",
+        "channel": "Prehistoric Facts with Dino Chris"
+      }
     ],
     "coelo": [
-      {"id":"kjBbcT533r4","title":"Was This Dinosaur a Cannibal?","channel":"PBS Eons"},
-      {"id":"tgwLmyK84Fc","title":"Coelophysis: Meet the World's First True Predator","channel":"Prehistoric Earth"}
+      {
+        "id": "kjBbcT533r4",
+        "title": "Was This Dinosaur a Cannibal?",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "_110j8kB_vc",
+        "title": "Placerias vs Celophysis: Battle for Triassic Survival | Walking with Dinosaurs (1999) | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "DK4FaY7p6KI",
+        "title": "Coelophysis: The Legendary Dinosaur of the Triassic | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      },
+      {
+        "id": "tgwLmyK84Fc",
+        "title": "Coelophysis: Meet the World's First True Predator",
+        "channel": "Prehistoric Earth"
+      }
     ],
     "plateosaurus": [
-      {"id":"qymwa0-tbCc","title":"Dinosaur Profile: Plateosaurus","channel":"Andrew Murray"},
-      {"id":"ANFZlRCX5kQ","title":"The Plateosaurus herd","channel":"Palaeo Research Station"}
+      {
+        "id": "nXM_Ib-gFTY",
+        "title": "Plateosaurus: YDAW Archive (Re-upload + Corrections)",
+        "channel": "Your Dinosaurs Are Wrong"
+      },
+      {
+        "id": "OwTYS1kf1mQ",
+        "title": "Making-of Plateosaurus Ben (English)",
+        "channel": "Institute of Natural Sciences Belgium"
+      },
+      {
+        "id": "qymwa0-tbCc",
+        "title": "Dinosaur Profile: Plateosaurus",
+        "channel": "Andrew Murray"
+      },
+      {
+        "id": "ANFZlRCX5kQ",
+        "title": "The Plateosaurus herd",
+        "channel": "Palaeo Research Station"
+      }
     ],
     "massospondylus": [
-      {"id":"9oCW4-vHUlY","title":"Massospondylus' Weird Growth Rate","channel":"Raptor Chatter"},
-      {"id":"Kqfi2h5Fe7w","title":"Early Jurassic All-Stars: Dilophosaurus, Cryolophosaurus, Massospondylus… | Episode 4","channel":"Lost Worlds of Earth"}
+      {
+        "id": "DcqBTtwrq3w",
+        "title": "The Oldest Dinosaur Nesting Site Ever Found",
+        "channel": "Ben G Thomas"
+      },
+      {
+        "id": "ivUXQOO5fPQ",
+        "title": "Massospondylus: Dinosaur of the Day",
+        "channel": "I Know Dino: The Big Dinosaur Podcast"
+      },
+      {
+        "id": "9oCW4-vHUlY",
+        "title": "Massospondylus' Weird Growth Rate",
+        "channel": "Raptor Chatter"
+      },
+      {
+        "id": "Kqfi2h5Fe7w",
+        "title": "Early Jurassic All-Stars: Dilophosaurus, Cryolophosaurus, Massospondylus… | Episode 4",
+        "channel": "Lost Worlds of Earth"
+      }
     ],
     "brachio": [
-      {"id":"EdA8SA2CQOk","title":"One Of The LARGEST Animals Ever! | Walking With Dinosaurs | BBC Earth Kids","channel":"BBC Earth Kids"},
-      {"id":"0a504x1fxPw","title":"The Brachiosaurus, Walking With Dinosaurs (1999)","channel":"The Official Terra Nova Channel"}
+      {
+        "id": "cu3l8V_qx98",
+        "title": "Brachiosaurus: One Of The LARGEST Animals to Ever Exist | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      },
+      {
+        "id": "p86gh2HEsp0",
+        "title": "Bringing Giraffatitan DINOSAURS back to LIFE with 360 VR 🦕 | Google Arts & Culture",
+        "channel": "Google Arts & Culture"
+      },
+      {
+        "id": "GKO9rbm7F2w",
+        "title": "Dinosaur Profile: Brachiosaurus",
+        "channel": "Andrew Murray"
+      },
+      {
+        "id": "EdA8SA2CQOk",
+        "title": "One Of The LARGEST Animals Ever! | Walking With Dinosaurs | BBC Earth Kids",
+        "channel": "BBC Earth Kids"
+      }
     ],
     "diplod": [
-      {"id":"r1yv7Pi78Og","title":"Diplodocus Herd - Walking with Dinosaurs: Ballad of Big Al - BBC","channel":"BBC Studios"},
-      {"id":"zOqy_jGFSx0","title":"A Short Tale About Diplodocus' Long Neck","channel":"PBS Eons"}
+      {
+        "id": "r1yv7Pi78Og",
+        "title": "Diplodocus Herd - Walking with Dinosaurs: Ballad of Big Al - BBC",
+        "channel": "BBC Studios"
+      },
+      {
+        "id": "zOqy_jGFSx0",
+        "title": "A Short Tale About Diplodocus' Long Neck",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "8DY7xTrrMTQ",
+        "title": "Diplodocus: The Dinosaur with a Super Sonic Whip for a Tail | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "apo": [
-      {"id":"_IKXmtAdRoc","title":"When Dinosaurs Roamed America - Apatosaurus","channel":"Riamus"},
-      {"id":"qKu2fKVmz9U","title":"Apatosaurus: One of the Most Iconic Sauropods to Ever Walk the Earth | Documentary","channel":"Dinosaur Discovery "}
+      {
+        "id": "qKu2fKVmz9U",
+        "title": "Apatosaurus: One of the Most Iconic Sauropods to Ever Walk the Earth | Documentary",
+        "channel": "Dinosaur Discovery "
+      },
+      {
+        "id": "ELGzjzzNZas",
+        "title": "Brontosaurus vs. Apatosaurus: What's the Difference?",
+        "channel": "Texas Science & Natural History Museum"
+      },
+      {
+        "id": "Nd-0woMqKe0",
+        "title": "The MANY Interpretations of Apatosaurus (And Brontosaurus)",
+        "channel": "Dino Guy"
+      },
+      {
+        "id": "_IKXmtAdRoc",
+        "title": "When Dinosaurs Roamed America - Apatosaurus",
+        "channel": "Riamus"
+      }
     ],
     "camarasaurus": [
-      {"id":"g8WguJTimm8","title":"When Dinosaurs Roamed America - Camarasaurus","channel":"Riamus"},
-      {"id":"J2oqSp-x018","title":"Camarasaurus: The Gentle Giant of the Jurassic Era 🌍🦕","channel":"Randomness Reloaded"}
+      {
+        "id": "QmID7wuILTs",
+        "title": "Prehistoric Breakdown: Camarasaurus",
+        "channel": "Raptor Rex"
+      },
+      {
+        "id": "1UqMdRQFbBw",
+        "title": "Dinosaur Profile: Camarasaurus",
+        "channel": "Andrew Murray"
+      },
+      {
+        "id": "owEsK2sgzp4",
+        "title": "Camarasaurus: Dinosaur of the Day",
+        "channel": "I Know Dino: The Big Dinosaur Podcast"
+      },
+      {
+        "id": "g8WguJTimm8",
+        "title": "When Dinosaurs Roamed America - Camarasaurus",
+        "channel": "Riamus"
+      }
     ],
     "barosaurus": [
-      {"id":"nPjFpageH-o","title":"Iconic: Barosaurus","channel":"Royal Ontario Museum"},
-      {"id":"LY8efQr0_Dk","title":"We Were Wrong About the Biggest Animal on Earth | Barosaurus | BS Earth","channel":"BS Earth Studio"}
+      {
+        "id": "nPjFpageH-o",
+        "title": "Iconic: Barosaurus",
+        "channel": "Royal Ontario Museum"
+      },
+      {
+        "id": "xO_ZQ1eqMR8",
+        "title": "Museum Separates Iconic Battling Dinosaurs in Rotunda",
+        "channel": "American Museum of Natural History"
+      },
+      {
+        "id": "DPYLjSOsxOI",
+        "title": "Barosaurus: The Longest Known Sauropod Dinosaur",
+        "channel": "CHimerasuchus"
+      },
+      {
+        "id": "LY8efQr0_Dk",
+        "title": "We Were Wrong About the Biggest Animal on Earth | Barosaurus | BS Earth",
+        "channel": "BS Earth Studio"
+      }
     ],
     "stego": [
-      {"id":"dIAZ5S7vkZw","title":"Secrets of the stegosaurus skeleton | Natural History Museum","channel":"Natural History Museum"},
-      {"id":"Nsf5xCbZ7us","title":"Stegosaurs: Tiny Brains & Thagomizers","channel":"PBS Eons"}
+      {
+        "id": "dIAZ5S7vkZw",
+        "title": "Secrets of the stegosaurus skeleton | Natural History Museum",
+        "channel": "Natural History Museum"
+      },
+      {
+        "id": "372Uj6V_dQo",
+        "title": "Stegosaurus vs Allosaurus Face-Off | Walking with Dinosaurs (1999) | BBC Earth Science",
+        "channel": "BBC Earth Science"
+      },
+      {
+        "id": "HHdG8OvsRro",
+        "title": "Stegosaurus: An Iconic Dinosaur of the Jurassic Period | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      },
+      {
+        "id": "Nsf5xCbZ7us",
+        "title": "Stegosaurs: Tiny Brains & Thagomizers",
+        "channel": "PBS Eons"
+      }
     ],
     "kentrosaurus": [
-      {"id":"KmyuHifaZcY","title":"Kentrosaurus Documentary","channel":"Dino Documentaries"},
-      {"id":"T0sfU3kSiK8","title":"Paleo Log: Kentrosaurus","channel":"Omega Pictures"}
+      {
+        "id": "CisSdYYl3Ug",
+        "title": "The MANY Interpretations of Kentrosaurus!",
+        "channel": "Dino Guy"
+      },
+      {
+        "id": "T0sfU3kSiK8",
+        "title": "Paleo Log: Kentrosaurus",
+        "channel": "Omega Pictures"
+      },
+      {
+        "id": "AYB6ISr6Bd0",
+        "title": "Learn All About the Prehistoric Dinosaur Kentrosaurus",
+        "channel": "Mysterious Extinct Creatures"
+      },
+      {
+        "id": "KmyuHifaZcY",
+        "title": "Kentrosaurus Documentary",
+        "channel": "Dino Documentaries"
+      }
     ],
     "wuerho": [
-      {"id":"cgOuqGIfSVA","title":"Wuerhosaurus: The Stegosaurus with Short Plates from China! 🦖🇨🇳","channel":"Survivor Dino"},
-      {"id":"gtdGLBC9Y6o","title":"Evolution Of Wuerhosaurus In Documentaries, Games, & Paleo Media","channel":"Alpha Tyrannosaurus Rex"}
+      {
+        "id": "AzGYS6zVQqY",
+        "title": "Prehistoric Breakdown: Wuerhosaurus",
+        "channel": "Raptor Rex"
+      },
+      {
+        "id": "2PSsDJ_rE3E",
+        "title": "THE LAST STEGOSAUR??? | Paleontologists rank WUERHOSAURUS in Jurassic World: Evolution 2",
+        "channel": "Skeleton Crew"
+      },
+      {
+        "id": "oTtMWuv3aS0",
+        "title": "Wuerhosaurus in 60 seconds | DinoLexicon",
+        "channel": "DinoLexicon | Dinosaurs A to Z"
+      },
+      {
+        "id": "cgOuqGIfSVA",
+        "title": "Wuerhosaurus: The Stegosaurus with Short Plates from China! 🦖🇨🇳",
+        "channel": "Survivor Dino"
+      }
     ],
     "allo": [
-      {"id":"YSGdowqESaQ","title":"A deadly Allosaurus ambushes its prey | Planet Dinosaur - BBC","channel":"BBC"},
-      {"id":"mffq4hFlf2Q","title":"Allosaurus: One of the BIGGEST Carnivorous Predators of the Jurassic | Dinosaur Documentary","channel":"Dinosaur Discovery "}
+      {
+        "id": "YSGdowqESaQ",
+        "title": "A deadly Allosaurus ambushes its prey | Planet Dinosaur - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "mffq4hFlf2Q",
+        "title": "Allosaurus: One of the BIGGEST Carnivorous Predators of the Jurassic | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      },
+      {
+        "id": "HT-7LFQdsHU",
+        "title": "Dinosaur Profile: Allosaurus",
+        "channel": "Andrew Murray"
+      }
     ],
     "torvo": [
-      {"id":"T-nZ5qXrHug","title":"Meet The Torvosaurus: Europe's Apex Carnivore | Walking with Dinosaurs | BBC Earth Science","channel":"BBC Earth Science"},
-      {"id":"T7Ic1SUsc9Q","title":"Torvosaurus | The First Monarch of Europe | Dino Basics","channel":"Dino Basics"}
+      {
+        "id": "T-nZ5qXrHug",
+        "title": "Meet The Torvosaurus: Europe's Apex Carnivore | Walking with Dinosaurs | BBC Earth Science",
+        "channel": "BBC Earth Science"
+      },
+      {
+        "id": "T7Ic1SUsc9Q",
+        "title": "Torvosaurus | The First Monarch of Europe | Dino Basics",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "g20Zu4E596Q",
+        "title": "Prehistoric Breakdown: Torvosaurus",
+        "channel": "Raptor Rex"
+      }
     ],
     "dilo": [
-      {"id":"y7jSOp2mr2s","title":"A Modern Look at Dilophosaurus","channel":"BRIAN ENGH PALEOART"},
-      {"id":"nxYfTn3KwkY","title":"When Dinosaurs Roamed America - Dilophosaurus wetherli","channel":"Riamus"}
+      {
+        "id": "jnw-wY8lmow",
+        "title": "Dilophosaurus | The Misunderstood Movie Icon",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "y7jSOp2mr2s",
+        "title": "A Modern Look at Dilophosaurus",
+        "channel": "BRIAN ENGH PALEOART"
+      },
+      {
+        "id": "Piws64Um5YY",
+        "title": "Dilophosaurus: The Most Misinterpreted Dinosaur of All Time | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      },
+      {
+        "id": "nxYfTn3KwkY",
+        "title": "When Dinosaurs Roamed America - Dilophosaurus wetherli",
+        "channel": "Riamus"
+      }
     ],
     "baryonyx": [
-      {"id":"94jLUmbqyMQ","title":"Baryonyx: the discovery of an amazing fish-eating dinosaur | Natural History Museum","channel":"Natural History Museum"},
-      {"id":"1bKt2SxmebI","title":"Baryonyx | The Ferocious Fish Eater","channel":"Dino Basics"}
+      {
+        "id": "94jLUmbqyMQ",
+        "title": "Baryonyx: the discovery of an amazing fish-eating dinosaur | Natural History Museum",
+        "channel": "Natural History Museum"
+      },
+      {
+        "id": "TkBdxRkXbYM",
+        "title": "Giant fishing dinosaurs: Uncovering Spinosaurus and Baryonyx – with David Hone",
+        "channel": "The Royal Institution"
+      },
+      {
+        "id": "1bKt2SxmebI",
+        "title": "Baryonyx | The Ferocious Fish Eater",
+        "channel": "Dino Basics"
+      }
     ],
     "archaeopteryx": [
-      {"id":"fVNXXLLUYFM","title":"Mark Norell Publishes New Archaeopteryx Findings","channel":"American Museum of Natural History"},
-      {"id":"31KV2AVSwfo","title":"The Chicago Field Museum's New Fossil Acquisition, the Archaeopteryx | Encyclopaedia Britannica","channel":"Encyclopaedia Britannica"}
+      {
+        "id": "yCd3TuSK6tU",
+        "title": "Archaeopteryx: The World’s Most Famous Bird",
+        "channel": "Royal Tyrrell Museum of Palaeontology"
+      },
+      {
+        "id": "s2ors7c_roE",
+        "title": "Archaeopteryx EN",
+        "channel": "Teylers Museum"
+      },
+      {
+        "id": "fVNXXLLUYFM",
+        "title": "Mark Norell Publishes New Archaeopteryx Findings",
+        "channel": "American Museum of Natural History"
+      },
+      {
+        "id": "31KV2AVSwfo",
+        "title": "The Chicago Field Museum's New Fossil Acquisition, the Archaeopteryx | Encyclopaedia Britannica",
+        "channel": "Encyclopaedia Britannica"
+      }
     ],
     "rhampho": [
-      {"id":"PAXrl_G_Zns","title":"TRILOGY OF LIFE - Walking with Dinosaurs - \"Ramphorhynchus\"","channel":"Riamus"},
-      {"id":"AaU_LruQVlU","title":"Prehistoric Breakdown: Rhamphorhynchus","channel":"Raptor Rex"}
+      {
+        "id": "AaU_LruQVlU",
+        "title": "Prehistoric Breakdown: Rhamphorhynchus",
+        "channel": "Raptor Rex"
+      },
+      {
+        "id": "wiBgx05-JJs",
+        "title": "The Lagoon That Puzzled Paleontologists for 250 Years",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "r8GBXhi9A2A",
+        "title": "How Pterosaurs Got Their Wings",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "PAXrl_G_Zns",
+        "title": "TRILOGY OF LIFE - Walking with Dinosaurs - \"Ramphorhynchus\"",
+        "channel": "Riamus"
+      }
     ],
     "trex": [
-      {"id":"v7iLJnNod-M","title":"T.rex Ambush | Walking with Dinosaurs | BBC Earth","channel":"BBC Earth"},
-      {"id":"SFC-XW4j1ek","title":"Does T. rex Have The Wrong Name?","channel":"PBS Eons"}
+      {
+        "id": "Qf7QRoJ3qWk",
+        "title": "Prehistoric Planet 2 — How Good Were T.rex Senses? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "fFKEedgHd9U",
+        "title": "Secrets of the Deadly T-Rex: King of the Dinosaurs (Full Episode) | Lost Beasts Unearthed",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "772GiBXnWoQ",
+        "title": "How the T-Rex Lost Its Arms",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "v7iLJnNod-M",
+        "title": "T.rex Ambush | Walking with Dinosaurs | BBC Earth",
+        "channel": "BBC Earth"
+      }
     ],
     "trike": [
-      {"id":"_AZbmwGAODc","title":"Prehistoric Planet 2 — Why Did Triceratops Have A Frill? | Apple TV","channel":"Apple TV"},
-      {"id":"XV2c3kvfwxg","title":"Greatest Standoff: T.rex vs Triceratops | Walking with Dinosaurs | BBC Earth","channel":"BBC Earth"}
+      {
+        "id": "_AZbmwGAODc",
+        "title": "Prehistoric Planet 2 — Why Did Triceratops Have A Frill? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "CGvE1M95rtw",
+        "title": "The Toughest Of All Dinosaurs: The Triceratops | Clash Of The Dinosaurs",
+        "channel": "Discovery UK"
+      },
+      {
+        "id": "iYeCCV9Eqfw",
+        "title": "How Lane the \"mummy\" Triceratops completely changed what we know about dinosaurs!",
+        "channel": "Houston Museum of Natural Science"
+      },
+      {
+        "id": "XV2c3kvfwxg",
+        "title": "Greatest Standoff: T.rex vs Triceratops | Walking with Dinosaurs | BBC Earth",
+        "channel": "BBC Earth"
+      }
     ],
     "styraco": [
-      {"id":"at9V3_VOk0A","title":"Styracosaurus: The Spiked Dinosaur More Extreme Than Triceratops | Dinosaur Documentary","channel":"Dinosaur Discovery "},
-      {"id":"SEsHlq2-j9I","title":"The Most Bizarre Face in History? | The Full Story of Styracosaurus","channel":"Fossilverse"}
+      {
+        "id": "lS3-9tHNR7I",
+        "title": "Styracosaurus | The Rhino of the Cretaceous",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "caUVRB-FXOA",
+        "title": "Styracosaurus: Your Dinosaurs Are Wrong #22",
+        "channel": "Chaotic Good"
+      },
+      {
+        "id": "rV79gAFx5G8",
+        "title": "Prehistoric Breakdown: Styracosaurus",
+        "channel": "Raptor Rex"
+      },
+      {
+        "id": "at9V3_VOk0A",
+        "title": "Styracosaurus: The Spiked Dinosaur More Extreme Than Triceratops | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "centro": [
-      {"id":"Dg_Qw-JuE2A","title":"Centrosaurus: Dinosaur of the Day","channel":"I Know Dino: The Big Dinosaur Podcast"},
-      {"id":"wfguXl9tou4","title":"Fossil Friday - Centrosaurus - #FossilFriday","channel":"Ben G Thomas"}
+      {
+        "id": "xO8BjI3L3yg",
+        "title": "Dinosaur Massacre | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "qSrsZ3OUsS4",
+        "title": "Centrosaurus: The 'Healing Fracture' That Was Bone Cancer",
+        "channel": "The Dinosaur Record"
+      },
+      {
+        "id": "MG802LysFPo",
+        "title": "What is a Centrosaurus Dino Dig Like?",
+        "channel": "Earth Explained"
+      },
+      {
+        "id": "Dg_Qw-JuE2A",
+        "title": "Centrosaurus: Dinosaur of the Day",
+        "channel": "I Know Dino: The Big Dinosaur Podcast"
+      }
     ],
     "proto": [
-      {"id":"BnwFcjfLHfY","title":"The MANY Interpretations of Protoceratops!","channel":"Dino Guy"},
-      {"id":"AWmxDQ9l9EQ","title":"Protoceratops VS velociraptors (dinosaures) - ZAPPING SAUVAGE","channel":"France tv science & nature"}
+      {
+        "id": "vdeWlibb7r0",
+        "title": "Protoceratops | The Evolutionary Headache of Ceratopsians | Dino Basics",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "AWmxDQ9l9EQ",
+        "title": "Protoceratops VS velociraptors (dinosaures) - ZAPPING SAUVAGE",
+        "channel": "France tv science & nature"
+      },
+      {
+        "id": "-Zl7fMqpTQc",
+        "title": "The Story of the Fighting Dinosaurs",
+        "channel": "UTD GEOSCIENCE STUDIO"
+      },
+      {
+        "id": "BnwFcjfLHfY",
+        "title": "The MANY Interpretations of Protoceratops!",
+        "channel": "Dino Guy"
+      }
     ],
     "edmont": [
-      {"id":"xk-cpHB75rg","title":"Prehistoric Pursuit: Albertosaurus vs Edmontosaurus | Walking With Dinosaurs - BBC","channel":"BBC"},
-      {"id":"srwRJNc38JM","title":"Edmontosaurus | The Last of the Dinosaurs | Dino Basics","channel":"Dino Basics"}
+      {
+        "id": "srwRJNc38JM",
+        "title": "Edmontosaurus | The Last of the Dinosaurs | Dino Basics",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "i2OYcptFl9c",
+        "title": "Dinosaur Mummy Discovery: Hooved Edmontosaurus Revealed in Wyoming Badlands",
+        "channel": "University of Chicago Biological Sciences Division"
+      },
+      {
+        "id": "xk-cpHB75rg",
+        "title": "Prehistoric Pursuit: Albertosaurus vs Edmontosaurus | Walking With Dinosaurs - BBC",
+        "channel": "BBC"
+      }
     ],
     "para": [
-      {"id":"kjliP6xfxLk","title":"Parasaurolophus: The Strangest Dinosaur of the Cretaceous | Dinosaur Documentary","channel":"Dinosaur Discovery "},
-      {"id":"gT5DQDqtJ2w","title":"The Clash of the Dinosaurs - |The Defenders| - Parasaurolophus","channel":"Deiondré"}
+      {
+        "id": "rBMEwoM1LYs",
+        "title": "The Parasaurolophus’ Pipes: Modeling the Dinosaur’s Crest To Study Its Sound",
+        "channel": "Acoustical Society of America"
+      },
+      {
+        "id": "KR6_0HJi_IE",
+        "title": "Parasaurolophus: YDAW Archive (Re-upload + Corrections)",
+        "channel": "Your Dinosaurs Are Wrong"
+      },
+      {
+        "id": "R6ZZ2Lsm9xc",
+        "title": "Parasaurolophus' life was WAY crazier than you think",
+        "channel": "Deep Nature"
+      },
+      {
+        "id": "kjliP6xfxLk",
+        "title": "Parasaurolophus: The Strangest Dinosaur of the Cretaceous | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "ankylo": [
-      {"id":"75ECu8GFLME","title":"Prehistoric Planet 2 — How Did Ankylosaurs Use Their Tail? | Apple TV","channel":"Apple TV"},
-      {"id":"lRt-4SdzWrk","title":"How Ankylosaurs Got Their Clubs","channel":"PBS Eons"}
+      {
+        "id": "75ECu8GFLME",
+        "title": "Prehistoric Planet 2 — How Did Ankylosaurs Use Their Tail? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "lRt-4SdzWrk",
+        "title": "How Ankylosaurs Got Their Clubs",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "aMUf7XaHAbM",
+        "title": "Clash of the Dinosaurs: The Defenders - Dinosaurian Tank",
+        "channel": "Discovery"
+      }
     ],
     "doed": [
-      {"id":"TCGWwbPJus4","title":"Prehistoric Facts Special #63: Doedicurus","channel":"Prehistoric Facts with Dino Chris"},
-      {"id":"CPbk0Fx7ddY","title":"Smilodon playing with Doedicurus","channel":"Palaeo Research Station"}
+      {
+        "id": "xBXrSoYqcyk",
+        "title": "Doedicurus Battle | Prehistoric Planet: Ice Age | OFFICIAL CLIP",
+        "channel": "EDGE Science"
+      },
+      {
+        "id": "xyCBzKsI6hI",
+        "title": "Glyptodonts: The Giant Extinct Armadillos of the Americas",
+        "channel": "Dr. Polaris"
+      },
+      {
+        "id": "48Fg6GPyDj8",
+        "title": "HMNS IQ: What is a glyptodon?",
+        "channel": "Houston Museum of Natural Science"
+      },
+      {
+        "id": "TCGWwbPJus4",
+        "title": "Prehistoric Facts Special #63: Doedicurus",
+        "channel": "Prehistoric Facts with Dino Chris"
+      }
     ],
     "nodo": [
-      {"id":"ohNRaimQZwA","title":"Badlands Nodosaur | Is This The Best Preserved Fossil Ever Discovered?","channel":"10 Minute Fauna"},
-      {"id":"qvfQ9S6P_gc","title":"Owner of strong armor!【 Nodosaurus 】Short Dinosaur Explanation!《:DINOchannnel English ver.》","channel":"でぃのちゃんねる:DINOchannel"}
+      {
+        "id": "a-UZXBF63z4",
+        "title": "The Dinosaur Who Was Buried at Sea",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "Ml_V1dCxxsg",
+        "title": "Palaeo Investigations: What Colour Was a Nodosaur?",
+        "channel": "Royal Tyrrell Museum of Palaeontology"
+      },
+      {
+        "id": "CehqV3lfayA",
+        "title": "Newly Unveiled Dinosaur Fossil is Best Preserved Of Its Kind | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "ohNRaimQZwA",
+        "title": "Badlands Nodosaur | Is This The Best Preserved Fossil Ever Discovered?",
+        "channel": "10 Minute Fauna"
+      }
     ],
     "pachy": [
-      {"id":"eL8lbCW1yn0","title":"Prehistoric Planet 2 — Was Pachycephalosaur Really A Headbutter? | Apple TV","channel":"Apple TV"},
-      {"id":"D_pf5f_PUOs","title":"The Untold Story Of Pachycephalosaurus","channel":"ExtinctWorld"}
+      {
+        "id": "eL8lbCW1yn0",
+        "title": "Prehistoric Planet 2 — Was Pachycephalosaur Really A Headbutter? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "f3jEKO1-WLI",
+        "title": "Pachycephalosaurus | The Living Battering Ram",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "GpXmeoCZM98",
+        "title": "Pachycephalosaurus: Are Stygimoloch and Dracorex Valid?",
+        "channel": "Factor Trace"
+      },
+      {
+        "id": "D_pf5f_PUOs",
+        "title": "The Untold Story Of Pachycephalosaurus",
+        "channel": "ExtinctWorld"
+      }
     ],
     "stygi": [
-      {"id":"paGA60RSK0g","title":"Stygimoloch | The Spiked Potential Pachy | Dino Basics","channel":"Dino Basics"},
-      {"id":"GpXmeoCZM98","title":"Pachycephalosaurus: Are Stygimoloch and Dracorex Valid?","channel":"Factor Trace"}
+      {
+        "id": "paGA60RSK0g",
+        "title": "Stygimoloch | The Spiked Potential Pachy | Dino Basics",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "aiiOP4Dk1xs",
+        "title": "What Was The Stygimoloch? - The Dinosaur Channel",
+        "channel": "BrachioTitan 🦕- The Dinosaur Channel"
+      },
+      {
+        "id": "JwcupiPcKX4",
+        "title": "Dracorex and Stygimoloch OR Juvenile Pachys (Paleo Myths #2)",
+        "channel": "Red Raptor Writes"
+      },
+      {
+        "id": "GpXmeoCZM98",
+        "title": "Pachycephalosaurus: Are Stygimoloch and Dracorex Valid?",
+        "channel": "Factor Trace"
+      }
     ],
     "spino": [
-      {"id":"VTzfaY2kx0U","title":"Spinosaurus Fishes for Prey | Planet Dinosaur | BBC Earth","channel":"BBC Earth"},
-      {"id":"CrRr9sMBJjw","title":"Why Paleontologists Can’t Stop Fighting About Spinosaurus","channel":"PBS Eons"}
+      {
+        "id": "VTzfaY2kx0U",
+        "title": "Spinosaurus Fishes for Prey | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "CrRr9sMBJjw",
+        "title": "Why Paleontologists Can’t Stop Fighting About Spinosaurus",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "Wv6hEuODrLg",
+        "title": "Spinosaurus vs Carcharodontosaurus | The balance of power  | Planet Dinosaur | BBC",
+        "channel": "BBC Earth"
+      }
     ],
     "carchar": [
-      {"id":"sp2v1Wjr3NI","title":"Carcharodontosaurus - Planet Dinosaur - Episode 1 - BBC","channel":"BBC"},
-      {"id":"Wv6hEuODrLg","title":"Spinosaurus vs Carcharodontosaurus | The balance of power  | Planet Dinosaur | BBC","channel":"BBC Earth"}
+      {
+        "id": "sp2v1Wjr3NI",
+        "title": "Carcharodontosaurus - Planet Dinosaur - Episode 1 - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "Wv6hEuODrLg",
+        "title": "Spinosaurus vs Carcharodontosaurus | The balance of power  | Planet Dinosaur | BBC",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "fIhh-VMU2kE",
+        "title": "Carcharodontosaurus: The Scary 'Shark Toothed Lizard' Bigger Than a T-Rex | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "giganoto": [
-      {"id":"W8Fh720Cs5w","title":"Giganotosaurus Hunt, Walking With Dinosaurs (2003)","channel":"The Official Terra Nova Channel"},
-      {"id":"3zVZZetPl0g","title":"Giganotosaurus: The Terrifying Carnivore That Was BIGGER Than a T-Rex | Dinosaur Documentary","channel":"Dinosaur Discovery "}
+      {
+        "id": "W8Fh720Cs5w",
+        "title": "Giganotosaurus Hunt, Walking With Dinosaurs (2003)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "gGXtsAwgz7Y",
+        "title": "Giganotosaurus - The Biggest Carnivore The World Has Ever Seen... Almost",
+        "channel": "Clint's Reptiles"
+      },
+      {
+        "id": "3zVZZetPl0g",
+        "title": "Giganotosaurus: The Terrifying Carnivore That Was BIGGER Than a T-Rex | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "mapu": [
-      {"id":"15BCDj7p-3E","title":"Mapusaurus - Planet Dinosaur - Episode 5 - BBC","channel":"BBC"},
-      {"id":"CpaZkVqQAFA","title":"Mapusaurus gang Vs. Argentinosaurus | Planet Dinosaur | BBC Earth","channel":"BBC Earth"}
+      {
+        "id": "CpaZkVqQAFA",
+        "title": "Mapusaurus gang Vs. Argentinosaurus | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "15BCDj7p-3E",
+        "title": "Mapusaurus - Planet Dinosaur - Episode 5 - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "40SR9KJocUM",
+        "title": "Mapusaurus | The Titan Killer | Dino Basics",
+        "channel": "Dino Basics"
+      }
     ],
     "acro": [
-      {"id":"s1LOhCCb9qI","title":"Acrocanthosaurus","channel":"Houston Museum of Natural Science"},
-      {"id":"8B8f47-ELvU","title":"Acrocanthosaurus | The Arch-Backed Menace | Dino Basics","channel":"Dino Basics"}
+      {
+        "id": "ul9JzlNYpvs",
+        "title": "Acrocanthosaurus atokensis",
+        "channel": "Museum of the Red River"
+      },
+      {
+        "id": "s1LOhCCb9qI",
+        "title": "Acrocanthosaurus",
+        "channel": "Houston Museum of Natural Science"
+      },
+      {
+        "id": "8B8f47-ELvU",
+        "title": "Acrocanthosaurus | The Arch-Backed Menace | Dino Basics",
+        "channel": "Dino Basics"
+      }
     ],
     "raptor": [
-      {"id":"xcRxwi0x5ig","title":"Prehistoric Planet — Did Velociraptor Have Feathers? | Apple TV","channel":"Apple TV"},
-      {"id":"WCrmkX35Xks","title":"The Best Velociraptor Scenes in 4K HDR | Jurassic World","channel":"Jurassic World"}
+      {
+        "id": "xcRxwi0x5ig",
+        "title": "Prehistoric Planet — Did Velociraptor Have Feathers? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "14en_Jf_3os",
+        "title": "The Real Velociraptor Was Nothing Like Jurassic Park",
+        "channel": "PaleoArchive"
+      },
+      {
+        "id": "kuQJEtwqVD4",
+        "title": "Frozen in Combat: The Astonishing Fossil Discovery of Velociraptor and Protoceratops Clash",
+        "channel": "Dinofact"
+      },
+      {
+        "id": "WCrmkX35Xks",
+        "title": "The Best Velociraptor Scenes in 4K HDR | Jurassic World",
+        "channel": "Jurassic World"
+      }
     ],
     "utahraptor": [
-      {"id":"JTnOFY7V2Vg","title":"Utahraptors Hunting in the Forest | Walking with Dinosaurs | BBC Earth","channel":"BBC Earth"},
-      {"id":"knBhA4S4qgI","title":"Utahraptor - a dinosaur made for battle | Walking With Dinosaurs - BBC","channel":"BBC"}
+      {
+        "id": "knBhA4S4qgI",
+        "title": "Utahraptor - a dinosaur made for battle | Walking With Dinosaurs - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "JTnOFY7V2Vg",
+        "title": "Utahraptors Hunting in the Forest | Walking with Dinosaurs | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "E-jtwNGnQ5U",
+        "title": "Utahraptor vs Gastonia: A 20-Million-Year Evolutionary Arms Race | Walking with Dinosaurs Unearthed",
+        "channel": "PBS Terra"
+      }
     ],
     "deinonychus": [
-      {"id":"zZWqEnnuWUs","title":"Deinonychus \"terrible claw\". The real story from a real paleontologist.","channel":"RealPaleontology"},
-      {"id":"tUYhimGI0ds","title":"Deinonychus Pack Hunts Arkansaurus | Life On Our Planet 2023 Chapter 5","channel":"AnimalComparisons"}
+      {
+        "id": "d_gyJUdk-6g",
+        "title": "The Raptor That Made Us Rethink Dinosaurs",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "zZWqEnnuWUs",
+        "title": "Deinonychus \"terrible claw\". The real story from a real paleontologist.",
+        "channel": "RealPaleontology"
+      },
+      {
+        "id": "cZhQCA40z7U",
+        "title": "Deinonychus: The Dinosaur that Changed Paleontology for ever",
+        "channel": "Dr. Polaris"
+      },
+      {
+        "id": "tUYhimGI0ds",
+        "title": "Deinonychus Pack Hunts Arkansaurus | Life On Our Planet 2023 Chapter 5",
+        "channel": "AnimalComparisons"
+      }
     ],
     "oviraptor": [
-      {"id":"TtOfCaYhjzk","title":"Oviraptorid Defends Her Nest from Predators | Planet Dinosaur | BBC Earth","channel":"BBC Earth"},
-      {"id":"27Ss4CdGkDk","title":"The (Ovi)Raptor That Paleontologists Got Wrong","channel":"PBS Eons"}
+      {
+        "id": "TtOfCaYhjzk",
+        "title": "Oviraptorid Defends Her Nest from Predators | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "27Ss4CdGkDk",
+        "title": "The (Ovi)Raptor That Paleontologists Got Wrong",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "D4YLP_4lsJU",
+        "title": "Fossil in Focus: Oviraptor... egg-thief or egg-layer?",
+        "channel": "Earth Explained"
+      }
     ],
     "iguanodon": [
-      {"id":"TPHR1O0P-Tg","title":"Iguanodon | One of the Original Dinosaurs","channel":"Dino Basics"},
-      {"id":"x8LWSsZSwFM","title":"What Disney Dinosaur Got Wrong About The Iguanodon...","channel":"Dinosaur Discovery "}
+      {
+        "id": "qrCw5kLXLn8",
+        "title": "Our Natural Selection - The Bernissart Iguanodons",
+        "channel": "Institute of Natural Sciences Belgium"
+      },
+      {
+        "id": "TPHR1O0P-Tg",
+        "title": "Iguanodon | One of the Original Dinosaurs",
+        "channel": "Dino Basics"
+      },
+      {
+        "id": "24yTmsYcGUM",
+        "title": "Iguanodon - The Dino with a Thumb Spike",
+        "channel": "Total Dino"
+      },
+      {
+        "id": "x8LWSsZSwFM",
+        "title": "What Disney Dinosaur Got Wrong About The Iguanodon...",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "quetzal": [
-      {"id":"IH5IGhi2Pu8","title":"Prehistoric Planet — Flamboyant Flyers | Apple TV","channel":"Apple TV"},
-      {"id":"LZxFyNCSc9A","title":"Prehistoric Planet S01E03 Quetzalcoatlus Protects the nest clip [HD 1080p]","channel":"Glitchy Raptor Animations Studios Memes & Gaming"}
+      {
+        "id": "NmosCtNCJSs",
+        "title": "Prehistoric Planet 2 — Could Giant Pterosaurs Really Hunt on the Ground? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "scAp-fncp64",
+        "title": "The Biggest Thing That Ever Flew",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "IH5IGhi2Pu8",
+        "title": "Prehistoric Planet — Flamboyant Flyers | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "LZxFyNCSc9A",
+        "title": "Prehistoric Planet S01E03 Quetzalcoatlus Protects the nest clip [HD 1080p]",
+        "channel": "Glitchy Raptor Animations Studios Memes & Gaming"
+      }
     ],
     "ptero": [
-      {"id":"mfYuvlE78Nk","title":"Pterosaurs 101 | National Geographic","channel":"National Geographic"},
-      {"id":"NmosCtNCJSs","title":"Prehistoric Planet 2 — Could Giant Pterosaurs Really Hunt on the Ground? | Apple TV","channel":"Apple TV"}
+      {
+        "id": "mfYuvlE78Nk",
+        "title": "Pterosaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "RtDBzO9I4OA",
+        "title": "Pteranodon Encounter, Walking With Dinosaurs (2003)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "r8GBXhi9A2A",
+        "title": "How Pterosaurs Got Their Wings",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "NmosCtNCJSs",
+        "title": "Prehistoric Planet 2 — Could Giant Pterosaurs Really Hunt on the Ground? | Apple TV",
+        "channel": "Apple TV"
+      }
     ],
     "mosa": [
-      {"id":"WRQ-RSNImIM","title":"Mosasaurs 101 | National Geographic","channel":"National Geographic"},
-      {"id":"UQQeSnrVSMw","title":"Mosasaurus Feeding Show Scene - Jurassic World (2015) Movie Clip HD","channel":"BestClips"}
+      {
+        "id": "Hl6Lj2fAuGM",
+        "title": "Prehistoric Planet 2 — How Fast Was A Mosasaur? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "WRQ-RSNImIM",
+        "title": "Mosasaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "Zl9gCk-o2t0",
+        "title": "Prehistoric Planet - Hoffman’s Mosasaur - [4k, Ultra HD, HDR]",
+        "channel": "HDR Unleashed"
+      },
+      {
+        "id": "UQQeSnrVSMw",
+        "title": "Mosasaurus Feeding Show Scene - Jurassic World (2015) Movie Clip HD",
+        "channel": "BestClips"
+      }
     ],
     "plesio": [
-      {"id":"mkw593Qa19U","title":"Plesiosaurs 101 | National Geographic","channel":"National Geographic"}
+      {
+        "id": "mkw593Qa19U",
+        "title": "Plesiosaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "bhTpnviWAbo",
+        "title": "Curiosities of the Natural History Museum London - Ep 2 Mary Annings first Ichthyosaur & Plesiosaur",
+        "channel": "Em Gems"
+      },
+      {
+        "id": "LC-2Ql3T4Bg",
+        "title": "Plesiosaurs Were Evolution’s Strangest Mistake",
+        "channel": "Mr. Science"
+      }
     ],
     "elasmo": [
-      {"id":"s2fzKbSVwks","title":"Prehistoric Planet S01E03 Elasmosaurus clip [HD 1080p]","channel":"Glitchy Raptor Animations Studios Memes & Gaming"},
-      {"id":"exTfqjDAPpA","title":"Elasmosaurus: The Long-Necked Ocean Giant That Ruled the Cretaceous Seas","channel":"TurkSplainer"}
+      {
+        "id": "jBZGvAP9IF8",
+        "title": "Prehistoric Planet — Tuarangisaurus Dive for Pebbles | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "6JKJin261tk",
+        "title": "Elasmosaur Discovery!",
+        "channel": "Royal Tyrrell Museum of Palaeontology"
+      },
+      {
+        "id": "qfspr5jPSk4",
+        "title": "UBC Science: Meet our Elasmosaurus",
+        "channel": "Faculty of Science at UBC"
+      },
+      {
+        "id": "s2fzKbSVwks",
+        "title": "Prehistoric Planet S01E03 Elasmosaurus clip [HD 1080p]",
+        "channel": "Glitchy Raptor Animations Studios Memes & Gaming"
+      }
     ],
     "ichthyo": [
-      {"id":"OfZnBV_LFZc","title":"Ichthyosaurs 101 | National Geographic","channel":"National Geographic"},
-      {"id":"V342aXQs9XY","title":"When Ichthyosaurs Led a Revolution in the Seas","channel":"PBS Eons"}
+      {
+        "id": "V342aXQs9XY",
+        "title": "When Ichthyosaurs Led a Revolution in the Seas",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "OfZnBV_LFZc",
+        "title": "Ichthyosaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "-SQiLu83uGc",
+        "title": "Most Dangerous Birth In Prehistoric Oceans | Walking with Dinosaurs (1999) | BBC Earth",
+        "channel": "BBC Earth"
+      }
     ],
     "krono": [
-      {"id":"3fy-wX_guBc","title":"The Kronosaurus: How a Famous Fossil Fooled Science for 60 Years","channel":"ExtinctDoc"},
-      {"id":"a7n2fTrTJrY","title":"Kronosaurus: The Ocean Deadliest Predator","channel":"The Abyss Report "}
+      {
+        "id": "x8WUYc75zOA",
+        "title": "The Insane Evolution of Kronosaurus",
+        "channel": "Earth 2.0"
+      },
+      {
+        "id": "fLlfVG4EAJk",
+        "title": "Let's talk Kronosaurs | Inside the Lab",
+        "channel": "Australian Age of Dinosaurs"
+      },
+      {
+        "id": "MNIkzjpHySw",
+        "title": "Meet a titan of the sea: \"Kronosaurus\" | From the Collection",
+        "channel": "Australian Age of Dinosaurs"
+      },
+      {
+        "id": "3fy-wX_guBc",
+        "title": "The Kronosaurus: How a Famous Fossil Fooled Science for 60 Years",
+        "channel": "ExtinctDoc"
+      }
     ],
     "liopleurodon": [
-      {"id":"utXft8fjTYQ","title":"Walking with Dinosaurs - Demise of a Liopleurodon","channel":"Wild Destinations"},
-      {"id":"-538sx0jDcI","title":"Liopleurodon: The Terror of the Jurassic Seas | Dinosaur Documentary","channel":"Dinosaur Discovery "}
+      {
+        "id": "utXft8fjTYQ",
+        "title": "Walking with Dinosaurs - Demise of a Liopleurodon",
+        "channel": "Wild Destinations"
+      },
+      {
+        "id": "45fi8zJPGSU",
+        "title": "Liopleurodon Fight, Walking With Dinosaurs (1999) ",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "1WtsDmOIq2g",
+        "title": "The Scientific Accuracy of Walking With Dinosaurs - Episode 3: Cruel Sea",
+        "channel": "Ben G Thomas"
+      },
+      {
+        "id": "-538sx0jDcI",
+        "title": "Liopleurodon: The Terror of the Jurassic Seas | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "archelon": [
-      {"id":"aLsSkMM8IFk","title":"Archelon: The Giant Sea Turtle That Ruled the Prehistoric Seas","channel":"AGE OF DINOSAURS"},
-      {"id":"8lDv_cvl7IM","title":"Prehistoric Planet [2022] - Archelon Screen Time ","channel":"M. REX Screen Time & Edits"}
+      {
+        "id": "Tmb8XCwb3FI",
+        "title": "The Return of Giant Skin-Shell Sea Turtles",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "ORbm8FnFu_s",
+        "title": "Archelon: The Largest Turtle Ever To Have Lived",
+        "channel": "Earth 2.0"
+      },
+      {
+        "id": "gHhhlrsImwc",
+        "title": "The Gigantic Sea Turtle - Archelon",
+        "channel": "Paleontology Plus"
+      },
+      {
+        "id": "aLsSkMM8IFk",
+        "title": "Archelon: The Giant Sea Turtle That Ruled the Prehistoric Seas",
+        "channel": "AGE OF DINOSAURS"
+      }
     ],
     "deino": [
-      {"id":"mzFbaKH1I04","title":"Deinosuchus: The Terrifying Extinct Dinosaur Eating Crocodile | Dinosaur Documentary","channel":"Dinosaur Discovery "},
-      {"id":"WubW1CJYx2g","title":"Deinosuchus Ambush, Prehistoric Park, Episode 6 (2006)","channel":"The Official Terra Nova Channel"}
+      {
+        "id": "7lJOMAkfQRE",
+        "title": "Deinosuchus: The King Of The Crocodilians",
+        "channel": "CHimerasuchus"
+      },
+      {
+        "id": "iZ_iLxygKjY",
+        "title": "The Largest Predator To Walk During The Cretaceous Wasn't A Dinosaur?",
+        "channel": "ExtinctZoo "
+      },
+      {
+        "id": "WubW1CJYx2g",
+        "title": "Deinosuchus Ambush, Prehistoric Park, Episode 6 (2006)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "mzFbaKH1I04",
+        "title": "Deinosuchus: The Terrifying Extinct Dinosaur Eating Crocodile | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "dimetrodon": [
-      {"id":"SR3OOP9mImI","title":"Dimetrodon: Our Most Unlikely Ancestor","channel":"PBS Eons"},
-      {"id":"ZpV4U3pclPc","title":"This Dimetrodon grandis Fossil was a Pre-Dinosaur Apex Predator from Texas","channel":"Smithsonian's National Museum of Natural History"}
+      {
+        "id": "SR3OOP9mImI",
+        "title": "Dimetrodon: Our Most Unlikely Ancestor",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "6BnPBKPADTw",
+        "title": "How Dimetrodon Lived Through an Ice Age",
+        "channel": "Moth Light Media"
+      },
+      {
+        "id": "cOVkK8-WCHM",
+        "title": "TRILOGY OF LIFE - Walking with Monsters - \"Dimetrodon\"",
+        "channel": "Riamus"
+      },
+      {
+        "id": "ZpV4U3pclPc",
+        "title": "This Dimetrodon grandis Fossil was a Pre-Dinosaur Apex Predator from Texas",
+        "channel": "Smithsonian's National Museum of Natural History"
+      }
     ]
   },
   "battles": {
     "trex-vs-trike": [
-      {"id":"XV2c3kvfwxg","title":"Greatest Standoff: T.rex vs Triceratops | Walking with Dinosaurs | BBC Earth","channel":"BBC Earth"},
-      {"id":"Zgv0bT5-MB0","title":"T.rex vs Triceratops: who would win?  | Walking with Dinosaurs - BBC","channel":"BBC"}
+      {
+        "id": "XV2c3kvfwxg",
+        "title": "Greatest Standoff: T.rex vs Triceratops | Walking with Dinosaurs | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "Zgv0bT5-MB0",
+        "title": "T.rex vs Triceratops: who would win?  | Walking with Dinosaurs - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "TzVsfFV9tnQ",
+        "title": "T-Rex Fights For Survival Against Vicious Enemies | Clash Of The Dinosaurs",
+        "channel": "Discovery UK"
+      },
+      {
+        "id": "KEwVUrukhvA",
+        "title": "How Triceratops VS Tyrannosaurus Actually Happened",
+        "channel": "Vividen: Paleontology Evolved"
+      },
+      {
+        "id": "1R18IJJPRFc",
+        "title": "Tyrannosaurus Rex VS Triceratops - Who Would Win In A Fight?",
+        "channel": "WildCiencias"
+      }
     ],
     "allo-vs-stego": [
-      {"id":"LPjN9FEptus","title":"Stegosaurus vs Allosaurus Face-Off | Walking with Dinosaurs (1999) | BBC Earth","channel":"BBC Earth"}
+      {
+        "id": "LPjN9FEptus",
+        "title": "Stegosaurus vs Allosaurus Face-Off | Walking with Dinosaurs (1999) | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "ASxQKIUf6x8",
+        "title": "Mammals Vs. Dinos- Allosaurus vs. Stegosaurus",
+        "channel": "Science Channel"
+      },
+      {
+        "id": "C0r5P-PzIPU",
+        "title": "The Smell of Prey | Walking with Dinosaurs in HQ | BBC",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "YSGdowqESaQ",
+        "title": "A deadly Allosaurus ambushes its prey | Planet Dinosaur - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "Nsf5xCbZ7us",
+        "title": "Stegosaurs: Tiny Brains & Thagomizers",
+        "channel": "PBS Eons"
+      }
     ],
     "raptor-vs-proto": [
-      {"id":"-Zl7fMqpTQc","title":"The Story of the Fighting Dinosaurs","channel":"UTD GEOSCIENCE STUDIO"},
-      {"id":"AWmxDQ9l9EQ","title":"Protoceratops VS velociraptors (dinosaures) - ZAPPING SAUVAGE","channel":"France tv science & nature"}
+      {
+        "id": "AWmxDQ9l9EQ",
+        "title": "Protoceratops VS velociraptors (dinosaures) - ZAPPING SAUVAGE",
+        "channel": "France tv science & nature"
+      },
+      {
+        "id": "qwOb7Ofpuoo",
+        "title": "Velociraptor VS Protoceratops - The Land of Dinosaurs, #07, 벨로키랍토르 VS 프로토케라",
+        "channel": "MBClife"
+      },
+      {
+        "id": "pkb0ymjIykU",
+        "title": "The Fate of the Fighting Dinosaurs",
+        "channel": "The Budget Museum"
+      },
+      {
+        "id": "-Zl7fMqpTQc",
+        "title": "The Story of the Fighting Dinosaurs",
+        "channel": "UTD GEOSCIENCE STUDIO"
+      }
     ],
     "trex-vs-ankylo": [
-      {"id":"UIL5JAudx6k","title":"T. rex vs Ankylosaurus | Epic Dinosaur Battle | The Dinosaurs | Netflix","channel":"Silverback Films"},
-      {"id":"11PJbMkAdPQ","title":"T rex vs Ankylosaurus, Walking With Dinosaurs (1999) ","channel":"The Official Terra Nova Channel"}
+      {
+        "id": "UIL5JAudx6k",
+        "title": "T. rex vs Ankylosaurus | Epic Dinosaur Battle | The Dinosaurs | Netflix",
+        "channel": "Silverback Films"
+      },
+      {
+        "id": "11PJbMkAdPQ",
+        "title": "T rex vs Ankylosaurus, Walking With Dinosaurs (1999) ",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "75ECu8GFLME",
+        "title": "Prehistoric Planet 2 — How Did Ankylosaurs Use Their Tail? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "rmMqFdYkiCM",
+        "title": "The Only Dinosaur That T. Rex Was Scared Of",
+        "channel": "ExtinctZoo "
+      },
+      {
+        "id": "lRt-4SdzWrk",
+        "title": "How Ankylosaurs Got Their Clubs",
+        "channel": "PBS Eons"
+      }
     ],
     "spino-vs-carchar": [
-      {"id":"Wv6hEuODrLg","title":"Spinosaurus vs Carcharodontosaurus | The balance of power  | Planet Dinosaur | BBC","channel":"BBC Earth"},
-      {"id":"PC39p9t4_5Q","title":"Walking with Dinosaurs 2025 - Carcharodontosaurus vs Spinosaurus fight clip","channel":"Glitchy Raptor Animations Studios Memes & Gaming"}
+      {
+        "id": "Wv6hEuODrLg",
+        "title": "Spinosaurus vs Carcharodontosaurus | The balance of power  | Planet Dinosaur | BBC",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "sp2v1Wjr3NI",
+        "title": "Carcharodontosaurus - Planet Dinosaur - Episode 1 - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "VTzfaY2kx0U",
+        "title": "Spinosaurus Fishes for Prey | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "BBPlZNfemmM",
+        "title": "Spinosaurus Fierce Fight for Food and Survival | Walking with Dinosaurs | BBC Earth Science",
+        "channel": "BBC Earth Science"
+      },
+      {
+        "id": "DfksdU2dcgk",
+        "title": "SPINOSAURUS VS CARCHARODONTOSAURUS [Who Would Win?]",
+        "channel": "Mega Tales"
+      },
+      {
+        "id": "PC39p9t4_5Q",
+        "title": "Walking with Dinosaurs 2025 - Carcharodontosaurus vs Spinosaurus fight clip",
+        "channel": "Glitchy Raptor Animations Studios Memes & Gaming"
+      }
     ],
     "spino-vs-acro": [
-      {"id":"jAkwQ2csKjk","title":"SPINOSAURUS VS ACROCANTHOSAURUS [Who Would Win?]","channel":"Mega Tales"},
-      {"id":"ZLwG_p6Wn0M","title":"Dinosaurs Battle Special: Spinosaurus vs Acrocanthosaurus","channel":"TB Productions"}
+      {
+        "id": "jAkwQ2csKjk",
+        "title": "SPINOSAURUS VS ACROCANTHOSAURUS [Who Would Win?]",
+        "channel": "Mega Tales"
+      },
+      {
+        "id": "Wv6hEuODrLg",
+        "title": "Spinosaurus vs Carcharodontosaurus | The balance of power  | Planet Dinosaur | BBC",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "h8s_6ZECpLk",
+        "title": "Monsters Resurrected - Acrocanthosaurus atokensis",
+        "channel": "Riamus"
+      },
+      {
+        "id": "BBPlZNfemmM",
+        "title": "Spinosaurus Fierce Fight for Food and Survival | Walking with Dinosaurs | BBC Earth Science",
+        "channel": "BBC Earth Science"
+      },
+      {
+        "id": "r-J19OGBumc",
+        "title": "Acrocanthosaurus | The giant-killing king before T.rex",
+        "channel": "Dino-gen"
+      },
+      {
+        "id": "ZLwG_p6Wn0M",
+        "title": "Dinosaurs Battle Special: Spinosaurus vs Acrocanthosaurus",
+        "channel": "TB Productions"
+      }
     ],
     "mosa-vs-plesio": [
-      {"id":"l4os8t9IbMs","title":"mosasaur attack  - mosasaur hunts plesiosaur","channel":"Paleotrace"},
-      {"id":"JPW1gXHA08E","title":"Abyss of Blood – Plesiosaurus vs Mosasaurus in the Cretaceous Deep Sea","channel":"Prehistoric Planet 3D"}
+      {
+        "id": "ObLS2_sYEoE",
+        "title": "Prehistoric Planet 2 - Mosasaurus Attacks the Tuarangisaurus Scene",
+        "channel": "AlliSaurus"
+      },
+      {
+        "id": "9ktJ57KOhlo",
+        "title": "Sea Monster Smackdown",
+        "channel": "Versus"
+      },
+      {
+        "id": "uX16ciRHZxI",
+        "title": "Mosasaurus HUNTS down Elasmosaurus - Jurassic World Evolution 2",
+        "channel": "Krowasaurus"
+      },
+      {
+        "id": "WRQ-RSNImIM",
+        "title": "Mosasaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "mkw593Qa19U",
+        "title": "Plesiosaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "l4os8t9IbMs",
+        "title": "mosasaur attack  - mosasaur hunts plesiosaur",
+        "channel": "Paleotrace"
+      }
     ],
     "baryonyx-vs-iguanodon": [
-      {"id":"8HcdTiWvkmg","title":"PPBA Baryonyx vs Iguanodon","channel":"Parasaurolophus 67"},
-      {"id":"k8GJxxaHLOw","title":"dinosaurs battle. batalla 17. Iguanodon vs baryonyx.","channel":"pachycephalo–oficial"}
+      {
+        "id": "L-dFK8kJA5M",
+        "title": "Baryonyx FIGHTS Iguanodon! - Life in the Cretaceous || Jurassic World Evolution 🦖 [4K] 🦖",
+        "channel": "National Jurassic"
+      },
+      {
+        "id": "UowgAA2u2NY",
+        "title": "Baryonyx capturing an Iguanodon",
+        "channel": "Howdytoons"
+      },
+      {
+        "id": "8HcdTiWvkmg",
+        "title": "PPBA Baryonyx vs Iguanodon",
+        "channel": "Parasaurolophus 67"
+      },
+      {
+        "id": "DmLpgzkLPek",
+        "title": "BBC JellyFish studios - Dinosaur Britain - \"Baryonyx walkeri\"",
+        "channel": "Riamus"
+      },
+      {
+        "id": "J3Sf6SdYHrI",
+        "title": "Walking with Dinosaurs - Utahraptor vs. Iguanodon",
+        "channel": "Wild Destinations"
+      },
+      {
+        "id": "k8GJxxaHLOw",
+        "title": "dinosaurs battle. batalla 17. Iguanodon vs baryonyx.",
+        "channel": "pachycephalo–oficial"
+      }
     ],
     "deino-vs-deino": [
-      {"id":"WubW1CJYx2g","title":"Deinosuchus Ambush, Prehistoric Park, Episode 6 (2006)","channel":"The Official Terra Nova Channel"},
-      {"id":"mzFbaKH1I04","title":"Deinosuchus: The Terrifying Extinct Dinosaur Eating Crocodile | Dinosaur Documentary","channel":"Dinosaur Discovery "}
+      {
+        "id": "9LXHFu1UlUc",
+        "title": "Albertosaurus vs Deinosuchus, Prehistoric Park (Ep 6)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "WubW1CJYx2g",
+        "title": "Deinosuchus Ambush, Prehistoric Park, Episode 6 (2006)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "7lJOMAkfQRE",
+        "title": "Deinosuchus: The King Of The Crocodilians",
+        "channel": "CHimerasuchus"
+      },
+      {
+        "id": "iZ_iLxygKjY",
+        "title": "The Largest Predator To Walk During The Cretaceous Wasn't A Dinosaur?",
+        "channel": "ExtinctZoo "
+      },
+      {
+        "id": "itHu4qkn9b8",
+        "title": "Trapping the Deinosuchus, Prehistoric Park Episode 6 (2006)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "mzFbaKH1I04",
+        "title": "Deinosuchus: The Terrifying Extinct Dinosaur Eating Crocodile | Dinosaur Documentary",
+        "channel": "Dinosaur Discovery "
+      }
     ],
     "giganoto-vs-mapu": [
-      {"id":"MD27SrRQCfM","title":"Mapusaurus vs Giganotosaurus | Who is the true king of the Carcharodontosaurids?","channel":"SaurZilla"},
-      {"id":"YX9QaIPqTzs","title":"Mapusaurus and Giganotosaurus battle over a carcass -Epic Battle-","channel":"J DINK"}
+      {
+        "id": "CpaZkVqQAFA",
+        "title": "Mapusaurus gang Vs. Argentinosaurus | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "15BCDj7p-3E",
+        "title": "Mapusaurus - Planet Dinosaur - Episode 5 - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "W8Fh720Cs5w",
+        "title": "Giganotosaurus Hunt, Walking With Dinosaurs (2003)",
+        "channel": "The Official Terra Nova Channel"
+      },
+      {
+        "id": "MD27SrRQCfM",
+        "title": "Mapusaurus vs Giganotosaurus | Who is the true king of the Carcharodontosaurids?",
+        "channel": "SaurZilla"
+      },
+      {
+        "id": "ljtt7iJ9h7M",
+        "title": "MAPUSAURUS VS GIGANOTOSAURUS - Jurassic World Evolution 2",
+        "channel": "Krowasaurus"
+      },
+      {
+        "id": "YX9QaIPqTzs",
+        "title": "Mapusaurus and Giganotosaurus battle over a carcass -Epic Battle-",
+        "channel": "J DINK"
+      }
     ],
     "allo-vs-torvo": [
-      {"id":"OIWkJ7ED7bA","title":"Final Turf Battle | Allosaurus vs. Torvosaurus","channel":"WBM World's Best Media"},
-      {"id":"9MhPXjB6D_I","title":"Allosaurus vs Torvosaurus - Animacion MS Paint","channel":"Beto Films"}
+      {
+        "id": "TEtiSB61gTI",
+        "title": "Turf Battle | Allosaurus vs. Torvosaurus",
+        "channel": "WBM World's Best Media"
+      },
+      {
+        "id": "OIWkJ7ED7bA",
+        "title": "Final Turf Battle | Allosaurus vs. Torvosaurus",
+        "channel": "WBM World's Best Media"
+      },
+      {
+        "id": "ftVOFLwSxCg",
+        "title": "A Good Neighbor | Dinosaur Revolution",
+        "channel": "Discovery"
+      },
+      {
+        "id": "T-nZ5qXrHug",
+        "title": "Meet The Torvosaurus: Europe's Apex Carnivore | Walking with Dinosaurs | BBC Earth Science",
+        "channel": "BBC Earth Science"
+      },
+      {
+        "id": "YSGdowqESaQ",
+        "title": "A deadly Allosaurus ambushes its prey | Planet Dinosaur - BBC",
+        "channel": "BBC"
+      },
+      {
+        "id": "9MhPXjB6D_I",
+        "title": "Allosaurus vs Torvosaurus - Animacion MS Paint",
+        "channel": "Beto Films"
+      }
     ],
     "quetzal-vs-ptero": [
-      {"id":"_eOVVdq4Xtw","title":"Pteranodon vs Quetzalcoatlus|The Greatest Aerial Battle in Prehistory","channel":"Echoes of Evolution"},
-      {"id":"2ULnLPAzb3U","title":"Pteranodon vs Quetzalcoatlus - Epic Sky Wars","channel":"Battle For Prehistoric Earth"}
+      {
+        "id": "NmosCtNCJSs",
+        "title": "Prehistoric Planet 2 — Could Giant Pterosaurs Really Hunt on the Ground? | Apple TV",
+        "channel": "Apple TV"
+      },
+      {
+        "id": "0tSOkFzkx_s",
+        "title": "One of the Scariest Moments in The Dinosaurs | Giant Pterosaur Attack | Netflix",
+        "channel": "Silverback Films"
+      },
+      {
+        "id": "bP3JkC0FyMI",
+        "title": "King of the Skies | Walking with Dinosaurs in HQ | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "5vea06e6x_E",
+        "title": "What Quetzalcoatlus was really like",
+        "channel": "Howtown"
+      },
+      {
+        "id": "mfYuvlE78Nk",
+        "title": "Pterosaurs 101 | National Geographic",
+        "channel": "National Geographic"
+      },
+      {
+        "id": "_eOVVdq4Xtw",
+        "title": "Pteranodon vs Quetzalcoatlus|The Greatest Aerial Battle in Prehistory",
+        "channel": "Echoes of Evolution"
+      }
     ],
     "trike-vs-centro": [
-      {"id":"z4hb_v3CcDE","title":"Centrosaurus vs Triceratops | Ceratopsian Tournament Fight [S1E9]","channel":"Alpha Tyrannosaurus Rex"}
+      {
+        "id": "z4hb_v3CcDE",
+        "title": "Centrosaurus vs Triceratops | Ceratopsian Tournament Fight [S1E9]",
+        "channel": "Alpha Tyrannosaurus Rex"
+      },
+      {
+        "id": "c6hPCX9NDrg",
+        "title": "Triceratops Fight",
+        "channel": "Palaeo Research Station"
+      },
+      {
+        "id": "xO8BjI3L3yg",
+        "title": "Dinosaur Massacre | Planet Dinosaur | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "CGvE1M95rtw",
+        "title": "The Toughest Of All Dinosaurs: The Triceratops | Clash Of The Dinosaurs",
+        "channel": "Discovery UK"
+      },
+      {
+        "id": "_AZbmwGAODc",
+        "title": "Prehistoric Planet 2 — Why Did Triceratops Have A Frill? | Apple TV",
+        "channel": "Apple TV"
+      }
     ],
     "dilo-vs-coelo": [
-      {"id":"IpsYxhnmtu4","title":"Pivot Dinosaur Battles: REBORN! - Dilophosaurus VS Coelophysis","channel":"Prince T-RexSpinoMaster2015 Studios"},
-      {"id":"Z-CGbIMpDAk","title":"Coelophysis vs Dilophosaurus","channel":"Siaka Dibba"}
+      {
+        "id": "_110j8kB_vc",
+        "title": "Placerias vs Celophysis: Battle for Triassic Survival | Walking with Dinosaurs (1999) | BBC Earth",
+        "channel": "BBC Earth"
+      },
+      {
+        "id": "nxYfTn3KwkY",
+        "title": "When Dinosaurs Roamed America - Dilophosaurus wetherli",
+        "channel": "Riamus"
+      },
+      {
+        "id": "y7jSOp2mr2s",
+        "title": "A Modern Look at Dilophosaurus",
+        "channel": "BRIAN ENGH PALEOART"
+      },
+      {
+        "id": "kjBbcT533r4",
+        "title": "Was This Dinosaur a Cannibal?",
+        "channel": "PBS Eons"
+      },
+      {
+        "id": "RaphVW3IaMQ",
+        "title": "TRILOGY OF LIFE - Walking with Dinosaurs - \"Coelophysis\"",
+        "channel": "Riamus"
+      },
+      {
+        "id": "IpsYxhnmtu4",
+        "title": "Pivot Dinosaur Battles: REBORN! - Dilophosaurus VS Coelophysis",
+        "channel": "Prince T-RexSpinoMaster2015 Studios"
+      }
     ]
   },
   "extra": [
-    {"id":"erWsDXNeDW0","title":"Iconic Dinosaur Moments from Walking With Dinosaurs (1999) | BBC Earth","channel":"BBC Earth","matchup":"Walking with Dinosaurs highlights"},
-    {"id":"xO8BjI3L3yg","title":"Dinosaur Massacre | Planet Dinosaur | BBC Earth","channel":"BBC Earth","matchup":"Planet Dinosaur: massacre"},
-    {"id":"CpaZkVqQAFA","title":"Mapusaurus gang Vs. Argentinosaurus | Planet Dinosaur | BBC Earth","channel":"BBC Earth","matchup":"Mapusaurus pack vs Argentinosaurus"},
-    {"id":"J3Sf6SdYHrI","title":"Walking with Dinosaurs - Utahraptor vs. Iguanodon","channel":"Wild Destinations","matchup":"Utahraptor vs Iguanodon"},
-    {"id":"0iuRGYB9QLQ","title":"The UNSEEN Dinosaur Killer | Planet Dinosaur | BBC Earth","channel":"BBC Earth","matchup":"Planet Dinosaur: unseen killer"},
-    {"id":"xk-cpHB75rg","title":"Prehistoric Pursuit: Albertosaurus vs Edmontosaurus | Walking With Dinosaurs - BBC","channel":"BBC","matchup":"Albertosaurus vs Edmontosaurus"}
+    {
+      "id": "erWsDXNeDW0",
+      "title": "Iconic Dinosaur Moments from Walking With Dinosaurs (1999) | BBC Earth",
+      "channel": "BBC Earth",
+      "matchup": "Walking with Dinosaurs highlights"
+    },
+    {
+      "id": "xO8BjI3L3yg",
+      "title": "Dinosaur Massacre | Planet Dinosaur | BBC Earth",
+      "channel": "BBC Earth",
+      "matchup": "Planet Dinosaur: massacre"
+    },
+    {
+      "id": "CpaZkVqQAFA",
+      "title": "Mapusaurus gang Vs. Argentinosaurus | Planet Dinosaur | BBC Earth",
+      "channel": "BBC Earth",
+      "matchup": "Mapusaurus pack vs Argentinosaurus"
+    },
+    {
+      "id": "J3Sf6SdYHrI",
+      "title": "Walking with Dinosaurs - Utahraptor vs. Iguanodon",
+      "channel": "Wild Destinations",
+      "matchup": "Utahraptor vs Iguanodon"
+    },
+    {
+      "id": "0iuRGYB9QLQ",
+      "title": "The UNSEEN Dinosaur Killer | Planet Dinosaur | BBC Earth",
+      "channel": "BBC Earth",
+      "matchup": "Planet Dinosaur: unseen killer"
+    },
+    {
+      "id": "xk-cpHB75rg",
+      "title": "Prehistoric Pursuit: Albertosaurus vs Edmontosaurus | Walking With Dinosaurs - BBC",
+      "channel": "BBC",
+      "matchup": "Albertosaurus vs Edmontosaurus"
+    }
   ]
 }

@@ -90,24 +90,105 @@ export function makePlacard(title, sub, { w = 2.6, h = 0.65, accent = "#ffb347" 
   return mesh;
 }
 
-/** Floating name tag sprite. */
-export function makeNameTag(text, color = "#ffffff") {
-  const c = makeCanvas(512, 128);
+function roundRectPath(ctx, x, y, w, h, r) {
+  r = Math.min(r, h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/**
+ * Canvas layout of a name tag (1024 x 256, so callers scale the sprite 4:1):
+ * the pill is NAME_TAG_PILL of the canvas height, centred vertically.
+ */
+export const NAME_TAG_ASPECT = 4;
+export const NAME_TAG_PILL = 168 / 256;
+
+/**
+ * Floating name tag sprite, styled like a game nameplate: the name in white
+ * on a dark translucent rounded pill, led by a dot in the player's colour.
+ * The pill is sized to the name inside a fixed 4:1 canvas (long names shrink
+ * to fit), so callers keep scaling the sprite 4:1.
+ *
+ * occlude (default true): depth-tested against the scene so walls hide it,
+ * but it never writes depth and draws after the scene (renderOrder 999), so
+ * it is not hidden by other translucent things or other tags. Pass
+ * occlude: false for the old always-on-top tag.
+ */
+export function makeNameTag(text, color = "#ffffff", { occlude = true } = {}) {
+  const W = 1024;
+  const H = 256;
+  const c = makeCanvas(W, H);
   const ctx = c.getContext("2d");
-  ctx.font = "700 56px Inter, system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = "rgba(4,10,14,0.85)";
-  ctx.strokeText(text, 256, 64);
+  const name = String(text || "Visitor").trim().slice(0, 32) || "Visitor";
+  const font = (s) => `700 ${s}px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+  const pillH = Math.round(H * NAME_TAG_PILL);
+  const top = (H - pillH) / 2;
+  const cy = H / 2;
+  const dotR = 25;
+  const gap = 26;
+  const padL = 44;
+  const padR = 56;
+  const maxText = W - 8 - padL - dotR * 2 - gap - padR;
+  let fs = 96;
+  ctx.font = font(fs);
+  let tw = ctx.measureText(name).width;
+  while (tw > maxText && fs > 52) {
+    fs -= 4;
+    ctx.font = font(fs);
+    tw = ctx.measureText(name).width;
+  }
+  tw = Math.min(tw, maxText);
+  const pillW = padL + dotR * 2 + gap + tw + padR;
+  const x0 = (W - pillW) / 2;
+
+  // the pill: dark, translucent, a hairline rim so it reads on dark walls too
+  roundRectPath(ctx, x0, top, pillW, pillH, pillH / 2);
+  ctx.fillStyle = "rgba(9,13,19,0.66)";
+  ctx.fill();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.stroke();
+
+  // the player's colour dot (white ring keeps dark colours visible)
+  const dx = x0 + padL + dotR;
+  ctx.beginPath();
+  ctx.arc(dx, cy, dotR, 0, TAU);
   ctx.fillStyle = color;
-  ctx.fillText(text, 256, 64);
+  ctx.fill();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.stroke();
+
+  // the name
+  ctx.font = font(fs);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(name, dx + dotR + gap, cy + fs * 0.04, maxText);
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  tex.anisotropy = 4;
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthTest: occlude,
+    depthWrite: false,
+    fog: false,
+    toneMapped: false,
+  });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(1.6, 0.4, 1);
   sprite.renderOrder = 999;
+  sprite.userData.nameTag = true;
   return sprite;
 }
 

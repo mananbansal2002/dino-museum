@@ -1,6 +1,9 @@
 /**
- * Procedural sound bank — no audio files, everything is synthesised with the
- * Web Audio API so the museum stays a single static deploy.
+ * Museum sound bank: recorded samples (public/audio, CC0 / public domain —
+ * see public/audio/CREDITS.json) layered over a procedural Web Audio synth.
+ * Samples load lazily after ensure(); until they arrive, or if any fails to
+ * load / decode, every sound falls back to the procedural voice, so the API
+ * never depends on the network.
  *
  * Signal graph
  *
@@ -28,7 +31,26 @@
  *   chime(f, { zone })     zone-gated like roar
  *   land(impact)           heavier footstep for landing after a jump/fall
  *   zone, volume, ducked   getters
- * Also exported: zoneForHall(hallName), ZONES.
+ * Samples:
+ *   roar(p, { kind })      "trex" | "sauropod" | "raptor" | "visitor" — picks a
+ *                          recorded variant (pitch ±8%, never the same one
+ *                          twice in a row). Default: "visitor" (the player's V
+ *                          emote and other players' roars); zone-gated roars
+ *                          (screenings) default to "trex".
+ *   roar(p, { kind, distance, range, pan })
+ *                          a far-off creature: quieter, darker and wetter
+ *                          with distance, silent beyond `range` metres
+ *                          (default 28 for visitors/raptors, 60 for trex /
+ *                          sauropod); pan -1..1 places it left/right.
+ *   step(vol, surface)     surface "stone" (default) | "marble" | "wood" |
+ *   land(impact, surface)  "parquet" | "carpet" | "rug"
+ *   loadSamples()          start / await the sample download (idempotent;
+ *                          ensure() starts it on its own when idle)
+ *   samples                { loaded, failed, total, codec } getter
+ * Ambience: a recorded museum room tone sits under every zone bed (scaled
+ * like the procedural room tone) and a distant, unintelligible crowd murmur
+ * under the big halls (CROWD_LEVEL).
+ * Also exported: zoneForHall(hallName), ZONES, ROAR_KINDS, SURFACES.
  */
 
 export const ZONES = [
@@ -109,6 +131,72 @@ const UNLOCK_EVENTS = ["pointerdown", "pointerup", "touchend", "keydown", "click
 const later = (fn) =>
   typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 16);
 
+/* ------------------------------------------------------------------ */
+/* sample bank                                                         */
+/* ------------------------------------------------------------------ */
+
+/** public/audio/, resolved next to this module so any page path works. */
+const SAMPLE_DIR = (() => {
+  try {
+    return new URL("../audio/", import.meta.url).href;
+  } catch {
+    return "audio/";
+  }
+})();
+
+/** group → variant count (0 = a single file named after the group). */
+const BANK = {
+  ui_click: 0,
+  ui_chime: 0,
+  step_stone: 4,
+  step_wood: 4,
+  step_carpet: 3,
+  roar_visitor: 3,
+  roar_trex: 3,
+  roar_raptor: 4,
+  roar_sauropod: 2,
+  amb_room: 0,
+  amb_crowd: 0,
+};
+
+export const ROAR_KINDS = ["trex", "sauropod", "raptor", "visitor"];
+export const SURFACES = ["stone", "wood", "carpet"];
+
+/** Loudness of each roar kind relative to the others (samples are peak-normalised). */
+const ROAR_LEVEL = { trex: 1, sauropod: 1.1, raptor: 0.45, visitor: 0.36 };
+/** Default audible range (m) of a roar given a distance, per kind. */
+const ROAR_RANGE = { trex: 60, sauropod: 60, raptor: REMOTE_RANGE, visitor: REMOTE_RANGE };
+/** Procedural fallback character per kind: pitch and length multipliers. */
+const ROAR_SYNTH = {
+  trex: { pitch: 0.85, len: 1.15 },
+  sauropod: { pitch: 0.62, len: 1.5 },
+  raptor: { pitch: 2.1, len: 0.5 },
+  visitor: { pitch: 1, len: 1 },
+};
+
+const SURFACE_ALIAS = { marble: "stone", stone: "stone", tile: "stone", concrete: "stone", wood: "wood", parquet: "wood", carpet: "carpet", rug: "carpet" };
+/** Footstep sample gain / reverb send per surface. */
+const STEP_MIX = {
+  stone: { gain: 0.2, wet: 0.16 },
+  wood: { gain: 0.18, wet: 0.1 },
+  carpet: { gain: 0.24, wet: 0.04 },
+};
+
+/** Crowd murmur level under each zone's bed (big public halls only). */
+const CROWD_LEVEL = {
+  atrium: 0.2,
+  gallery: 0.18,
+  triassic: 0.07,
+  jurassic: 0.07,
+  cretaceous: 0.07,
+  icecream: 0.1,
+};
+/** Recorded room tone gain inside the room bed (scaled by ROOM_LEVEL). */
+const ROOM_SAMPLE_GAIN = 0.32;
+
+const normSurface = (s) => SURFACE_ALIAS[String(s || "").toLowerCase()] || "stone";
+const normKind = (k) => (ROAR_KINDS.includes(k) ? k : null);
+
 export function createAudio() {
   let ctx = null;
   let ctxBorn = 0;
@@ -133,6 +221,15 @@ export function createAudio() {
   let activeRoars = 0;
   let lastStep = 0;
   let suspendTimer = 0;
+  /** group → decoded AudioBuffer[] (filled as samples arrive). */
+  const samples = new Map();
+  /** looping buffer → [loopStart, loopEnd] past any codec padding. */
+  const loopPoints = new WeakMap();
+  /** group → index of the variant played last (never repeated back to back). */
+  const lastVariant = new Map();
+  let loadPromise = null;
+  let codec = null;
+  const sampleStats = { loaded: 0, failed: 0, total: 0 };
 
   const MASTER_GAIN = 0.9;
   const masterTarget = () => (muted ? 0 : volume * MASTER_GAIN);
@@ -151,6 +248,7 @@ export function createAudio() {
       }
       ctxBorn = performance.now();
       build();
+      later(() => loadSamples());
       // Whenever the clock (re)starts — unlock, unmute, tab shown — fill in
       // any ambience bed that was skipped while it was frozen.
       ctx.addEventListener("statechange", () => {
@@ -414,14 +512,263 @@ export function createAudio() {
   }
 
   /* ---------------------------------------------------------------- */
+  /* samples: loading                                                  */
+  /* ---------------------------------------------------------------- */
+
+  /** Opus-in-Ogg where the browser says it can play it, MP3 otherwise. */
+  function pickCodec() {
+    try {
+      const a = document.createElement("audio");
+      if (a.canPlayType && a.canPlayType('audio/ogg; codecs="opus"')) return "ogg";
+    } catch {
+      /* no DOM: fall through */
+    }
+    return "mp3";
+  }
+
+  /** decodeAudioData, promise- and callback-style (old WebKit has only the latter). */
+  function decode(data) {
+    return new Promise((resolve, reject) => {
+      try {
+        const p = ctx.decodeAudioData(data, resolve, reject);
+        if (p && typeof p.then === "function") p.then(resolve, reject);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async function fetchSample(name) {
+    const get = async (ext) => {
+      const res = await fetch(`${SAMPLE_DIR}${name}.${ext}`);
+      if (!res.ok) throw new Error(`${name}.${ext}: HTTP ${res.status}`);
+      return decode(await res.arrayBuffer());
+    };
+    if (codec === "mp3") return get("mp3");
+    try {
+      return await get(codec);
+    } catch {
+      // Ogg advertised but not decodable (some Safari builds): MP3 from now on.
+      const buf = await get("mp3");
+      codec = "mp3";
+      return buf;
+    }
+  }
+
+  /** Loop points that skip encoder padding / priming silence at either end. */
+  function trimLoop(buf) {
+    const d = buf.getChannelData(0);
+    const eps = 1e-4;
+    let a = 0;
+    let b = d.length - 1;
+    while (a < b && Math.abs(d[a]) < eps) a++;
+    while (b > a && Math.abs(d[b]) < eps) b--;
+    loopPoints.set(buf, [a / buf.sampleRate, (b + 1) / buf.sampleRate]);
+  }
+
+  /**
+   * Download + decode the whole bank (≈0.8 MB in Ogg), most-needed first,
+   * three at a time. Idempotent; resolves even when files fail (those sounds
+   * keep their procedural voice).
+   */
+  function loadSamples() {
+    if (loadPromise) return loadPromise;
+    if (!ctx || typeof fetch !== "function") return Promise.resolve(sampleStats);
+    codec = pickCodec();
+    const jobs = [];
+    for (const [group, n] of Object.entries(BANK)) {
+      const names = n ? Array.from({ length: n }, (_, i) => `${group}_${i + 1}`) : [group];
+      names.forEach((name, i) => jobs.push({ group, name, i }));
+    }
+    sampleStats.total = jobs.length;
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length) {
+        const job = jobs[next++];
+        if (!ctx || ctx.state === "closed") return;
+        try {
+          const buf = await fetchSample(job.name);
+          if (job.group.startsWith("amb_")) trimLoop(buf);
+          const list = samples.get(job.group) || [];
+          list[job.i] = buf;
+          samples.set(job.group, list);
+          sampleStats.loaded++;
+          if (job.group.startsWith("amb_")) attachBedSamples();
+        } catch {
+          sampleStats.failed++;
+        }
+      }
+    };
+    loadPromise = Promise.all([worker(), worker(), worker()]).then(() => sampleStats);
+    return loadPromise;
+  }
+
+  /** A random loaded variant of `group` (not the one played last), or null. */
+  function variant(group) {
+    const list = (samples.get(group) || []).filter(Boolean);
+    if (!list.length) return null;
+    if (list.length === 1) return list[0];
+    const prev = lastVariant.get(group);
+    let i = Math.floor(Math.random() * list.length);
+    if (list[i] === prev) i = (i + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
+    lastVariant.set(group, list[i]);
+    return list[i];
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* samples: playback                                                 */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * One-shot sample voice: buffer → [lowpass] → gain → [pan] → dry to `dest`,
+   * plus a reverb send. Everything is disconnected when the buffer ends.
+   */
+  function sampleVoice(buf, { dest = sfx, gain = 1, rate = 1, dry = 1, wet = 0.2, lp = 0, pan = 0, when = 0, onend } = {}) {
+    const t = Math.max(ctx.currentTime + 0.005, when || 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = clamp(rate, 0.25, 4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.004);
+    const nodes = [src, g];
+    let head = src;
+    if (lp > 0) {
+      const f = filter("lowpass", lp, 0.6);
+      head.connect(f);
+      head = f;
+      nodes.push(f);
+    }
+    head.connect(g);
+    let out = g;
+    if (pan && typeof ctx.createStereoPanner === "function") {
+      const p = ctx.createStereoPanner();
+      p.pan.value = clamp(pan, -1, 1);
+      g.connect(p);
+      out = p;
+      nodes.push(p);
+    }
+    const d = gainNode(dry);
+    out.connect(d);
+    d.connect(dest);
+    nodes.push(d);
+    if (wet > 0) {
+      const w = gainNode(wet);
+      out.connect(w);
+      w.connect(revFor(dest));
+      nodes.push(w);
+    }
+    src.onended = () => {
+      nodes.forEach((n) => {
+        try { n.disconnect(); } catch { /* already gone */ }
+      });
+      if (onend) onend();
+    };
+    src.start(t);
+    return src;
+  }
+
+  /**
+   * Recorded roar of `kind`. distance (m) → quieter, darker, more reverb.
+   * Returns false when no sample of that kind is loaded (caller synthesises).
+   */
+  function sampleRoar(kind, power, { dest = sfx, level = 1, distance, range, pan = 0 } = {}) {
+    const buf = variant(`roar_${kind}`);
+    if (!buf) return false;
+    const p = clamp(Number(power) || 1, 0.15, 1.6);
+    let gain = ROAR_LEVEL[kind] * p * level;
+    let dry = 1;
+    let wet = kind === "sauropod" ? 0.4 : 0.3;
+    let lp = 0;
+    if (distance !== undefined) {
+      const d = Math.max(0, Number(distance) || 0);
+      const k = clamp(1 - d / (range || ROAR_RANGE[kind]), 0, 1);
+      const att = Math.pow(k, 1.5);
+      if (att < 0.03) return true; // out of earshot: handled, but silent
+      gain *= att;
+      dry = 0.3 + 0.7 * k;
+      wet = 0.3 + 0.55 * (1 - k);
+      lp = d > 3 ? 700 + 9000 * k * k : 0;
+    }
+    activeRoars++;
+    sampleVoice(buf, {
+      dest,
+      gain,
+      dry,
+      wet,
+      lp,
+      pan,
+      rate: rand(0.92, 1.08),
+      onend: () => {
+        activeRoars = Math.max(0, activeRoars - 1);
+      },
+    });
+    return true;
+  }
+
+  /** Recorded footstep. Returns false when that surface has no samples yet. */
+  function sampleStep(vol, surface, { dest = sfx, rate = 1, wetMul = 1, gainMul = 1 } = {}) {
+    const s = normSurface(surface);
+    const buf = variant(`step_${s}`);
+    if (!buf) return false;
+    const mix = STEP_MIX[s];
+    sampleVoice(buf, {
+      dest,
+      gain: mix.gain * clamp(Number(vol) || 1, 0, 2) * gainMul * rand(0.85, 1.05),
+      wet: mix.wet * wetMul,
+      rate: rate * rand(0.93, 1.07),
+    });
+    return true;
+  }
+
+  /** Looped recording into a bed, faded in; the bed's sources stop it. */
+  function bedSample(bed, buf, gain, fade = 3) {
+    const s = ctx.createBufferSource();
+    s.buffer = buf;
+    s.loop = true;
+    const [a, b] = loopPoints.get(buf) || [0, buf.duration];
+    s.loopStart = a;
+    s.loopEnd = b;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    s.connect(g);
+    g.connect(bed.out);
+    bedStart(bed, s, a + Math.random() * (b - a) * 0.9);
+    rampTo(g.gain, gain, fade);
+    return g;
+  }
+
+  /** Recorded room tone / crowd under a bed, once those samples exist. */
+  function bedLayers(bed, fade = 3) {
+    if (!bed || !bed.alive) return;
+    if (bed.name === "room" && !bed.roomTone) {
+      const buf = variant("amb_room");
+      if (buf) bed.roomTone = bedSample(bed, buf, ROOM_SAMPLE_GAIN, fade);
+    }
+    const crowd = CROWD_LEVEL[bed.name];
+    if (crowd && !bed.crowd) {
+      const buf = variant("amb_crowd");
+      if (buf) bed.crowd = bedSample(bed, buf, crowd, fade);
+    }
+  }
+
+  /** Samples just arrived: give the running beds their recorded layers. */
+  function attachBedSamples() {
+    if (!ready() || ctx.state !== "running") return;
+    bedLayers(roomBed, 4);
+    bedLayers(zoneBed, 4);
+  }
+
+  /* ---------------------------------------------------------------- */
   /* roar                                                              */
   /* ---------------------------------------------------------------- */
-  function roarVoice(power, { distant = false, dest = sfx, level = 1 } = {}) {
+  function roarVoice(power, { distant = false, dest = sfx, level = 1, kind = "visitor" } = {}) {
     const c = ctx;
     const p = clamp(Number(power) || 1, 0.15, 1.6);
+    const ch = ROAR_SYNTH[kind] || ROAR_SYNTH.visitor;
     const t = c.currentTime + 0.02;
-    const dur = rand(1.3, 2.2) * (0.7 + 0.35 * p) * (distant ? 1.3 : 1);
-    const f0 = rand(40, 66) * (distant ? 0.85 : 1);
+    const dur = rand(1.3, 2.2) * (0.7 + 0.35 * p) * (distant ? 1.3 : 1) * ch.len;
+    const f0 = rand(40, 66) * (distant ? 0.85 : 1) * ch.pitch;
     const atk = rand(0.12, 0.26);
     const peakT = t + dur * rand(0.2, 0.35);
     const end = t + dur;
@@ -682,10 +1029,14 @@ export function createAudio() {
   function farFootsteps(bed) {
     const count = Math.floor(rand(3, 7));
     const gap = rand(0.42, 0.6);
+    const vol = rand(0.18, 0.3);
     for (let i = 0; i < count; i++) {
       const id = setTimeout(() => {
         bed.timers.delete(id);
-        if (bed.alive && ctx.state === "running") stepVoice(rand(0.25, 0.4), bed.out, 1.4, 0.6);
+        if (!bed.alive || ctx.state !== "running") return;
+        if (!sampleStep(vol, "stone", { dest: bed.out, wetMul: 9, rate: 0.95 })) {
+          stepVoice(rand(0.25, 0.4), bed.out, 1.4, 0.6);
+        }
       }, i * gap * 1000);
       bed.timers.add(id);
     }
@@ -835,12 +1186,23 @@ export function createAudio() {
     every(bed, 45, 110, () => {
       if (ducked || activeRoars > 1) return;
       if (["theatre", "icecream", "marine", "plaza"].includes(zone)) return;
-      roarVoice(rand(0.35, 0.6), { distant: true, dest: bed.out, level: 0.5 });
+      const kind = Math.random() < 0.6 ? "trex" : "sauropod";
+      const far = { dest: bed.out, level: 0.6, distance: rand(30, 42), pan: rand(-0.7, 0.7) };
+      if (!sampleRoar(kind, rand(0.6, 0.9), far)) {
+        roarVoice(rand(0.35, 0.6), { distant: true, dest: bed.out, level: 0.5 });
+      }
     }, rand(25, 50));
+    bedLayers(bed);
     return bed;
   }
 
   function buildZone(name) {
+    const bed = buildZoneBed(name);
+    bedLayers(bed);
+    return bed;
+  }
+
+  function buildZoneBed(name) {
     switch (name) {
       case "atrium": {
         const bed = makeBed(name, 1, 0.5);
@@ -927,7 +1289,7 @@ export function createAudio() {
         return bed;
       }
       default:
-        return buildZone("gallery");
+        return buildZoneBed("gallery");
     }
   }
 
@@ -936,10 +1298,12 @@ export function createAudio() {
       roomBed = reviveBed("room", 3) || buildRoom();
       roomBed.level = ROOM_LEVEL[zone] ?? 1;
       fadeIn(roomBed, 3);
+      bedLayers(roomBed);
     }
     if (!zoneBed) {
       zoneBed = reviveBed(zone, 3) || buildZone(zone);
       fadeIn(zoneBed, 3);
+      bedLayers(zoneBed);
     }
   }
 
@@ -964,6 +1328,7 @@ export function createAudio() {
     if (ctx.state !== "running") return;
     zoneBed = reviveBed(zone, ZONE_FADE) || buildZone(zone);
     fadeIn(zoneBed, ZONE_FADE);
+    bedLayers(zoneBed, ZONE_FADE);
   }
 
   function stopAmbience(seconds = 1.2) {
@@ -989,6 +1354,16 @@ export function createAudio() {
     },
     get ducked() {
       return ducked;
+    },
+    /** Sample bank progress: { loaded, failed, total, codec }. */
+    get samples() {
+      return { ...sampleStats, codec };
+    },
+
+    /** Start (or await) the sample download; needs the context, so ensures it. */
+    loadSamples() {
+      if (!ensure()) return Promise.resolve({ ...sampleStats, codec });
+      return loadSamples().then(() => ({ ...sampleStats, codec }));
     },
 
     setMuted(v) {
@@ -1059,49 +1434,58 @@ export function createAudio() {
     },
 
     /**
-     * Layered dinosaur roar: growl + formant sweep + breath, different every time.
+     * Dinosaur roar: a recorded, sound-designed variant of opts.kind when the
+     * samples are in, else the procedural growl + formant sweep + breath.
+     * opts.kind: "trex" | "sauropod" | "raptor" | "visitor" (default
+     *   "visitor"; "trex" for zone-gated screening roars).
      * opts.zone: only heard while the listener is in that zone (a screening's
      *   roars stay in the theatre; leaving fades the ones still sounding).
-     * opts.distance: metres to a remote roarer; quieter and muffled with
-     *   distance, silent beyond REMOTE_RANGE.
+     * opts.distance: metres to the roarer; quieter, darker and wetter with
+     *   distance, silent beyond opts.range (default 28 m, 60 m for trex /
+     *   sauropod). opts.pan: -1 (left) .. 1 (right).
      */
     roar(power = 1, opts = {}) {
       const c = ensure();
       if (!c || !playable() || activeRoars >= 3) return;
-      const { zone: only, distance } = opts || {};
+      const { zone: only, distance, range, pan } = opts || {};
+      const kind = normKind(opts?.kind) || (only !== undefined ? "trex" : "visitor");
       if (only !== undefined) {
         const z = zoneForHall(only);
         if (z !== zone) return;
-        roarVoice(power, { dest: spot(z) });
+        if (!sampleRoar(kind, power, { dest: spot(z), pan })) roarVoice(power, { dest: spot(z), kind });
         return;
       }
       if (distance !== undefined) {
+        if (sampleRoar(kind, power, { distance, range, pan })) return;
         const d = Math.max(0, Number(distance) || 0);
-        const level = Math.pow(clamp(1 - d / REMOTE_RANGE, 0, 1), 1.5);
+        const r = Number(range) > 0 ? Number(range) : REMOTE_RANGE;
+        const level = Math.pow(clamp(1 - d / r, 0, 1), 1.5);
         if (level < 0.03) return;
-        roarVoice(power, { distant: d > 10, level });
+        roarVoice(power, { distant: d > 10, level, kind });
         return;
       }
-      roarVoice(power);
+      if (!sampleRoar(kind, power, { pan })) roarVoice(power, { kind });
     },
 
-    /** Soft footstep on stone. */
-    step(vol = 1) {
+    /** Footstep; surface "stone" (default) | "marble" | "wood" | "parquet" | "carpet" | "rug". */
+    step(vol = 1, surface = "stone") {
       const c = ensure();
       if (!c || !playable()) return;
       const now = c.currentTime;
       if (now - lastStep < 0.06) return;
       lastStep = now;
-      stepVoice(vol);
+      if (!sampleStep(vol, surface)) stepVoice(vol);
     },
 
     /** Landing after a jump / fall: a heavier, duller footfall plus body thump. */
-    land(impact = 1) {
+    land(impact = 1, surface = "stone") {
       const c = ensure();
       if (!c || !playable()) return;
       const k = clamp(Number(impact) || 1, 0.2, 2);
       lastStep = c.currentTime;
-      stepVoice(1.2 * k, sfx, 0.16, 0.7);
+      if (!sampleStep(1.1 * k, surface, { rate: 0.82, wetMul: 1.3 })) {
+        stepVoice(1.2 * k, sfx, 0.16, 0.7);
+      }
       const out = voiceOut(sfx, 0.12);
       const o = tone(out, {
         freq: rand(85, 100),
@@ -1119,6 +1503,12 @@ export function createAudio() {
       const c = ensure();
       if (!c || !playable()) return;
       const f = clamp(Number(freq) || 660, 80, 6000);
+      const tick = variant("ui_click");
+      if (tick) {
+        // pitch follows freq (gently), so callers' high / low ticks still differ
+        sampleVoice(tick, { gain: 0.32, wet: 0.06, rate: clamp(Math.sqrt(f / 660), 0.6, 1.6) });
+        return;
+      }
       const t = c.currentTime + 0.005;
       const out = voiceOut(sfx, 0.08);
       tone(out, { freq: f, glideTo: f * 0.94, t, peak: 0.1, attack: 0.003, decay: 0.09 });
@@ -1133,7 +1523,18 @@ export function createAudio() {
       const only = opts?.zone;
       if (only !== undefined && zoneForHall(only) !== zone) return;
       const f0 = clamp(Number(base) || 523.25, 80, 4000);
-      const out = voiceOut(only !== undefined ? spot(zoneForHall(only)) : sfx, 0.45);
+      const dest = only !== undefined ? spot(zoneForHall(only)) : sfx;
+      const bell = variant("ui_chime");
+      if (bell) {
+        // the same rising arpeggio, struck on a real glass bell
+        const r0 = clamp(f0 / 523.25, 0.4, 2.5);
+        const t0 = c.currentTime + 0.01;
+        [1, 1.25, 1.5, 2].forEach((mul, i) => {
+          sampleVoice(bell, { dest, gain: i === 3 ? 0.2 : 0.24, wet: 0.45, rate: r0 * mul, when: t0 + i * 0.075 });
+        });
+        return;
+      }
+      const out = voiceOut(dest, 0.45);
       const t0 = c.currentTime + 0.01;
       [1, 1.25, 1.5, 2].forEach((mul, i) => {
         const t = t0 + i * 0.075;

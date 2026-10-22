@@ -1,0 +1,42 @@
+{
+  "note": "Every sound in this folder is built from CC0 / public-domain recordings (no attribution legally required; credited anyway). Files are mono, peak-normalised, trimmed and faded; each exists as .ogg (Opus) and .mp3 (Safari fallback). Roars are sound-designed layers (time-compressed, tape-pitched, low-passed, light early reflections).",
+  "files": {
+    "roar_trex_1": { "kind": "trex", "layers": ["t-rex-calls 26.1-35.2s (tempo x1.7, rate 0.9)", "alligator-growls 4.3-6.8s (rate 0.7, low-passed)", "lion 1.0-4.6s (rate 0.8)"] },
+    "roar_trex_2": { "kind": "trex", "layers": ["t-rex-calls 36.55-46s (tempo x1.75, rate 0.92)", "lion-roaring 0-3.3s (rate 0.62)", "alligator-growls 9.6-12s (rate 0.75, low-passed)"] },
+    "roar_trex_3": { "kind": "trex", "layers": ["t-rex-calls 19.25-25.5s (tempo x1.35, rate 0.9)", "lion-loud 0.85-1.95s (rate 0.6)", "alligator-growls 0.1-3.1s (rate 0.72)"] },
+    "roar_sauropod_1": { "kind": "sauropod", "layers": ["t-rex-calls bellow 4.1-9.1s (rate 0.8)", "alligator-bellow-usfws 7.3-10.7s (rate 0.6)", "elephant-rumble 6-12s (low-passed 260 Hz)"] },
+    "roar_sauropod_2": { "kind": "sauropod", "layers": ["deep-monster-roar 0-6s (rate 0.85)", "t-rex-calls bellow 10.4-15.4s (rate 0.75)", "alligator-bellow-usfws 10.9-14.1s (rate 0.58)"] },
+    "roar_raptor_1": { "kind": "raptor", "layers": ["monster-snarl-attack 2.55-3.5s (rate 1.12)", "crocodilian-growl (high-passed)"] },
+    "roar_raptor_2": { "kind": "raptor", "layers": ["monster-snarl-attack 8.74-9.86s (rate 1.15)", "crocodilian-growl (high-passed)"] },
+    "roar_raptor_3": { "kind": "raptor", "layers": ["monster-snarl-5 13.05-14.43s (rate 1.18)", "crocodilian-growl (high-passed)"] },
+    "roar_raptor_4": { "kind": "raptor", "layers": ["monster-snarl-5 8.87-10.12s (rate 1.1)", "crocodilian-growl (high-passed)"] },
+    "roar_visitor_1": { "kind": "visitor", "layers": ["t-rex-calls 26.1-28.5s (rate 1.22)"] },
+    "roar_visitor_2": { "kind": "visitor", "layers": ["t-rex-calls 36.55-39.05s (rate 1.28)"] },
+    "roar_visitor_3": { "kind": "visitor", "layers": ["lion-loud 3.0-4.8s (rate 1.12)", "t-rex-calls 19.3-20.9s (rate 1.15)"] },
+    "step_stone_1..4": { "layers": ["marble-footsteps 3.27s / 3.89s / 4.45s / 5.05s"] },
+    "step_wood_1..4": { "layers": ["kenney-impact footstep_wood_000..003"] },
+    "step_carpet_1..3": { "layers": ["kenney-impact footstep_carpet_000, 001, 003"] },
+    "ui_click": { "layers": ["kenney-interface click_001"] },
+    "ui_chime": { "layers": ["kenney-interface glass_004"] },
+    "amb_room": { "layers": ["museum-interior 20-55s (seamless 32 s loop, band-limited 30 Hz-7 kHz)"] },
+    "amb_crowd": { "layers": ["crowd-reverberant 8-43s (seamless 32 s loop, low-passed ~1.7 kHz so speech is unintelligible)"] }
+  },
+  "sources": {
+    "t-rex-calls": { "title": "T-rex Calls", "author": "CaveboyTup", "license": "CC0-1.0", "url": "https://opengameart.org/content/t-rex-calls", "file": "https://opengameart.org/sites/default/files/t-rex_calls.mp3" },
+    "deep-monster-roar": { "title": "CC0 Deep Monster Roar", "author": "trazzz123", "license": "CC0-1.0", "url": "https://opengameart.org/content/cc0-deep-monster-roar", "file": "https://opengameart.org/sites/default/files/monster_roar.wav" },
+    "monster-snarl-attack": { "title": "Monster snarls (monster-snarl-attack.ogg)", "author": "Darsycho", "license": "CC0-1.0", "url": "https://opengameart.org/content/monster-snarls", "file": "https://opengameart.org/sites/default/files/monster-snarl-attack.ogg" },
+    "monster-snarl-5": { "title": "Monster snarls (monster-snarl-5.ogg)", "author": "Darsycho", "license": "CC0-1.0", "url": "https://opengameart.org/content/monster-snarls", "file": "https://opengameart.org/sites/default/files/monster-snarl-5.ogg" },
+    "alligator-growls": { "title": "Alligator Growls 02.wav", "author": "D.jones", "license": "CC0-1.0", "url": "https://freesound.org/people/D.jones/sounds/527844/", "file": "https://cdn.freesound.org/previews/527/527844_11431915-hq.mp3" },
+    "crocodilian-growl": { "title": "CrocodilianTypeGrowl", "author": "Ovkovko", "license": "CC0-1.0", "url": "https://freesound.org/people/Ovkovko/sounds/825609/", "file": "https://cdn.freesound.org/previews/825/825609_17675403-hq.mp3" },
+    "alligator-bellow-usfws": { "title": "Alligatorbellow1.ogg (U.S. Fish and Wildlife Service)", "author": "U.S. Fish and Wildlife Service", "license": "Public domain (US federal government work)", "url": "https://commons.wikimedia.org/wiki/File:Alligatorbellow1.ogg", "file": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Alligatorbellow1.ogg" },
+    "lion": { "title": "Lion.wav", "author": "GJ55GB", "license": "CC0-1.0", "url": "https://freesound.org/people/GJ55GB/sounds/488348/", "file": "https://cdn.freesound.org/previews/488/488348_10507382-hq.mp3" },
+    "lion-roaring": { "title": "Lion roaring.mp3", "author": "Bidone", "license": "CC0-1.0", "url": "https://freesound.org/people/Bidone/sounds/69572/", "file": "https://cdn.freesound.org/previews/69/69572_706955-hq.mp3" },
+    "lion-loud": { "title": "Lion loud.mp3", "author": "Bidone", "license": "CC0-1.0", "url": "https://freesound.org/people/Bidone/sounds/69570/", "file": "https://cdn.freesound.org/previews/69/69570_706955-hq.mp3" },
+    "elephant-rumble": { "title": "Night in the Serengeti with elephant rumble", "author": "zachrau", "license": "CC0-1.0", "url": "https://freesound.org/people/zachrau/sounds/818986/", "file": "https://cdn.freesound.org/previews/818/818986_676927-hq.mp3" },
+    "marble-footsteps": { "title": "male-foot-walk-marble-stereo.aif", "author": "ragamuffin", "license": "CC0-1.0", "url": "https://freesound.org/people/ragamuffin/sounds/118985/", "file": "https://cdn.freesound.org/previews/118/118985_167260-hq.mp3" },
+    "kenney-impact": { "title": "Impact Sounds 1.0", "author": "Kenney (www.kenney.nl)", "license": "CC0-1.0", "url": "https://kenney.nl/assets/impact-sounds" },
+    "kenney-interface": { "title": "Interface Sounds", "author": "Kenney (www.kenney.nl)", "license": "CC0-1.0", "url": "https://kenney.nl/assets/interface-sounds" },
+    "museum-interior": { "title": "Ambience_Museum Interior", "author": "exuberate", "license": "CC0-1.0", "url": "https://freesound.org/people/exuberate/sounds/580538/", "file": "https://cdn.freesound.org/previews/580/580538_1810340-hq.mp3" },
+    "crowd-reverberant": { "title": "R08-48-Crowd in Reverberant Space.wav", "author": "craigsmith", "license": "CC0-1.0", "url": "https://freesound.org/people/craigsmith/sounds/480728/", "file": "https://cdn.freesound.org/previews/480/480728_2524442-hq.mp3" }
+  }
+}

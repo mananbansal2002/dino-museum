@@ -248,7 +248,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3px;
-  height: 132px;
+  height: 150px;
   margin: -14px -14px 4px;
   overflow: hidden;
   background: #0b1016;
@@ -262,7 +262,9 @@
 
 .bp-art-side {
   position: relative;
-  background-size: cover;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-color: #14120f;
   background-position: center;
   background-repeat: no-repeat;
   display: flex;
@@ -340,6 +342,20 @@
   gap: 8px;
   margin-top: auto;
   padding-top: 6px;
+}
+
+/* one chip per verified clip of the match-up */
+.bp-clips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.bp-clip {
+  font-size: 12px;
+  padding: 4px 10px;
+  min-height: 28px;
 }
 
 .bp-hint {

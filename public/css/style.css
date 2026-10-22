@@ -1485,9 +1485,12 @@ body:has(#battleOverlay:not(.hidden)) #prompt {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: radial-gradient(circle at 50% 40%, #2a2720, #15130f);
   position: relative;
-  aspect-ratio: 16 / 8;
-  max-height: 340px;
+  /* the whole photo, never cropped: the frame takes the image's own shape */
+  min-height: 160px;
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .exHero::after {
   content: "";
@@ -1499,10 +1502,11 @@ body:has(#battleOverlay:not(.hidden)) #prompt {
 }
 .exHero img {
   display: block;
-  width: 100%;
-  height: 100%;
-  max-height: 340px;
-  object-fit: cover;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(58vh, 520px);
+  object-fit: contain;
   animation: fadeIn 0.5s ease-out;
 }
 .exHero figcaption {
@@ -1522,6 +1526,120 @@ body:has(#battleOverlay:not(.hidden)) #prompt {
 }
 .exHero figcaption:empty {
   display: none;
+}
+.exHero figcaption a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-underline-offset: 2px;
+}
+.exHero figcaption a:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+/* Life | Fossil segmented toggle (and the static "Specimen" tag) over the photo */
+.exHeroToggle,
+.exHeroTag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  box-shadow: var(--glass-hi), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.exHeroToggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+}
+.exHeroToggle button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1.4;
+  padding: 4px 12px;
+  transition: background 0.15s, color 0.15s;
+}
+.exHeroToggle button:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+.exHeroToggle button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #1b1206;
+}
+.exHeroToggle button:focus-visible {
+  outline-offset: 1px;
+}
+.exHeroTag {
+  padding: 4px 11px;
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* no usable photo: a quiet "dig site" panel instead of a broken image */
+.exHero.exHeroBlank {
+  aspect-ratio: auto;
+  height: auto;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 20px;
+  text-align: center;
+  border: 1px dashed rgba(255, 214, 140, 0.22);
+  background: repeating-linear-gradient(
+      -8deg,
+      transparent 0 22px,
+      rgba(255, 214, 140, 0.035) 22px 24px
+    ),
+    radial-gradient(circle at 50% 40%, #2a2720, #15130f);
+}
+.exHeroBlank::after {
+  display: none;
+}
+.exHeroBlank svg {
+  width: 56px;
+  height: 56px;
+  fill: rgba(255, 214, 140, 0.5);
+  stroke: rgba(255, 214, 140, 0.5);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.exHeroBlank svg circle {
+  stroke: none;
+}
+.exHero.exHeroBlank figcaption {
+  position: static;
+  max-width: 420px;
+  padding: 0;
+  background: none;
+  white-space: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.exHeroBlank figcaption b {
+  color: var(--text);
+  font-size: 14px;
+}
+.exHeroBlank figcaption span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* full-screen viewers (era window) hide the game HUD */
@@ -1760,6 +1878,10 @@ body.immersive #hud {
   }
   .chip {
     padding: 6px 12px;
+    min-height: 30px;
+  }
+  .exHeroToggle button {
+    padding: 6px 14px;
     min-height: 30px;
   }
   /* chat lives above the joystick zone, clear of the Jump button (right 22-94px,

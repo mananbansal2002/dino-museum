@@ -1,5 +1,6 @@
+import * as THREE from "three";
 import { createCharacter } from "./character.js";
-import { angleLerp, clamp, damp } from "./util.js";
+import { angleLerp, clamp, damp, NAME_TAG_ASPECT, NAME_TAG_PILL } from "./util.js";
 
 function toCss(color) {
   if (typeof color === "number") return `#${color.toString(16).padStart(6, "0")}`;
@@ -21,6 +22,32 @@ const ANIMS = new Set(["idle", "walk", "run", "jump", "sit"]);
 const MOVING = new Set(["walk", "run", "jump"]);
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+
+/*
+ * Name tags, game style (needs a camera: update(dt, camera) or setCamera):
+ * about the same size on screen at any distance, a little smaller far off,
+ * fading out from TAG_FADE_FROM and gone past TAG_HIDE_AT metres; walls hide
+ * them (the sprite is depth-tested, see makeNameTag). They sit TAG_GAP above
+ * the top of the head and follow the rigged avatar's head bone, so they
+ * dip when the player sits and rise with a jump.
+ */
+const TAG_SCREEN = 0.03; // pill height as a fraction of the screen height
+const TAG_MIN_H = 0.24; // sprite height clamp, metres (the pill is NAME_TAG_PILL of it)
+const TAG_MAX_H = 1.6;
+const TAG_FADE_FROM = 30;
+const TAG_HIDE_AT = 40;
+const TAG_GAP = 0.1; // between the head top and the sprite's bottom edge
+const PROC_HEAD_TOP = 1.98; // the procedural body's head top (with bodyY 0)
+
+const smoothstep = (a, b, v) => {
+  const t = clamp((v - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+function headBoneOf(ch) {
+  const name = ch.modelSpec?.bones?.head;
+  return (name && ch.rig?.model?.getObjectByName(name)) || null;
+}
 
 function num(v, fallback = 0) {
   const n = Number(v);
@@ -333,7 +360,63 @@ export function createRemotePlayers(scene) {
     };
   }
 
-  function update(dt) {
+  let cameraRef = null;
+  const camPos = new THREE.Vector3();
+  const headPos = new THREE.Vector3();
+
+  /** Height of the top of the head above the character's feet (group origin). */
+  function headTop(p) {
+    const ch = p.character;
+    const spec = ch.modelSpec;
+    if (ch.rig && spec) {
+      if (!p.tagRig || p.tagRig.rig !== ch.rig) p.tagRig = { rig: ch.rig, bone: headBoneOf(ch), offset: null };
+      const t = p.tagRig;
+      const height = Number(spec.height) || 1.8;
+      if (!t.bone) return height;
+      t.bone.getWorldPosition(headPos);
+      const boneY = headPos.y - ch.group.position.y;
+      // learn how far the head top is above the head bone the first time the
+      // avatar stands on the floor (head bones sit at different places in
+      // the Rocketbox and Quaternius skeletons)
+      if (t.offset === null && !p.sitting && p.anim !== "sit" && Math.abs(ch.group.position.y) < 0.02 && boneY > height * 0.6) {
+        t.offset = clamp(height - boneY, -0.2, 0.45);
+      }
+      return t.offset === null ? (p.sitting ? height - 0.5 : height) : boneY + t.offset;
+    }
+    // procedural body: character.update keeps the old tag at 2.28 + bodyY
+    return PROC_HEAD_TOP + (ch.tag.position.y - 2.28);
+  }
+
+  /** Anchor, size and fade one remote player's tag for this camera. */
+  function updateTag(p, camera) {
+    const tag = p.character.tag;
+    if (!tag) return;
+    if (!p.character.group.visible) return;
+    const y = headTop(p) + TAG_GAP;
+    tag.center.set(0.5, 0);
+    tag.position.set(0, y, 0);
+    camPos.setFromMatrixPosition(camera.matrixWorld);
+    const d = Math.hypot(camPos.x - p.x, camPos.y - (p.y + y), camPos.z - p.z);
+    if (d >= TAG_HIDE_AT) {
+      tag.visible = false;
+      return;
+    }
+    tag.visible = true;
+    tag.material.opacity = 1 - smoothstep(TAG_FADE_FROM, TAG_HIDE_AT, d);
+    // world height that keeps the pill at TAG_SCREEN of the view's height
+    const fov = camera.isPerspectiveCamera ? THREE.MathUtils.degToRad(camera.fov) : 0.96;
+    const perMetre = (2 * Math.tan(fov / 2) * TAG_SCREEN) / NAME_TAG_PILL;
+    // a touch smaller with distance, so far tags read as far
+    const h = clamp(d * perMetre * (1 - 0.3 * smoothstep(6, TAG_HIDE_AT, d)), TAG_MIN_H, TAG_MAX_H);
+    tag.scale.set(h * NAME_TAG_ASPECT, h, 1);
+  }
+
+  /**
+   * Advance every remote player. With a camera (passed here or once through
+   * setCamera) their name tags are sized, faded and anchored game-style;
+   * without one they keep the old fixed world-size tag.
+   */
+  function update(dt, camera = cameraRef) {
     const renderT = now() - INTERP_DELAY;
     for (const p of players.values()) {
       const smp = p.hasPosition ? sample(p, renderT) : null;
@@ -365,7 +448,12 @@ export function createRemotePlayers(scene) {
 
       place(p);
       p.character.update(dt, { speed: clamp(p.speed, 0, 1), anim });
+      if (camera) updateTag(p, camera);
     }
+  }
+
+  function setCamera(camera) {
+    cameraRef = camera || null;
   }
 
   return {
@@ -377,6 +465,7 @@ export function createRemotePlayers(scene) {
     setHeld,
     setLook,
     update,
+    setCamera,
     get list() {
       return Array.from(players.values());
     },

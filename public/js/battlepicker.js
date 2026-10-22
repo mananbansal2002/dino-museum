@@ -87,7 +87,7 @@ export function createBattlePicker({
   onPlay3D,
   onPlay, // alias of onPlay3D
   onPlayVideo,
-  onSearch,
+  onSearch: _onSearch, // accepted for compatibility; the museum no longer links out
   onClose,
 } = {}) {
   const root = el("div", "media-overlay bp-overlay hidden");
@@ -100,7 +100,7 @@ export function createBattlePicker({
   const headText = el("div");
   const h = el("h2", null, "🎬 Tonight's screenings");
   h.id = "bpTitle";
-  headText.append(h, el("p", "bp-lede", "Pick a match-up. Screen it in the theatre, or watch real footage and documentary clips on YouTube."));
+  headText.append(h, el("p", "bp-lede", "Pick a match-up and the fight plays right here on the big screen — real documentary footage, several clips per fight."));
   const closeBtn = el("button", "media-close", "✕");
   closeBtn.type = "button";
   closeBtn.setAttribute("aria-label", "Close");
@@ -138,28 +138,40 @@ export function createBattlePicker({
     credit.dataset.a = b.a;
     credit.dataset.b = b.b;
     const actions = el("div", "bp-actions");
-    const play = el("button", "media-btn primary bp-play", "▶ Screen in theatre");
-    play.type = "button";
-    play.onclick = () => choose3D(b);
-    actions.append(play);
     const vids = validVideos(b.videos);
+    // real fight footage is the main event; the photo slideshow is the fallback
+    const slideshow = el("button", "media-btn ghost bp-play", "🖼 Slideshow");
+    slideshow.type = "button";
+    slideshow.title = "Narrated photo screening of this match-up";
+    slideshow.onclick = () => choose3D(b);
     if (vids.length) {
-      const yt = el("button", "media-btn ghost bp-yt", `▶ Watch on YouTube (${vids.length})`);
-      yt.type = "button";
-      yt.onclick = () => chooseVideo(vids[0], b);
-      actions.append(yt);
-    } else if (onSearch) {
-      const s = el("button", "media-btn ghost bp-yt", "🔎 Find on YouTube");
-      s.type = "button";
-      s.onclick = () => onSearch(`${b.title} dinosaur`, b);
-      actions.append(s);
+      const watch = el("button", "media-btn primary bp-yt", "▶ Watch the fight");
+      watch.type = "button";
+      watch.title = vids[0].title;
+      watch.onclick = () => chooseVideo(vids[0], b);
+      actions.append(watch, slideshow);
+    } else {
+      slideshow.className = "media-btn primary bp-play";
+      actions.append(slideshow);
     }
     c.append(vs, badges, title, sub, credit, actions);
+    if (vids.length > 1) {
+      // every verified clip for this match-up, playable on the same screen
+      const clips = el("div", "bp-clips");
+      vids.forEach((v, i) => {
+        const btn = el("button", "media-btn chip bp-clip", `Clip ${i + 1}`);
+        btn.type = "button";
+        btn.title = `${v.title}${v.channel ? ` — ${v.channel}` : ""}`;
+        btn.onclick = () => chooseVideo(v, b);
+        clips.append(btn);
+      });
+      c.append(clips);
+    }
     c.addEventListener("click", (e) => {
       if (e.target.closest("button")) return;
       focusCard(cards().indexOf(c));
     });
-    c._primary = () => choose3D(b);
+    c._primary = () => (vids.length ? chooseVideo(vids[0], b) : choose3D(b));
     return c;
   }
 
@@ -191,7 +203,7 @@ export function createBattlePicker({
     const sub = el("div", "bp-item-sub", v.matchup ? v.title : "");
     const ch = el("div", "bp-channel", v.channel ? `▶ ${v.channel}` : "");
     const actions = el("div", "bp-actions");
-    const yt = el("button", "media-btn primary bp-yt", "▶ Watch on YouTube");
+    const yt = el("button", "media-btn primary bp-yt", "▶ Watch");
     yt.type = "button";
     yt.onclick = () => chooseVideo(v, null);
     actions.append(yt);
@@ -209,7 +221,7 @@ export function createBattlePicker({
     body.append(grid);
     const ex = validVideos(extra);
     if (ex.length) {
-      body.append(el("h4", "bp-section", "More on YouTube"));
+      body.append(el("h4", "bp-section", "More dinosaur films"));
       const g2 = el("div", "bp-grid");
       for (const v of ex) g2.append(extraCard(v));
       body.append(g2);
@@ -262,6 +274,8 @@ export function createBattlePicker({
   }
 
   function chooseVideo(v, b) {
+    // the clip plays on the theatre screen (or the overlay player), not over the picker
+    close();
     onPlayVideo?.(v, b);
   }
 

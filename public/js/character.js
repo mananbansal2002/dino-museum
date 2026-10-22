@@ -641,8 +641,13 @@ export function createCharacter(lookInput = {}, opts = {}) {
       api.tag.material.map?.dispose();
       api.tag.material.dispose();
       const t = makeNameTag(name, tagColor || "#ffffff");
-      t.position.y = 2.28;
-      t.scale.set(1.5, 0.38, 1);
+      // keep whatever the owner did to the old tag (main.js hides your own,
+      // remote.js anchors, sizes and fades the others every frame)
+      t.position.copy(api.tag.position);
+      t.scale.copy(api.tag.scale);
+      t.center.copy(api.tag.center);
+      t.visible = api.tag.visible;
+      t.material.opacity = api.tag.material.opacity;
       root.add(t);
       api.tag = t;
     },

@@ -39,7 +39,7 @@ export const ROOMS = [
   // Ice Cream Court. Neither is visible from the entrance; both are hidden on
   // the minimap until a visitor walks in ("secret").
   { id: "xpassage", name: "Exit Passage", cols: [30, 30], rows: [18, 22], floor: 0x3a3f45, wall: 0x44494f, accent: 0xff8fab, h: 6, secret: true },
-  { id: "court", name: "Ice Cream Court", cols: [24, 30], rows: [23, 28], floor: 0x5c4b3c, wall: 0x6b5947, accent: 0xff8fab, h: 10, secret: true },
+  { id: "court", name: "Ice Cream Court", cols: [27, 30], rows: [23, 27], floor: 0x5c4b3c, wall: 0x6b5947, accent: 0xff8fab, h: 10, secret: true },
 ];
 
 /** Rooms that hold mounted skeletons (the "halls" of the tour). */
@@ -316,28 +316,32 @@ function beamTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-function bannerTexture(title, sub, accent) {
+/** The theatre screen between screenings: a dim poster with the canvas aspect of the screen (2:1). */
+function screenPoster() {
   const c = makeCanvas(1024, 512);
   const ctx = c.getContext("2d");
-  const g = ctx.createLinearGradient(0, 0, 0, 512);
-  g.addColorStop(0, "#12181d");
-  g.addColorStop(1, "#1c262d");
+  const g = ctx.createRadialGradient(512, 230, 40, 512, 256, 620);
+  g.addColorStop(0, "#1d2c38");
+  g.addColorStop(1, "#080b0f");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 1024, 512);
-  ctx.fillStyle = accent;
-  ctx.fillRect(60, 90, 14, 300);
-  ctx.fillRect(950, 90, 14, 300);
-  ctx.fillStyle = "#f6efe2";
-  ctx.font = "800 78px Inter, system-ui, sans-serif";
+  ctx.strokeStyle = "rgba(89,212,230,0.55)";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(36, 36, 952, 440);
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(title, 110, 205);
-  ctx.fillStyle = accent;
-  ctx.font = "500 36px Inter, system-ui, sans-serif";
-  ctx.fillText(sub, 110, 320);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  return tex;
+  ctx.fillStyle = "#59d4e6";
+  ctx.font = "600 30px Inter, system-ui, sans-serif";
+  ctx.fillText("SCREENING THEATRE", 512, 110);
+  ctx.fillStyle = "#f6efe2";
+  ctx.font = "800 84px Inter, system-ui, sans-serif";
+  ctx.fillText("Tonight's screenings", 512, 220);
+  ctx.fillStyle = "#ffc857";
+  ctx.fillRect(392, 284, 240, 4);
+  ctx.fillStyle = "rgba(246,239,226,0.85)";
+  ctx.font = "500 38px Inter, system-ui, sans-serif";
+  ctx.fillText("Press E at the console to choose a fight", 512, 360);
+  return c;
 }
 
 /** Every mounted skeleton, where it stands and how it is posed. */
@@ -386,7 +390,7 @@ export const PLACEMENTS = [
   { id: "mosa", x: 47, z: -78, ry: Math.PI / 2, scale: 1, pedestal: 8 },
   { id: "liopleurodon", x: 71, z: -78, ry: Math.PI / 2, scale: 1, pedestal: 7 },
   { id: "elasmo", x: 45, z: -60, ry: Math.PI / 2, scale: 1, pedestal: 6 },
-  { id: "krono", x: 64, z: -60, ry: Math.PI / 2, scale: 1, pedestal: 6 },
+  { id: "krono", x: 64, z: -60, ry: Math.PI / 2, scale: 1, pedestal: 6, face: Math.PI }, // not towards the Ichthyosaurus 6 m west
   { id: "plesio", x: 78, z: -58, ry: 0, scale: 1, pedestal: 6 },
   { id: "deino", x: 48, z: -48, ry: -Math.PI / 2, scale: 1, pedestal: 6 },
   { id: "ichthyo", x: 58, z: -54, ry: 0, scale: 1, pedestal: 4 },
@@ -396,9 +400,11 @@ export const PLACEMENTS = [
   { id: "spino", x: -16, z: -22, ry: 0, scale: 1, pedestal: 8 },
   { id: "baryonyx", x: 12, z: -24, ry: Math.PI / 2, scale: 1, pedestal: 7 },
   { id: "dilo", x: -4, z: -18, ry: 0, scale: 1, pedestal: 4 },
-  { id: "raptor", x: -18, z: -8, ry: 0, scale: 1, pedestal: 2.5 },
-  { id: "deinonychus", x: -10, z: -8, ry: 0, scale: 1, pedestal: 3 },
-  { id: "oviraptor", x: -4, z: -8, ry: 0, scale: 1, pedestal: 2.5 },
+  // a row along x: facing down the row would put each panel's front (and
+  // its prompt) right against the back of the next one, so they face south
+  { id: "raptor", x: -18, z: -8, ry: 0, scale: 1, pedestal: 2.5, face: 0 },
+  { id: "deinonychus", x: -10, z: -8, ry: 0, scale: 1, pedestal: 3, face: 0 },
+  { id: "oviraptor", x: -4, z: -8, ry: 0, scale: 1, pedestal: 2.5, face: 0 },
   { id: "ptero", x: 16, z: -10, ry: 0, scale: 1, pedestal: 5 },
   { id: "dimetrodon", x: 8, z: 4, ry: 0, scale: 1, pedestal: 5 },
   { id: "utahraptor", x: -8, z: 4, ry: 0, scale: 1, pedestal: 3.5 },
@@ -406,8 +412,8 @@ export const PLACEMENTS = [
 
   // ---- Entrance Atrium ----
   { id: "quetzal", x: 14, z: 34, ry: Math.PI / 2, scale: 0.7, pedestal: 0 },
-  { id: "archaeopteryx", x: -30, z: 46, ry: 0, scale: 1.5, pedestal: 2 },
-  { id: "rhampho", x: -24, z: 46, ry: 0, scale: 1.5, pedestal: 2 },
+  { id: "archaeopteryx", x: -30, z: 46, ry: 0, scale: 1.5, pedestal: 2, face: 0 }, // side by side: both face the entrance
+  { id: "rhampho", x: -24, z: 46, ry: 0, scale: 1.5, pedestal: 2, face: 0 },
 ];
 
 /**
@@ -416,8 +422,64 @@ export const PLACEMENTS = [
  */
 export const SPAWN = { x: 0, z: g2z(21.5), ry: Math.PI };
 
-/** Ice Cream Court furniture: x 48..90, z 48..84; visitors enter at the north-east corner. */
-export const COURT = { stallX: 66, stallZ: 76, exitX: 48.2, exitZ: 79 };
+/**
+ * Ice Cream Court furniture: the court is x 66..90, z 48..78 and visitors
+ * enter at its north-east corner. The stall stands against the south wall
+ * facing north (stallX/stallZ = where the vendor works, main.js stands them
+ * just behind it); the exit door is in the west wall.
+ */
+export const COURT = { stallX: 78, stallZ: 75, exitX: 66.2, exitZ: 70 };
+
+/**
+ * Wayfinding to the Ice Cream Court, museum style: directional signs hung
+ * from the ceiling (or fixed high on a wall) at each junction of the way
+ * there, plus an illuminated EXIT · ICE CREAM lightbox over the exit doorway
+ * in the Jurassic Hall's east wall. All of them are well above head height
+ * and none has a collider, so they never block a path (scripts/check.mjs).
+ *
+ *   kind: "hang" (two cables up to the ceiling), "wall" (flat on a wall or
+ *         lintel, face at x/z), "lightbox" (backlit box over a doorway)
+ *   x, y, z: centre of the sign face; ry: the face looks along (sin ry, cos ry)
+ *   w, h: face size in metres
+ *   to: [x, z] the next waypoint, which sets the arrow (see wayArrow)
+ *   dest: where the signs lead ("court")
+ */
+const EXIT_DOOR = [g2w(29) + CELL / 2, (g2z(18) + g2z(19)) / 2]; // Jurassic Hall -> Exit Passage
+const WAY_TITLE = "EXIT · ICE CREAM COURT 🍦";
+export const WAYFINDING = [
+  // atrium: over the way into the South Corridor, seen from the spawn point
+  { id: "way-atrium", room: "lobby", kind: "hang", x: 0, y: 6.6, z: 34.5, ry: 0, w: 6.6, h: 1.35, to: [0, g2z(19) + CELL / 2], title: WAY_TITLE, sub: "Straight on · Grand Gallery → Jurassic Hall", dest: "court" },
+  // Grand Gallery: seen through the South Corridor (under its lintel), off the centrepieces' sightline, pointing right to the east doorway
+  { id: "way-gallery", room: "rotunda", kind: "hang", x: 17, y: 4.3, z: 10, ry: 0, w: 5.8, h: 1.2, to: [g2w(19) + CELL / 2, 9], title: WAY_TITLE, sub: "East Corridor · Jurassic Hall", dest: "court" },
+  // Grand Gallery: on the lintel over the east doorway, above its name sign
+  { id: "way-gallery-door", room: "rotunda", kind: "wall", x: g2w(19) + CELL / 2 - 0.26, y: 6.75, z: 6, ry: -Math.PI / 2, w: 6.4, h: 1.1, to: [g2w(21), 6], title: WAY_TITLE, sub: "Through the Jurassic Hall", dest: "court" },
+  // East Corridor
+  { id: "way-ecorridor", room: "ecorridor", kind: "hang", x: 35, y: 4.35, z: 6, ry: -Math.PI / 2, w: 4.8, h: 1.0, to: [g2w(23) + CELL / 2, 6], title: WAY_TITLE, sub: "Through the Jurassic Hall", dest: "court" },
+  // Jurassic Link (the way in from the Marine Reptile Hall)
+  { id: "way-jlink", room: "ec2", kind: "hang", x: 60, y: 4.35, z: -29, ry: Math.PI, w: 4.8, h: 1.0, to: [60, g2z(11) + CELL / 2], title: WAY_TITLE, sub: "Through the Jurassic Hall", dest: "court" },
+  // Jurassic Hall: inside each way in, and over the aisle leading to the exit
+  { id: "way-jurassic-north", room: "jurassic", kind: "hang", x: 60, y: 4.2, z: -14.5, ry: Math.PI, w: 5.4, h: 1.15, to: EXIT_DOOR, title: WAY_TITLE, sub: "Far end of this hall", dest: "court" },
+  { id: "way-jurassic-west", room: "jurassic", kind: "hang", x: 52, y: 4.2, z: 2.5, ry: -Math.PI / 2, w: 5.4, h: 1.15, to: EXIT_DOOR, title: WAY_TITLE, sub: "Far end of this hall", dest: "court" },
+  { id: "way-jurassic-aisle", room: "jurassic", kind: "hang", x: 72, y: 4.2, z: 13.5, ry: Math.PI, w: 5.0, h: 1.05, to: EXIT_DOOR, title: WAY_TITLE, sub: "This way out", dest: "court" },
+  // the lightbox over the exit doorway itself
+  { id: "way-exit-lightbox", room: "jurassic", kind: "lightbox", x: EXIT_DOOR[0] - 0.46, y: 7.0, z: EXIT_DOOR[1], ry: -Math.PI / 2, w: 6.6, h: 1.4, to: [EXIT_DOOR[0] + 3, EXIT_DOOR[1]], title: "EXIT", sub: "ICE CREAM 🍦", dest: "court" },
+];
+
+/**
+ * The arrow on a wayfinding sign, as seen by someone reading it: radians
+ * clockwise from "straight ahead" (0 = ↑, π/2 = →, -π/2 = ←), in 45° steps.
+ */
+export function wayArrow(sign) {
+  // the reader looks against the face normal (sin ry, cos ry)
+  const fx = -Math.sin(sign.ry);
+  const fz = -Math.cos(sign.ry);
+  const dx = sign.to[0] - sign.x;
+  const dz = sign.to[1] - sign.z;
+  const ahead = dx * fx + dz * fz;
+  const right = dx * -fz + dz * fx;
+  const step = Math.PI / 4;
+  return Math.round(Math.atan2(right, ahead) / step) * step;
+}
 
 /** The cinema screen hangs on the north wall of the theatre. */
 export const SCREEN = { x: 0, y: 6.4, z: g2z(1) - CELL / 2 + 0.9, w: 22, h: 11 };
@@ -449,7 +511,9 @@ export const THEATRE_SEATS = (() => {
 
 /** Benches in front of the big centrepieces: { x, z, ry } faces the exhibit. */
 export const BENCHES = [
-  { id: "rotunda", x: 0, z: 9.5, ry: Math.PI, looks: "the Grand Gallery" },
+  // off to the east side: the middle of the gallery is the sightline from the
+  // South Corridor to the T. rex
+  { id: "rotunda", x: 13, z: 11, ry: Math.PI, looks: "the Grand Gallery" },
   { id: "cretaceous", x: -78, z: -63, ry: Math.PI, looks: "the Cretaceous Hall" },
   { id: "marine", x: 49, z: -68.8, ry: Math.PI, looks: "the Mosasaurus" },
   { id: "jurassic", x: 71.5, z: 13.6, ry: -Math.PI / 2, looks: "the long-necks" },
@@ -528,10 +592,10 @@ export const PROPS = {
   desk: { x: -16, z: 52, w: 8, d: 2.2 }, // atrium information desk
   puzzle: { x: -78, z: 34, w: 5.5, d: 3.2 }, // bone assembly table
   console: { x: 0, z: -51.6, w: 2.2, d: 1 }, // battle projection console
-  counter: { x: COURT.stallX, z: COURT.stallZ, w: 11.4, d: 3 }, // ice cream counter (with its top)
+  counter: { x: COURT.stallX, z: COURT.stallZ - 0.4, w: 6, d: 1.4 }, // ice cream counter (with its top); the vendor stands behind it
   volcano: { x: 54, z: 36, r: 4.6 }, // cone base
   pillar: { x: -16, z: 8, r: 1.45 }, // timeline pillar (bottom radius)
-  statue: { x: 62, z: 60, r: 1.2 }, // ice cream cone statue
+  statue: { x: 72, z: 55, r: 1.2 }, // ice cream cone statue
 };
 
 /** Free-standing atrium benches: { x, z, ry }, not sittable. */
@@ -544,15 +608,15 @@ export const ATRIUM_BENCHES = [
 /** Potted plants: [x, z]. */
 export const PLANTERS = [
   [-30, 44], [30, 44], [-36, 50], [36, 50], // atrium
-  [52, 52], [86, 81], [52, 66], // ice cream court
+  [68, 50], [88, 76], [68, 76], // ice cream court
 ];
 
 /** Café tables in the ice cream court: [x, z]. */
 export const CAFE_TABLES = [
-  [76, 58],
-  [80, 66],
-  [56, 70],
-  [72, 66],
+  [81, 57],
+  [86, 65],
+  [72, 64],
+  [80, 63],
 ];
 
 const BENCH_LEN = 3.2;
@@ -744,9 +808,14 @@ function benchSeats(b) {
   }));
 }
 
-/** How far in front of its panel an exhibit's interaction point is, and its reach. */
+/**
+ * How far in front of its panel an exhibit's interaction point is, and its
+ * reach: 5 m, cut down to 3/4 of the way to the next exhibit's point (never
+ * under 3 m) so two neighbouring prompts barely overlap.
+ */
 const EXHIBIT_POINT_AHEAD = 3;
 const EXHIBIT_POINT_RADIUS = 5;
+const EXHIBIT_POINT_MIN_RADIUS = 3;
 
 export function buildInteractables() {
   const list = [];
@@ -781,15 +850,21 @@ export function buildInteractables() {
   // The point sits on the floor in front of the picture, not on the plinth:
   // whoever stands in front of a panel is always nearest to that panel's
   // point, even when the next panel is only 6 m away or right behind them.
-  for (const p of EXHIBIT_PANELS) {
+  const points = EXHIBIT_PANELS.filter((p) => SPECIES[p.id]).map((p) => ({
+    p,
+    x: p.x + Math.sin(p.face) * EXHIBIT_POINT_AHEAD,
+    z: p.z + Math.cos(p.face) * EXHIBIT_POINT_AHEAD,
+  }));
+  for (const { p, x, z } of points) {
     const spec = SPECIES[p.id];
-    if (!spec) continue;
+    let gap = Infinity;
+    for (const o of points) if (o.p !== p) gap = Math.min(gap, Math.hypot(o.x - x, o.z - z));
     list.push({
       id: `exhibit:${spec.id}`,
       type: "exhibit",
-      x: p.x + Math.sin(p.face) * EXHIBIT_POINT_AHEAD,
-      z: p.z + Math.cos(p.face) * EXHIBIT_POINT_AHEAD,
-      radius: EXHIBIT_POINT_RADIUS,
+      x,
+      z,
+      radius: Math.max(EXHIBIT_POINT_MIN_RADIUS, Math.min(EXHIBIT_POINT_RADIUS, gap * 0.75)),
       label: `Examine ${spec.name}`,
       key: "E",
       exhibitId: spec.id,
@@ -1057,29 +1132,9 @@ export function buildWorld(scene) {
     }
   }
 
-  // ---------------- hanging banners ----------------
-  // hung high up under the ceiling so they never block the floor or a view
-  for (const room of ROOMS) {
-    if (room.h <= 6 || room.id === "porch" || room.id === "theater") continue;
-    const cx = (g2w(room.cols[0]) + g2w(room.cols[1])) / 2;
-    const cz = (g2z(room.rows[0]) + g2z(room.rows[1])) / 2;
-    const w = Math.min((room.cols[1] - room.cols[0] + 1) * CELL - 8, 9);
-    const banner = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, w * 0.5),
-      new THREE.MeshBasicMaterial({
-        map: bannerTexture(
-          room.name.toUpperCase(),
-          room.id === "court" ? "SCOOPS & DINOSAURS" : "DINOSAUR MUSEUM",
-          `#${new THREE.Color(room.accent).getHexString()}`
-        ),
-        side: THREE.DoubleSide,
-      })
-    );
-    banner.position.set(cx, room.h - 0.6 - w * 0.25, cz);
-    banner.rotation.y = room.id === "rotunda" ? 0 : Math.PI / 2;
-    group.add(banner);
-    tag(banner, "skip");
-  }
+  // No hanging hall banners: one under the Grand Gallery's oculus sat in the
+  // T. rex sightline and, turned edge-on to the doorways, they read as dark
+  // slabs. The doorway signs already name every hall.
 
   // ---------------- doorway signs ----------------
   // every doorway gets a sign on each side naming where it leads; a corridor
@@ -1104,6 +1159,15 @@ export function buildWorld(scene) {
         if (d.b === room) out.add(d.a);
       }
       return out;
+    };
+    // a straight-through corridor (two doorways facing each other): the sign
+    // over its far doorway, on the corridor side, only repeats the one over
+    // its entrance and is seen stacked right above it from the hall, so it
+    // is left out. A bent passage keeps it: its far end is out of sight.
+    const straightPassage = (room) => {
+      if (!isPassage(room)) return false;
+      const own = [...doors.values()].filter((d) => d.a === room || d.b === room);
+      return own.length === 2 && own[0].kind === own[1].kind;
     };
     const destName = (to, from) => {
       if (!isPassage(to)) return to.name;
@@ -1135,6 +1199,7 @@ export function buildWorld(scene) {
         [d.a, d.b, -1],
         [d.b, d.a, 1],
       ]) {
+        if (straightPassage(from)) continue;
         const text = destName(to, from).toUpperCase();
         // the canvas has the plane's aspect (110 px per 0.85 m both ways), so
         // a narrow one-cell doorway gets a narrower canvas, not squashed text
@@ -1412,10 +1477,11 @@ export function buildWorld(scene) {
     g.add(cap);
     tag(cap, "skip");
 
-    const { px, pz, rot } = placardSpot({ x: panel.x, z: panel.z, ry: panel.face, pedestal: panel.w });
-    const placard = addPlacard(px, 1.5, pz, rot, spec.name, spec.info.era, false);
-    // post: from the floor to 0.5 m under the placard's centre (as addPlacard does)
-    setPart(posts, i, IDENTITY, px, 0.5, pz, 1, 1.0, 1);
+    // the caption plate already names the animal: no separate standing placard,
+    // so its instanced post is collapsed to nothing
+    const { px, pz } = placardSpot({ x: panel.x, z: panel.z, ry: panel.face, pedestal: panel.w });
+    const placard = null;
+    setPart(posts, i, IDENTITY, px, 0.5, pz, 0, 0, 0);
 
     const entry = {
       id: spec.id,
@@ -1567,7 +1633,11 @@ export function buildWorld(scene) {
   // ---------------- theatre ----------------
   const screenW = SCREEN.w;
   const screenH = SCREEN.h;
-  const screenTex = new THREE.CanvasTexture(makeCanvas(64, 32));
+  // idle "poster": cinema.js keeps this texture as the screen's idle map,
+  // swaps in its own while a screening runs and puts this one back after
+  const screenTex = new THREE.CanvasTexture(screenPoster());
+  screenTex.colorSpace = THREE.SRGBColorSpace;
+  screenTex.anisotropy = 4;
   const screenMat = new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false });
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenMat);
   screen.position.set(SCREEN.x, SCREEN.y, SCREEN.z);
@@ -1776,41 +1846,96 @@ export function buildWorld(scene) {
   group.add(bendSign);
   tag(bendSign, "skip");
 
+  // ---------------- wayfinding to the ice cream court ----------------
+  {
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.5, metalness: 0.7 });
+    const backMat = new THREE.MeshBasicMaterial({ color: 0x0d1217 });
+    const cableGeo = new THREE.CylinderGeometry(0.012, 0.012, 1, 6);
+    for (const s of WAYFINDING) {
+      const sign = new THREE.Group();
+      sign.position.set(s.x, s.y, s.z);
+      sign.rotation.y = s.ry;
+      sign.name = s.id;
+      sign.userData.wayfinding = s.id;
+      group.add(sign);
+      const lightbox = s.kind === "lightbox";
+      // frame / housing: behind the face (wall and lightbox) or around it (hanging, two-sided)
+      const depth = lightbox ? 0.26 : s.kind === "wall" ? 0.06 : 0.09;
+      const rim = lightbox ? 0.1 : 0.05;
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(s.w + rim * 2, s.h + rim * 2, depth), frameMat);
+      frame.position.z = s.kind === "hang" ? 0 : -depth / 2 - 0.004;
+      sign.add(frame);
+      tag(frame, "metal", { metal: lightbox ? "steel" : "black" });
+      const face = new THREE.Mesh(
+        new THREE.PlaneGeometry(s.w, s.h),
+        new THREE.MeshBasicMaterial({ map: lightbox ? lightboxTexture(s) : wayfindingTexture(s), toneMapped: !lightbox })
+      );
+      face.position.z = s.kind === "hang" ? depth / 2 + 0.003 : 0.003;
+      sign.add(face);
+      // a lightbox glows (bloom picks it up); printed signs stay as authored
+      tag(face, lightbox ? "emissive" : "skip");
+      if (s.kind === "hang") {
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), backMat);
+        back.rotation.y = Math.PI;
+        back.position.z = -depth / 2 - 0.003;
+        sign.add(back);
+        tag(back, "skip");
+        // two cables up to the ceiling
+        const ceiling = (ROOMS.find((r) => r.id === s.room) || { h: s.y + 2 }).h;
+        const len = Math.max(0.1, ceiling - (s.y + s.h / 2 + rim));
+        for (const side of [-1, 1]) {
+          const cable = new THREE.Mesh(cableGeo, frameMat);
+          cable.scale.y = len;
+          cable.position.set(side * (s.w / 2 - 0.3), s.h / 2 + rim + len / 2, 0);
+          sign.add(cable);
+          tag(cable, "metal", { metal: "steel" });
+        }
+      }
+    }
+  }
+
   // ---------------- ice cream court ----------------
+  // A small kiosk sized for one vendor: a 6 m counter, a striped awning
+  // 3 m up on two poles behind the vendor, the shop sign on its front edge.
   const stallX = COURT.stallX;
   const stallZ = COURT.stallZ;
+  const C = PROPS.counter;
   const counter = new THREE.Mesh(
-    new THREE.BoxGeometry(11, 1.2, 2.6),
+    new THREE.BoxGeometry(C.w - 0.3, 1.1, C.d - 0.3),
     new THREE.MeshStandardMaterial({ color: 0xf2f0e6, roughness: 0.7 })
   );
-  counter.position.set(stallX, 0.6, stallZ);
+  counter.position.set(C.x, 0.55, C.z);
   counter.castShadow = true;
   group.add(counter);
   tag(counter, "plinth");
   const counterTop = new THREE.Mesh(
-    new THREE.BoxGeometry(11.4, 0.16, 3),
+    new THREE.BoxGeometry(C.w, 0.12, C.d),
     new THREE.MeshStandardMaterial({ color: 0xff8fab, roughness: 0.5 })
   );
-  counterTop.position.set(stallX, 1.28, stallZ);
+  counterTop.position.set(C.x, 1.16, C.z);
   group.add(counterTop);
   tag(counterTop, "plinth");
-  // striped awning
-  for (let i = 0; i < 8; i++) {
+  // striped awning over the counter and the vendor, sloping down to the front
+  const awningW = C.w + 0.4;
+  const awningD = 2.8;
+  const awningZ = stallZ + 0.1;
+  const awningY = 3.0;
+  for (let i = 0; i < 6; i++) {
     const stripe = new THREE.Mesh(
-      new THREE.BoxGeometry(11.6 / 8, 0.3, 3.6),
+      new THREE.BoxGeometry(awningW / 6, 0.14, awningD),
       new THREE.MeshStandardMaterial({ color: i % 2 ? 0xfff3e0 : 0xff8fab, roughness: 0.6 })
     );
-    stripe.position.set(stallX - 5.8 + (i + 0.5) * (11.6 / 8), 4.6, stallZ);
-    stripe.rotation.x = 0.12;
+    stripe.position.set(stallX - awningW / 2 + (i + 0.5) * (awningW / 6), awningY, awningZ);
+    stripe.rotation.x = -0.12;
     group.add(stripe);
     tag(stripe, "fabric");
   }
-  for (const sx of [-5.4, 5.4]) {
+  for (const sx of [-1, 1]) {
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.13, 0.13, 4.6, 8),
+      new THREE.CylinderGeometry(0.07, 0.07, awningY + 0.2, 8),
       new THREE.MeshStandardMaterial({ color: 0xd8d3c4, roughness: 0.6 })
     );
-    pole.position.set(stallX + sx, 2.3, stallZ - 1.2);
+    pole.position.set(stallX + sx * (awningW / 2 - 0.25), (awningY + 0.2) / 2, awningZ + awningD / 2 - 0.25);
     group.add(pole);
     tag(pole, "metal", { metal: "steel" });
   }
@@ -1818,15 +1943,16 @@ export function buildWorld(scene) {
   const tubColors = [0xff9aa2, 0x9be7c4, 0x8b5a3c, 0xff6b3d, 0x7aa8ff, 0xe0a96d, 0x9fd36b, 0xfff1d0];
   tubColors.forEach((c, i) => {
     const tub = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.42, 0.42, 0.2, 14),
+      new THREE.CylinderGeometry(0.26, 0.26, 0.14, 14),
       new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 })
     );
-    tub.position.set(stallX - 4.2 + i * 1.2, 1.42, stallZ - 0.3);
+    tub.position.set(stallX + (i - (tubColors.length - 1) / 2) * 0.64, 1.25, C.z + 0.15);
     group.add(tub);
     tag(tub, "skip");
   });
+  // the shop sign stands on the awning's low front edge, facing the court
   const stallSign = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 2),
+    new THREE.PlaneGeometry(5.4, 1.16),
     new THREE.MeshBasicMaterial({
       map: makeTextTexture("PREHISTORIC SCOOP", {
         width: 1024,
@@ -1839,7 +1965,7 @@ export function buildWorld(scene) {
       }),
     })
   );
-  stallSign.position.set(stallX, 5.9, stallZ - 1.6);
+  stallSign.position.set(stallX, awningY + 0.5, awningZ - awningD / 2 + 0.1);
   stallSign.rotation.y = Math.PI;
   group.add(stallSign);
   tag(stallSign, "skip");
@@ -1870,13 +1996,13 @@ export function buildWorld(scene) {
   }
   const boardTex = new THREE.CanvasTexture(boardCanvas);
   boardTex.colorSpace = THREE.SRGBColorSpace;
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.8), new THREE.MeshBasicMaterial({ map: boardTex }));
-  board.position.set(stallX + 9, 2.4, stallZ - 2);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), new THREE.MeshBasicMaterial({ map: boardTex }));
+  board.position.set(stallX + C.w / 2 + 1.4, 2.0, C.z - 0.6);
   board.rotation.y = Math.PI - 0.35;
   group.add(board);
   tag(board, "skip");
-  const boardPost = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2, 8), brassMat);
-  boardPost.position.set(stallX + 9, 0.6, stallZ - 1.95);
+  const boardPost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 8), brassMat);
+  boardPost.position.set(stallX + C.w / 2 + 1.4, 0.6, C.z - 0.55);
   group.add(boardPost);
   tag(boardPost, "metal", { metal: "brass" });
 
@@ -1935,10 +2061,16 @@ export function buildWorld(scene) {
   );
   let bi = 0;
   const bulbCol = new THREE.Color();
-  for (const [z0, z1] of [[52, 80], [80, 52], [66, 66]]) {
+  const courtRoom = ROOMS.find((r) => r.id === "court");
+  const cx0 = g2w(courtRoom.cols[0]) - CELL / 2 + 2;
+  const cx1 = g2w(courtRoom.cols[1]) + CELL / 2 - 2;
+  const cz0 = g2z(courtRoom.rows[0]) - CELL / 2 + 4;
+  const cz1 = g2z(courtRoom.rows[1]) + CELL / 2 - 6; // stops short of the awning
+  const czm = (cz0 + cz1) / 2;
+  for (const [z0, z1] of [[cz0, cz1], [cz1, cz0], [czm, czm]]) {
     for (let i = 0; i < 18; i++) {
       const t = i / 17;
-      seatDummy.position.set(50 + t * 38, 8.2 - Math.sin(t * Math.PI) * 1.2, z0 + (z1 - z0) * t);
+      seatDummy.position.set(cx0 + t * (cx1 - cx0), 8.2 - Math.sin(t * Math.PI) * 1.2, z0 + (z1 - z0) * t);
       seatDummy.rotation.set(0, 0, 0);
       seatDummy.updateMatrix();
       bulbs.setMatrixAt(bi, seatDummy.matrix);
@@ -2070,6 +2202,112 @@ export function buildWorld(scene) {
     screenTex,
     sun,
   };
+}
+
+/** Draws a wayfinding arrow centred on (cx, cy), `size` tall, rotated by `angle` (0 = up). */
+function drawArrow(ctx, cx, cy, size, angle, color) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  const s = size / 2;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, -s); // tip
+  ctx.lineTo(s * 0.86, -s * 0.06);
+  ctx.lineTo(s * 0.3, -s * 0.06);
+  ctx.lineTo(s * 0.3, s);
+  ctx.lineTo(-s * 0.3, s);
+  ctx.lineTo(-s * 0.3, -s * 0.06);
+  ctx.lineTo(-s * 0.86, -s * 0.06);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+const WAY_FONT = "Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+const WAY_ACCENT = "#ff8fab";
+
+/** Fits `text` into maxW px: the largest bold size <= size. */
+function fitWayFont(ctx, text, weight, size, maxW) {
+  let fs = size;
+  for (; fs > size * 0.5; fs -= 2) {
+    ctx.font = `${weight} ${fs}px ${WAY_FONT}`;
+    if (ctx.measureText(text).width <= maxW) break;
+  }
+  return fs;
+}
+
+/**
+ * A printed directional sign: dark plate, the arrow on a pink tile on the
+ * side it points to (left when it points straight on), title and route.
+ */
+function wayfindingTexture(s) {
+  const W = 1024;
+  const H = Math.round((W * s.h) / s.w);
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#0d1217";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = WAY_ACCENT;
+  ctx.fillRect(0, H - 8, W, 8);
+  const angle = wayArrow(s);
+  const tile = Math.round(H * 0.72);
+  const pad = Math.round((H - tile) / 2);
+  const right = angle > 0.01;
+  const tx = right ? W - pad - tile : pad;
+  ctx.fillStyle = WAY_ACCENT;
+  ctx.beginPath();
+  ctx.moveTo(tx + 18, pad);
+  ctx.arcTo(tx + tile, pad, tx + tile, pad + tile, 18);
+  ctx.arcTo(tx + tile, pad + tile, tx, pad + tile, 18);
+  ctx.arcTo(tx, pad + tile, tx, pad, 18);
+  ctx.arcTo(tx, pad, tx + tile, pad, 18);
+  ctx.closePath();
+  ctx.fill();
+  drawArrow(ctx, tx + tile / 2, pad + tile / 2, tile * 0.68, angle, "#1a1216");
+  const textX = right ? pad * 1.6 : tx + tile + pad * 1.4;
+  const textW = W - tile - pad * 4;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff6e6";
+  fitWayFont(ctx, s.title, 800, Math.round(H * 0.34), textW);
+  ctx.fillText(s.title, textX, H * (s.sub ? 0.4 : 0.5));
+  if (s.sub) {
+    ctx.fillStyle = WAY_ACCENT;
+    fitWayFont(ctx, s.sub, 500, Math.round(H * 0.2), textW);
+    ctx.fillText(s.sub, textX, H * 0.73);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+/** The backlit exit lightbox: green EXIT panel, pink ICE CREAM panel. */
+function lightboxTexture(s) {
+  const W = 1024;
+  const H = Math.round((W * s.h) / s.w);
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext("2d");
+  const split = Math.round(W * 0.4);
+  ctx.fillStyle = "#1fae5b";
+  ctx.fillRect(0, 0, split, H);
+  ctx.fillStyle = "#ffa3bb";
+  ctx.fillRect(split, 0, W - split, H);
+  ctx.fillStyle = "#fffdf5";
+  ctx.fillRect(split - 3, 0, 6, H);
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  fitWayFont(ctx, s.title, 900, Math.round(H * 0.56), split - 60);
+  ctx.fillText(s.title, split / 2, H * 0.53);
+  ctx.fillStyle = "#3a0f1e";
+  fitWayFont(ctx, s.sub, 900, Math.round(H * 0.46), W - split - 70);
+  ctx.fillText(s.sub, split + (W - split) / 2, H * 0.53);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
 }
 
 export function roomNameAt(x, z) {

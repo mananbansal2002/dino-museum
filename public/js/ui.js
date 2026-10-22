@@ -700,9 +700,12 @@ export function createUI(callbacks = {}) {
   chatInput.addEventListener("blur", () => chatInput.classList.remove("open"));
 
   // ---------------- exhibit card ----------------
+  speciesImages(); // fetch early so the first card already has its toggle and credit
   function showExhibit(ex) {
     const body = $("exhibitCardBody");
     const stats = ex.stats || {};
+    // main.js decides whether there is anything to play; without that hint we assume yes
+    const hasVideos = !!callbacks.onExhibitVideos && (callbacks.hasExhibitVideos?.(ex) ?? true);
     const bar = (label, value) => `
       <div class="barRow">
         <span>${label}</span>
@@ -716,8 +719,12 @@ export function createUI(callbacks = {}) {
           <h2 class="exTitle">${escapeHtml(ex.title)}</h2>
         </div>
         <div class="exActions">
-          ${callbacks.onExhibitVideos ? `<button class="chip" id="exhibitVideos">▶ videos</button>` : ""}
-          <button class="chip" id="closeExhibit">close ✕</button>
+          ${
+            hasVideos
+              ? `<button type="button" class="chip" id="exhibitVideos" aria-label="Watch ${escapeHtml(ex.title)} videos">▶ videos</button>`
+              : ""
+          }
+          <button type="button" class="chip" id="closeExhibit">close ✕</button>
         </div>
       </div>
       <figure class="exHero" id="exHero">
@@ -745,20 +752,121 @@ export function createUI(callbacks = {}) {
     $("closeExhibit").onclick = hideExhibit;
     const videos = $("exhibitVideos");
     if (videos) videos.onclick = () => callbacks.onExhibitVideos?.(ex);
-    const hero = $("exHero");
-    hero.querySelector("img").onerror = () => hero.remove();
-    speciesImages().then((m) => {
-      const info = m[ex.id];
-      const cap = $("exCredit");
-      if (info && cap && document.body.contains(cap)) {
-        cap.textContent = `Image: ${info.credit || "Unknown"} · ${info.license || ""}`;
-      }
-    });
+    setupHero($("exHero"), ex);
     releaseMouse();
     $("exhibitCard").classList.remove("hidden");
   }
   function hideExhibit() {
     $("exhibitCard").classList.add("hidden");
+  }
+
+  /**
+   * The card's hero photo. Once the manifest says what we have it adds a
+   * Life | Fossil toggle (when a skeleton photo exists), a "Specimen" tag
+   * (when the main photo already is a mounted fossil) and a linked credit.
+   * Species without any photo get a quiet placeholder instead.
+   */
+  function setupHero(hero, ex) {
+    const img = hero.querySelector("img");
+    const cap = hero.querySelector("figcaption");
+    let views = null; // { life, fossil } manifest entries, once known
+    let view = "life";
+    let blank = false;
+
+    const placeholder = () => {
+      blank = true;
+      hero.className = "exHero exHeroBlank";
+      hero.innerHTML = `
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <!-- a bone broken in two: "fragmentary" at a glance -->
+          <g transform="translate(-1.5 1.5)">
+            <circle cx="9.5" cy="33" r="4.6" /><circle cx="15" cy="38.5" r="4.6" />
+            <path d="M12.5 35.5 21.5 26.5" />
+          </g>
+          <g transform="translate(1.5 -1.5)">
+            <circle cx="33" cy="9.5" r="4.6" /><circle cx="38.5" cy="15" r="4.6" />
+            <path d="M35.5 12.5 26.5 21.5" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>Known only from fragmentary fossils</b>
+          <span>No complete skeleton or reliable restoration of ${escapeHtml(ex.title)} to show yet.</span>
+        </figcaption>`;
+    };
+
+    const credit = (info) => {
+      const who = escapeHtml(info.credit || "Unknown");
+      const src = /^https?:\/\//i.test(info.source || "") ? info.source : "";
+      const link = src
+        ? `<a href="${escapeHtml(src)}" target="_blank" rel="noopener">${who}</a>`
+        : who;
+      cap.innerHTML = `Image: ${link}${info.license ? ` · ${escapeHtml(info.license)}` : ""}`;
+    };
+
+    const show = (next) => {
+      const info = views?.[next];
+      if (!info || blank) return;
+      view = next;
+      const fossil = next === "fossil";
+      img.alt = `${ex.title} ${fossil ? "fossil skeleton" : views.specimen ? "museum specimen" : "life restoration"}`;
+      if (!img.src.endsWith(info.file)) {
+        img.src = info.file;
+        // a blurred copy fills the frame around the uncropped photo
+        hero.style.setProperty("--hero-bg", `url("${info.file}")`);
+        // replay the fade so the swap reads as a change, not a flicker
+        img.style.animation = "none";
+        void img.offsetWidth;
+        img.style.animation = "";
+      }
+      credit(info);
+      hero.querySelectorAll(".exHeroToggle button").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.dataset.view === next));
+      });
+    };
+
+    img.onerror = () => {
+      if (blank) return;
+      if (view === "fossil") {
+        // the skeleton photo is missing — fall back to life and drop the toggle
+        views.fossil = null;
+        hero.querySelector(".exHeroToggle")?.remove();
+        show("life");
+      } else {
+        placeholder();
+      }
+    };
+
+    speciesImages().then((m) => {
+      if (!hero.isConnected || blank) return;
+      const info = m[ex.id];
+      if (!info) {
+        // an empty manifest means the fetch failed; only a real gap gets the placeholder
+        if (Object.keys(m).length) placeholder();
+        return;
+      }
+      const specimen = info.note === "museum specimen photo";
+      views = {
+        specimen,
+        life: { ...info, file: info.file || `/images/species/${encodeURIComponent(ex.id)}.jpg` },
+        fossil: !specimen && info.skeleton?.file ? info.skeleton : null,
+      };
+      if (specimen) {
+        hero.insertAdjacentHTML("beforeend", `<span class="exHeroTag">Specimen</span>`);
+      } else if (views.fossil) {
+        hero.insertAdjacentHTML(
+          "beforeend",
+          `<div class="exHeroToggle" role="group" aria-label="Picture">
+            <button type="button" data-view="life" aria-pressed="true">Life</button>
+            <button type="button" data-view="fossil" aria-pressed="false">Fossil</button>
+          </div>`
+        );
+        hero.querySelectorAll(".exHeroToggle button").forEach((b) => {
+          b.onclick = () => show(b.dataset.view);
+        });
+        new Image().src = views.fossil.file; // warm the cache so the first swap is instant
+      }
+      show("life");
+    });
   }
   $("exhibitCard").addEventListener("click", (e) => {
     if (e.target.id === "exhibitCard") hideExhibit();

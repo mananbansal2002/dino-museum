@@ -8,12 +8,16 @@ import { createAudio } from "./audio.js";
 import { createFX } from "./fx.js";
 import { createUI, makeIceCream, FLAVOURS } from "./ui.js";
 import { createNet } from "./net.js";
-import { exhibitById, battleById, BATTLES, FACTS, EXHIBITS } from "./exhibits.js";
+import { exhibitById, battleById, BATTLES, FACTS, EXHIBITS, EXTRA_SCREENINGS } from "./exhibits.js";
 import { makeBubble } from "./util.js";
 import { upgradeCharacter, preloadModels } from "./models.js";
 import { SIT_SEAT_OFFSET, createCharacter } from "./character.js";
 import { createEraView } from "./eraview.js";
 import { createVideoPlayer, mediaOverlayOpen } from "./video.js";
+import { applyLookdev } from "./lookdev.js";
+import { placeLiveModels } from "./livemodels.js";
+import { createBattlePicker, fetchVideoCatalogue } from "./battlepicker.js";
+import { createScreenEmbed } from "./screen-embed.js";
 
 preloadModels(["male", "female"]);
 
@@ -21,11 +25,15 @@ preloadModels(["male", "female"]);
 /* renderer + scene                                                     */
 /* ------------------------------------------------------------------ */
 const canvas = document.getElementById("scene");
+// alpha: the in-world YouTube embed shows through a transparent hole in the
+// theatre screen (scene.background keeps every other pixel opaque)
 const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
+  alpha: true,
   powerPreference: "high-performance",
 });
+renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -47,12 +55,67 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0, 6, 20);
 
 const world = buildWorld(scene);
+const lookdev = applyLookdev({ renderer, scene, camera });
+
+// phones and tablets get the light versions of the heavy dressing
+const QUALITY =
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia?.("(pointer: coarse)").matches
+    ? "low"
+    : "high";
+// best-effort: a prop that fails to load leaves the primitive in its place
+const propsReady = import("./props.js")
+  .then((m) => m.placeProps({ scene, world, renderer, quality: QUALITY }))
+  .then((props) => {
+    window.__museum.props = props;
+    return props;
+  })
+  .catch((err) => console.warn("props: could not dress the halls", err));
+const live = placeLiveModels({ scene, world, camera, quality: QUALITY });
+
 const fx = createFX(scene);
 const audio = createAudio();
 const remote = createRemotePlayers(scene);
 const minimap = createMinimap(document.getElementById("minimap"));
 const eraView = createEraView({ renderer });
 const videoPlayer = createVideoPlayer();
+const screenEmbed = createScreenEmbed({ renderer, camera, screenMesh: world.screen });
+
+// verified clips per species / battle (in-site only: no routing out to YouTube)
+let catalogue = {};
+fetchVideoCatalogue().then((data) => {
+  catalogue = data;
+});
+
+const picker = createBattlePicker({
+  battles: BATTLES,
+  extra: EXTRA_SCREENINGS,
+  onPlay3D: (id) => {
+    stopEmbed();
+    S.net?.emit("action", { type: "battle", payload: { id } });
+    startBattle(id);
+  },
+  onPlayVideo: (video, battle) => {
+    if (inTheatre()) {
+      // on the big screen, for you: the shared 3D screening makes way
+      picker.close();
+      cinema.stop();
+      watchBattle(false);
+      if (!screenEmbed.play(video.id, { title: video.title })) return;
+      audio.duck(true);
+      ui.toast(`🎬 ${video.title}${video.channel ? ` · ${video.channel}` : ""} — Esc to stop`);
+    } else {
+      videoPlayer.open(video, battle?.videos || null);
+    }
+  },
+});
+
+/** Stop the YouTube clip on the theatre screen (if one is playing). */
+function stopEmbed() {
+  if (!screenEmbed.playing) return false;
+  screenEmbed.stop();
+  audio.duck(false);
+  return true;
+}
 
 /* ------------------------------------------------------------------ */
 /* the ice cream vendor behind the counter                              */
@@ -175,15 +238,14 @@ const ui = createUI({
     ui.setCounters({ scoops: S.scoops });
     audio.slurp();
     vendor.celebrate();
-    ui.toast(`${flavourName(payload.flavour)} — enjoy! 🍦`, "good");
+    ui.toast(`${flavourName(payload.flavour)} — enjoy! Press F to eat it 🍦`, "good");
     fx.burst("confetti", S.player.state.x, S.player.state.y + 1.6, S.player.state.z, 26);
   },
   onStopBattle: () => stopBattle(),
   onExhibitVideos: (ex) => {
-    // verified clips when the exhibit has them, otherwise a YouTube search
-    if (!(ex.videos?.length && videoPlayer.open(ex.videos[0], ex.videos))) {
-      videoPlayer.openSearch(`${ex.title} dinosaur`, ex.title);
-    }
+    // verified clips from /data/videos.json, played in the site
+    const list = catalogue.species?.[ex.id] || [];
+    if (!(list.length && videoPlayer.open(list[0], list))) ui.toast("No videos for this one yet");
   },
   onLookChange: () => {
     if (S.player) S.player.setLook(ui.look);
@@ -222,6 +284,8 @@ function applyIceCream(id, payload, { animate = true } = {}) {
       : [],
   };
   const prop = makeIceCream(order);
+  // a fresh order replaces the one being eaten
+  if (mine) S.eating = null;
   if (mine) {
     S.player.character.setHeld(prop);
     if (animate) S.player.playAction("eat", 2.4);
@@ -234,6 +298,55 @@ function applyIceCream(id, payload, { animate = true } = {}) {
   const prev = held.get(key);
   held.set(key, { payload, prop });
   if (prev) disposeObject(prev.prop);
+}
+
+/** How long it takes to finish an ice cream, bite by bite. */
+const EAT_SECONDS = 5;
+const EAT_BITES = 5;
+
+/** Start eating the ice cream in your hand (F). */
+function eatIceCream() {
+  if (!held.has(ME) || S.eating) return;
+  S.eating = { t: 0, bite: 0 };
+  ui.toast("Mmm… 🍦");
+}
+
+/** Advance eating: a bite every second, the scoops shrink, then it is gone. */
+function updateEating(dt) {
+  const e = S.eating;
+  const h = held.get(ME);
+  if (!e || !h) {
+    S.eating = null;
+    return;
+  }
+  e.t += dt;
+  const bite = Math.min(EAT_BITES, Math.floor((e.t / EAT_SECONDS) * EAT_BITES) + 1);
+  if (bite !== e.bite) {
+    e.bite = bite;
+    S.player.playAction("eat", EAT_SECONDS / EAT_BITES);
+    audio.slurp();
+  }
+  // what is left of it, never quite zero until the last bite
+  const left = Math.max(0.15, 1 - e.t / EAT_SECONDS);
+  h.prop.scale.setScalar(left);
+  if (e.t >= EAT_SECONDS) {
+    S.eating = null;
+    dropIceCream(S.myId);
+    S.net?.emit("action", { type: "iceCreamDone", payload: {} });
+    ui.toast("All gone — that was delicious! 😋", "good");
+  }
+}
+
+/** Remove a finished ice cream from someone's hand. */
+function dropIceCream(id) {
+  const mine = id === S.myId;
+  const key = mine ? ME : id;
+  const h = held.get(key);
+  if (!h) return;
+  if (mine) S.player?.character.setHeld(null);
+  else remote.setHeld(id, null);
+  held.delete(key);
+  disposeObject(h.prop);
 }
 
 /** Re-attach a held prop after a character swaps to its rigged model. */
@@ -350,6 +463,9 @@ function connect(payload) {
           if (!(cinema.playing && S.currentBattleId === id)) startBattle(id);
         } else if (a.type === "iceCream") {
           applyIceCream(a.id, a.payload || {});
+        } else if (a.type === "iceCreamDone") {
+          remote.action(a.id, "eat", 1.2);
+          dropIceCream(a.id);
         } else if (a.type === "photo") {
           remote.action(a.id, "photo", 1.4);
           // only people in the shot see the flash, and never more than one every few seconds
@@ -426,6 +542,8 @@ async function startGame(opts) {
     }
     ui.setPlayers(rosterList(), S.myId);
     ui.enterGame();
+    showLoadingUntilReady();
+    collapseKeyHelpLater();
     ui.chat({
       system: true,
       text: S.solo
@@ -491,8 +609,11 @@ function nearestInteractable() {
 function useAction() {
   if (!S.joined || !S.player) return;
   if (ui.isChatOpen() || anyPanelOpen()) return;
-  if (S.player.isSitting) S.player.stand();
-  else interact(nearestInteractable());
+  // seated in the theatre, E chooses the fight; anywhere else it stands you up
+  if (S.player.isSitting) {
+    if (inTheatre()) picker.open();
+    else S.player.stand();
+  } else interact(nearestInteractable());
 }
 
 function inTheatre() {
@@ -506,6 +627,8 @@ function inTheatre() {
  */
 function startBattle(battleId) {
   const battle = battleById(battleId) || BATTLES[Math.floor(Math.random() * BATTLES.length)];
+  // a shared screening takes the screen back from a personal YouTube clip
+  stopEmbed();
   S.currentBattleId = battle.id;
   cinema.play(battle.id);
   S.watchingBattle = false;
@@ -559,9 +682,7 @@ function interact(it) {
       break;
     }
     case "battle": {
-      const battle = BATTLES[Math.floor(Math.random() * BATTLES.length)];
-      S.net?.emit("action", { type: "battle", payload: { id: battle.id } });
-      startBattle(battle.id);
+      picker.open();
       break;
     }
     case "guide": {
@@ -569,7 +690,7 @@ function interact(it) {
       ui.modal(`
         <h2>🎟️ Museum Guide</h2>
         <p class="quote">Welcome to the Dinosaur Museum! You have found ${S.visited.size} of
-        ${EXHIBITS.length} skeletons so far. There is also a screening theatre with comfy seats, a dig site — and a little surprise
+        ${EXHIBITS.length} exhibits so far. There is also a screening theatre with comfy seats, a dig site — and a little surprise
         waiting at the very end of the tour.
         <span class="who">— Guide</span></p>
         <p class="lead" style="margin-top:16px">Did you know?</p>
@@ -622,7 +743,7 @@ function interact(it) {
       if (S.player.sit({ x: seat.x, z: seat.z, ry: seat.ry, y: Math.max(0, seat.y - SIT_SEAT_OFFSET) })) {
         ui.toast(
           it.area === "theatre"
-            ? "Enjoy the show 🍿 — press E at the console to pick a fight, W to stand"
+            ? "Enjoy the show 🍿 — press E to choose a fight, W to stand"
             : "Taking a rest… press W to stand up"
         );
       }
@@ -838,11 +959,11 @@ window.addEventListener("keydown", (e) => {
   }
   switch (e.code) {
     case "Escape":
+      if (stopEmbed()) break;
       if (ui.isBattleOpen()) stopBattle();
       break;
     case "KeyE":
-      if (S.player.isSitting) S.player.stand();
-      else interact(nearestInteractable());
+      useAction();
       break;
     case "KeyV":
       roar();
@@ -852,20 +973,11 @@ window.addEventListener("keydown", (e) => {
       bubble(S.player, "👋", S.color);
       S.net?.emit("action", { type: "wave", payload: {} });
       break;
-    case "KeyF": {
-      const it = nearestInteractable();
-      if (it?.type === "dig") {
-        dig();
-      } else if (it?.type === "exhibit") {
-        const ex = exhibitById(it.exhibitId);
-        S.player.playAction("eat", 2.2);
-        ui.toast(`You fed the ${ex?.title || "dinosaur"} a bone 🦴`, "good");
-        audio.step(1.2);
-      } else {
-        ui.toast("Nothing to feed here.");
-      }
+    case "KeyF":
+      if (nearestInteractable()?.type === "dig") dig();
+      else if (held.has(ME)) eatIceCream();
+      else ui.toast("Press F at the dig site to dig");
       break;
-    }
     case "KeyG":
       interact(nearestInteractable()?.type === "photo" ? nearestInteractable() : { type: "photo" });
       break;
@@ -889,6 +1001,7 @@ function anyPanelOpen() {
     ui.isCardOpen() ||
     ui.isIceOpen() ||
     eraView.isOpen() ||
+    picker.isOpen() ||
     mediaOverlayOpen()
   );
 }
@@ -902,8 +1015,56 @@ canvas.addEventListener("click", () => {
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  // sizes the renderer and the post-processing chain
+  lookdev.resize(window.innerWidth, window.innerHeight);
+  screenEmbed.resize();
 });
+
+/* ------------------------------------------------------------------ */
+/* HUD                                                                  */
+/* ------------------------------------------------------------------ */
+// touch keyboards focus the chat box directly (no T key): mark it open so
+// the movement keys typed into it don't also walk the avatar
+document.getElementById("chatInput")?.addEventListener("focus", (e) => e.target.classList.add("open"));
+
+let keysTouched = false;
+document.getElementById("toggleKeys")?.addEventListener("click", (e) => {
+  // runs after ui.js's own toggle
+  keysTouched = true;
+  const collapsed = document.getElementById("keyHelp")?.classList.contains("collapsed");
+  e.currentTarget.setAttribute("aria-expanded", collapsed ? "false" : "true");
+});
+
+/** The controls panel tucks itself away after a while, unless the visitor chose. */
+function collapseKeyHelpLater() {
+  setTimeout(() => {
+    const help = document.getElementById("keyHelp");
+    const btn = document.getElementById("toggleKeys");
+    if (keysTouched || !help || !btn || help.classList.contains("collapsed")) return;
+    help.classList.add("collapsed");
+    btn.textContent = "show";
+    btn.setAttribute("aria-expanded", "false");
+  }, 10000);
+}
+
+/**
+ * Keep the loading card up until the world (and the props, within reason)
+ * is in and a frame of the visitor's view has been drawn.
+ */
+function showLoadingUntilReady() {
+  const box = document.getElementById("loading");
+  if (!box) return;
+  const text = document.getElementById("loadingText");
+  const bar = document.getElementById("loadingBar");
+  box.classList.remove("hidden");
+  if (text) text.textContent = "Building the museum…";
+  const propsOrTimeout = Promise.race([propsReady, new Promise((r) => setTimeout(r, 8000))]);
+  propsOrTimeout.then(() => {
+    if (bar) bar.style.width = "100%";
+    S.loadingFrames = 2;
+  });
+  S.hideLoading = () => box.classList.add("hidden");
+}
 
 /* ------------------------------------------------------------------ */
 /* main loop                                                            */
@@ -953,6 +1114,7 @@ function animate() {
     }
     remote.update(dt);
     S.digCooldown = Math.max(0, S.digCooldown - dt);
+    if (S.eating) updateEating(dt);
 
     // footsteps: by distance actually walked on the ground (not in the air,
     // not running into a wall), and a heavier one on landing
@@ -986,7 +1148,10 @@ function animate() {
     ui.setHall(hallName);
     audio.setZone(hallName);
     // the screening overlay follows you in and out of the theatre
-    watchBattle(cinema.playing && inTheatre());
+    const inside = inTheatre();
+    watchBattle(cinema.playing && inside);
+    // a YouTube clip on the big screen is only for the audience
+    if (!inside && stopEmbed()) ui.toast("The clip stopped when you left the theatre");
 
     // network state
     const now = performance.now();
@@ -1003,6 +1168,7 @@ function animate() {
   }
 
   vendor.update(dt, S.player?.state);
+  live.update(dt, S.player?.state);
 
   // animated exhibits
   for (const a of world.animated) {
@@ -1030,6 +1196,8 @@ function animate() {
   }
 
   renderFrame(dt);
+  // the loading card goes once the first frames of the visitor's view are drawn
+  if (S.loadingFrames > 0 && --S.loadingFrames === 0) S.hideLoading?.();
 }
 
 function rosterList() {
@@ -1050,7 +1218,13 @@ function renderFrame(dt = 0) {
     eraView.render();
     return;
   }
-  renderer.render(scene, camera);
+  if (screenEmbed.playing) {
+    // post-processing may fill the alpha hole the clip shows through
+    renderer.render(scene, camera);
+    screenEmbed.render();
+    return;
+  }
+  lookdev.render();
 }
 
 window.addEventListener("eraview:close", (e) => {
@@ -1078,6 +1252,12 @@ window.__museum = {
   cinema,
   remote,
   roomAt,
+  lookdev,
+  live,
+  picker,
+  screenEmbed,
+  videoPlayer,
+  props: null,
   get player() {
     return S.player;
   },

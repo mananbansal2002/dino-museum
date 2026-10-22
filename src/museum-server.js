@@ -30,6 +30,7 @@ export const ANIMS = new Set(["idle", "walk", "run", "jump", "sit"]);
 export const ACTION_TYPES = new Set([
   "score",
   "iceCream",
+  "iceCreamDone",
   "photo",
   "roar",
   "dig",
@@ -809,8 +810,9 @@ export function createMuseumServer({ staticDir = null, mountPath = null, sync: s
         player.photoAt = now;
       }
       if (type === "score") player.score = (player.score || 0) + payload;
-      if (type === "iceCream") {
-        player.iceCream = payload;
+      if (type === "iceCream" || type === "iceCreamDone") {
+        // finished eating: late joiners should no longer see it in the hand
+        player.iceCream = type === "iceCream" ? payload : null;
         sync.addPlayer(cur.code, rosterEntry(player));
       }
       // The sender already applied the action locally: don't echo it back.
@@ -843,10 +845,12 @@ export function createMuseumServer({ staticDir = null, mountPath = null, sync: s
   if (staticDir) {
     app.use(express.static(staticDir));
     // SPA fallback for page routes only: a missing asset (/js/x.js,
-    // /models/x.glb) must be a real 404, not index.html with status 200.
+    // /models/x.glb, anything under an asset folder even without an
+    // extension) must be a real 404, not index.html with status 200.
+    const ASSET_DIRS = /^\/(?:images|models|data|textures|vendor|js|css|audio|video|fonts)(?:\/|$)/;
     app.get(/^\/(?!api\/|socket\.io\/|health$).*/, (req, res, next) => {
       const last = req.path.slice(req.path.lastIndexOf("/") + 1);
-      if (/\.[A-Za-z0-9]+$/.test(last) || !req.accepts("html")) return next();
+      if (ASSET_DIRS.test(req.path) || /\.[A-Za-z0-9]+$/.test(last) || !req.accepts("html")) return next();
       res.sendFile("index.html", { root: staticDir });
     });
   }

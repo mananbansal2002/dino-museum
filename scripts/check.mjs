@@ -436,6 +436,26 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
       fail("line-of-sight check is broken (spawn cannot see its own room)");
     }
     console.log(`✓ the ice cream court is hidden from the entrance (${rays} sight lines blocked)`);
+
+    // the stall, its counter, the vendor's spot (main.js: just behind the
+    // counter at stallZ + 0.75) and the exit all belong to the court
+    const C = world.COURT;
+    const counter = (world.PROP_OBSTACLES || []).find((o) => o.id === "prop:counter");
+    for (const [what, x, z] of [
+      ["the ice cream stall", C.stallX, C.stallZ],
+      ["the vendor", C.stallX, C.stallZ + 0.75],
+      ["the exit door", C.exitX + 0.5, C.exitZ],
+    ]) {
+      if (roomAt(x, z)?.id !== "court") fail(`${what} is not in the ice cream court`);
+    }
+    if (!counter) fail("the ice cream counter has no collider");
+    else {
+      if (counter.maxZ > C.stallZ + 0.75 - 0.35) fail("the ice cream counter stands where the vendor works");
+      if (counter.maxX - counter.minX > 8) fail(`the ice cream counter is ${(counter.maxX - counter.minX).toFixed(1)} m wide: too big for one vendor`);
+    }
+    for (const it of interactables.filter((i) => i.type === "icecream" || i.type === "exit")) {
+      if (roomAt(it.x, it.z)?.id !== "court") fail(`the interactable ${it.id} is not in the ice cream court`);
+    }
   }
 }
 
@@ -571,16 +591,24 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
   console.log(`✓ ${n} exhibit placards face their visitors`);
 }
 
-/* standing in front of a panel, the prompt names that panel (main.js picks
-   the nearest interactable whose radius you are inside) */
+/* standing in front of a panel, the prompt names that panel. main.js picks
+   the interactable you are inside the radius of with the lowest
+   distance x (1 - 0.3 x facing) score; the visitor here looks at the panel. */
 {
-  const nearest = (x, z) => {
+  const nearest = (x, z, ry) => {
+    const fx = Math.sin(ry);
+    const fz = Math.cos(ry);
     let best = null;
-    let bestD = Infinity;
+    let bestScore = Infinity;
     for (const it of interactables) {
-      const d = Math.hypot(it.x - x, it.z - z);
-      if (d < it.radius && d < bestD) {
-        bestD = d;
+      const dx = it.x - x;
+      const dz = it.z - z;
+      const d = Math.hypot(dx, dz);
+      if (d >= it.radius) continue;
+      const facing = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
+      const score = d * (1 - 0.3 * facing);
+      if (score < bestScore) {
+        bestScore = score;
         best = it;
       }
     }
@@ -598,11 +626,23 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
         const [rx, rz] = world.resolveCollision(x, z, 0.52);
         if (Math.hypot(rx - x, rz - z) > 1e-6) continue; // nobody can stand there
         spots++;
-        const it = nearest(x, z);
-        if (it?.id !== `exhibit:${p.id}`) {
-          fail(`${d} m in front of the ${p.id} panel the prompt offers ${it ? it.id : "nothing"}`);
+        // looking straight at the panel, and at its picture from off to the side
+        for (const ry of [p.face + Math.PI, Math.atan2(p.x - x, p.z - z)]) {
+          const it = nearest(x, z, ry);
+          if (it?.id !== `exhibit:${p.id}`) {
+            fail(`${d} m in front of the ${p.id} panel the prompt offers ${it ? it.id : "nothing"}`);
+            break;
+          }
         }
       }
+    }
+  }
+  // no two exhibit prompts may cover the same stretch of floor in front of
+  // their panels: a point never sits inside a neighbour's reach
+  const exhibitIts = interactables.filter((i) => i.type === "exhibit");
+  for (const a of exhibitIts) {
+    for (const b of exhibitIts) {
+      if (a !== b && Math.hypot(a.x - b.x, a.z - b.z) < a.radius) fail(`the prompt of ${b.exhibitId} sits inside the reach of ${a.exhibitId}`);
     }
   }
   console.log(`✓ the prompt names the right exhibit from ${spots} spots in front of the panels`);
@@ -624,6 +664,56 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
     }
   }
   console.log(`✓ ${props.length} pieces of furniture are solid`);
+}
+
+/* wayfinding to the ice cream court: signs high up, inside their room, clear
+   of the exhibits, and at least one pointing to the court in the atrium and
+   one in the Jurassic Hall (where the exit is) */
+{
+  const signs = world.WAYFINDING || [];
+  const HEADROOM = 2.6; // lowest edge of any sign above the floor
+  for (const s of signs) {
+    const room = roomAt(s.x, s.z);
+    if (!room || room.id !== s.room) {
+      fail(`the wayfinding sign ${s.id} is not in the ${s.room} (found ${room?.id || "a wall"})`);
+      continue;
+    }
+    if (s.y - s.h / 2 < HEADROOM) fail(`the wayfinding sign ${s.id} hangs too low (${(s.y - s.h / 2).toFixed(2)} m): it would block the way`);
+    if (s.y + s.h / 2 > room.h - 0.2) fail(`the wayfinding sign ${s.id} goes through the ceiling of the ${room.name}`);
+    // both ends of the face stay inside the room (a sign never pokes through a wall)
+    const ax = Math.cos(s.ry) * (s.w / 2);
+    const az = -Math.sin(s.ry) * (s.w / 2);
+    for (const [ex, ez] of [
+      [s.x - ax, s.z - az],
+      [s.x + ax, s.z + az],
+    ]) {
+      if (roomAt(ex, ez)?.id !== s.room) fail(`the wayfinding sign ${s.id} pokes into a wall near ${ex.toFixed(1)},${ez.toFixed(1)}`);
+    }
+    // hanging signs are not hung over an exhibit plinth (the mounts are tall)
+    if (s.kind === "hang") {
+      const minX = Math.min(s.x - ax, s.x + ax) - 0.3;
+      const maxX = Math.max(s.x - ax, s.x + ax) + 0.3;
+      const minZ = Math.min(s.z - az, s.z + az) - 0.3;
+      const maxZ = Math.max(s.z - az, s.z + az) + 0.3;
+      for (const f of footprints) {
+        if (minX < f.maxX && maxX > f.minX && minZ < f.maxZ && maxZ > f.minZ) fail(`the wayfinding sign ${s.id} hangs over the exhibit ${f.id}`);
+      }
+    }
+    // wall signs and lightboxes are on a wall: a step behind the face is solid or another room
+    if (s.kind !== "hang") {
+      const bx = s.x - Math.sin(s.ry) * 0.5;
+      const bz = s.z - Math.cos(s.ry) * 0.5;
+      if (roomAt(bx, bz)?.id === s.room) fail(`the wall sign ${s.id} is not on a wall`);
+    }
+    // the arrow points roughly at the next waypoint, which is walkable
+    if (!roomAt(s.to[0] + 0.01, s.to[1] + 0.01) && !roomAt(s.to[0] - 0.01, s.to[1] - 0.01)) fail(`the wayfinding sign ${s.id} points into a wall`);
+    if (typeof world.wayArrow === "function" && Math.abs(world.wayArrow(s)) > Math.PI / 2 + 1e-6) fail(`the wayfinding sign ${s.id} points backwards`);
+  }
+  const toCourt = (roomId) => signs.some((s) => s.dest === "court" && s.room === roomId);
+  if (!toCourt("lobby")) fail("no sign in the Entrance Atrium points to the Ice Cream Court");
+  if (!toCourt("jurassic")) fail("no sign in the Jurassic Hall points to the Ice Cream Court");
+  if (!signs.some((s) => s.kind === "lightbox" && s.room === "jurassic")) fail("the exit to the Ice Cream Court has no lightbox");
+  console.log(`✓ ${signs.length} wayfinding signs lead to the ice cream court, all above head height`);
 }
 
 /* fine-grained walk test with the real collision code: every point of

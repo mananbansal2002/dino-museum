@@ -93,6 +93,17 @@ try {
   const three = await fetch(`${url}/vendor/three/three.module.js`);
   check(three.ok, "three.js is served", "the vendored three.js build is missing");
 
+  // a missing asset is a real 404, a page route still gets the app
+  const missing = await Promise.all(
+    ["/images/species/nope.jpg", "/models/nope", "/data/nope", "/textures/nope", "/vendor/nope", "/js/nope", "/css/nope.css", "/nope.glb"].map(
+      async (p) => [p, (await fetch(`${url}${p}`, { headers: { accept: "text/html,*/*" } })).status]
+    )
+  );
+  const wrong = missing.filter(([, s]) => s !== 404);
+  check(!wrong.length, "missing assets are a 404", `missing assets are not a 404: ${wrong.map(([p, s]) => `${p} ${s}`).join(", ")}`);
+  const spa = await fetch(`${url}/room/ABC123`, { headers: { accept: "text/html" } });
+  check(spa.ok && (await spa.text()).includes("Dinosaur Museum"), "page routes fall back to the app", "a page route did not get index.html");
+
   /* ---- two visitors in one room ---- */
   const alice = await connect(url);
   const bob = await connect(url);
