@@ -1,9 +1,9 @@
 /**
  * Vercel serverless function exposing the multiplayer Socket.IO server.
  *
- * Vercel serves this at /api/socket, and Socket.IO strips the mount path, so
- * the browser connects to /api/socket/socket.io (see public/js/net.js).
- * Static assets are served by Vercel straight from /public.
+ * Vercel serves this at /api/socket. `vercel.json` rewrites /socket.io to it,
+ * so the browser can use the standard Socket.IO path on every host (see
+ * public/js/net.js). Static assets are served straight from /public.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";

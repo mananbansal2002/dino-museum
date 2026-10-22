@@ -9,7 +9,17 @@
     }
   },
   "rewrites": [
-    { "source": "/api/socket/socket.io/:path*", "destination": "/api/socket" },
-    { "source": "/((?!api/|socket\\.io/).*)", "destination": "/api/socket" }
+    {
+      "source": "/socket.io",
+      "destination": "/api/socket"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "/api/socket"
+    },
+    {
+      "source": "/((?!api/|socket\\.io).*)",
+      "destination": "/api/socket"
+    }
   ]
 }
