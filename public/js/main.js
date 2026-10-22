@@ -1297,6 +1297,9 @@ window.__museum = {
   cinema,
   remote,
   roomAt,
+  get net() {
+    return S.net;
+  },
   lookdev,
   live,
   picker,

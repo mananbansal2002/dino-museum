@@ -130,6 +130,7 @@ try {
     return JSON.stringify({
       joined: !!S.joined,
       net: S.net ? !!S.net.connected : null,
+      sid: S.net ? S.net.id : null,
       x: S.player ? +S.player.state.x.toFixed(1) : null,
       z: S.player ? +S.player.state.z.toFixed(1) : null,
       remotes: m.remote ? m.remote.list.length : null,
