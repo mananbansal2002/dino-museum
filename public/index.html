@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0b1016" />
     <title>Dinosaur Museum — Multiplayer Hall</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/media.css" />
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>"
@@ -16,15 +17,16 @@
 
     <!-- ============================ HUD ============================ -->
     <div id="hud" class="hidden">
-      <div id="crosshair"><span></span></div>
+      <div id="crosshair" aria-hidden="true"><span></span></div>
 
       <div id="topleft" class="panel">
+        <div class="eyebrow">Now exploring</div>
         <div class="hall" id="hallName">Grand Gallery</div>
         <div class="sub">
-          <span id="roomCode">----</span>
+          <span id="roomCode" title="Room code">----</span>
           <button class="chip" id="copyRoom" title="Copy invite code">copy link</button>
         </div>
-        <div class="counters">
+        <div class="counters" aria-label="Your progress">
           <span title="Dinosaurs discovered">🦕 <b id="statDiscovered">0</b>/<b id="statTotal">0</b></span>
           <span title="Fossils dug">🪨 <b id="statFossils">0</b></span>
           <span title="Scoops eaten">🍦 <b id="statScoops">0</b></span>
@@ -32,47 +34,53 @@
       </div>
 
       <div id="topright">
-        <canvas id="minimap" width="260" height="240"></canvas>
-        <div id="playerList" class="panel"></div>
+        <canvas id="minimap" width="260" height="240" role="img" aria-label="Museum map"></canvas>
+        <div id="playerList" class="panel" aria-label="Visitors in this room"></div>
       </div>
 
-      <div id="prompt" class="hidden">
+      <div id="prompt" class="hidden" role="status">
         <b id="promptKey">E</b><span id="promptText"></span>
       </div>
 
-      <div id="toasts"></div>
+      <div id="toasts" role="status" aria-live="polite"></div>
 
       <div id="bottomleft">
-        <div class="panel keys" id="keyHelp">
+        <div class="panel keys" id="keyHelp" role="region" aria-label="Keyboard controls">
           <div class="khead">
             <span>Controls</span>
-            <button class="chip" id="toggleKeys">hide</button>
+            <button class="chip" id="toggleKeys" type="button" aria-controls="keyHelp">hide</button>
           </div>
           <div class="kbody">
             <div><b>W A S D</b> move</div>
             <div><b>Shift</b> run</div>
             <div><b>Space</b> jump</div>
-            <div><b>Mouse</b> look (click to lock)</div>
+            <div><b>Mouse</b> look</div>
+            <div><b>Click</b> lock mouse</div>
             <div><b>E</b> interact</div>
             <div><b>V</b> roar</div>
-            <div><b>F</b> feed / dig</div>
+            <div><b>F</b> dig / eat ice cream</div>
             <div><b>G</b> group photo</div>
             <div><b>C</b> camera</div>
             <div><b>M</b> minimap size</div>
             <div><b>T</b> chat</div>
-            <div><b>Esc</b> release mouse</div>
+            <div><b>B</b> wave</div>
+            <div><b>L</b> sound on/off</div>
+            <div><b>Wheel</b> zoom</div>
+            <div><b>Esc</b> free mouse</div>
           </div>
         </div>
       </div>
 
       <div id="bottomright">
-        <div id="chatLog"></div>
-        <input id="chatInput" maxlength="240" placeholder="Press T to chat…" autocomplete="off" />
+        <div id="chatLog" role="log" aria-live="polite" aria-label="Chat"></div>
+        <input id="chatInput" maxlength="240" placeholder="Press T to chat…" autocomplete="off" enterkeyhint="send" aria-label="Chat message" />
       </div>
 
-      <div id="loading" class="panel">
-        <div class="spin"></div>
-        <span id="loadingText">Building the museum…</span>
+      <div id="loading" class="panel" role="progressbar" aria-label="Loading the museum">
+        <div class="spin" aria-hidden="true"></div>
+        <div class="ltitle">Building the museum…</div>
+        <span id="loadingText">Unpacking fossils and lighting the halls</span>
+        <div class="lbar" aria-hidden="true"><i id="loadingBar"></i></div>
       </div>
     </div>
 
@@ -81,7 +89,7 @@
       <div class="card">
         <h1>🦖 Dinosaur Museum</h1>
         <p class="lead">
-          A shared 3D museum for you and your friends. Wander the halls, meet 56 dinosaurs,
+          A shared 3D museum for you and your friends. Wander the halls, meet 53 prehistoric animals,
           watch battle screenings, dig for fossils and finish with an ice cream.
         </p>
 
@@ -98,30 +106,38 @@
 
         <div class="look">
           <div class="lookPreview">
-            <canvas id="lookPreview" width="220" height="300"></canvas>
-            <button class="chip" id="randomLook">🎲 random</button>
+            <canvas id="lookPreview" width="400" height="560" aria-label="Character preview"></canvas>
+            <button class="chip" id="randomLook" type="button">🎲 random</button>
           </div>
           <div class="lookControls">
-            <label>
-              <span>Skin</span>
-              <div class="swatches" id="swSkin"></div>
-            </label>
-            <label>
-              <span>Shirt</span>
-              <div class="swatches" id="swShirt"></div>
-            </label>
-            <label>
-              <span>Pants</span>
-              <div class="swatches" id="swPants"></div>
-            </label>
-            <label>
-              <span>Hair</span>
-              <div class="swatches" id="swHair"></div>
-            </label>
-            <label>
-              <span>Accessory</span>
-              <div class="swatches" id="swAcc"></div>
-            </label>
+            <div class="lookRow">
+              <span class="lookLabel">Body</span>
+              <div class="swatches bodySeg" id="swBody" role="group" aria-label="Body type"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Skin</span>
+              <div class="swatches" id="swSkin" role="group" aria-label="Skin tone"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Shirt</span>
+              <div class="swatches" id="swShirt" role="group" aria-label="Shirt colour"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Pants</span>
+              <div class="swatches" id="swPants" role="group" aria-label="Pants colour"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Hair</span>
+              <div class="swatches" id="swHair" role="group" aria-label="Hair style"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Hair colour</span>
+              <div class="swatches" id="swHairColor" role="group" aria-label="Hair colour"></div>
+            </div>
+            <div class="lookRow">
+              <span class="lookLabel">Extra</span>
+              <div class="swatches" id="swAcc" role="group" aria-label="Accessory"></div>
+            </div>
           </div>
         </div>
 
@@ -154,6 +170,10 @@
             <div class="seg" id="styleSeg"></div>
           </div>
         </div>
+        <div class="picker">
+          <span>Toppings</span>
+          <div class="seg" id="toppingSeg"></div>
+        </div>
         <div class="row actions">
           <button class="primary" id="orderBtn">Order it</button>
           <button class="ghost" id="cancelIce">Cancel</button>
@@ -180,7 +200,12 @@
 
     <script src="/vendor/socket.io.min.js"></script>
     <script type="importmap">
-      { "imports": { "three": "/vendor/three/three.module.js" } }
+      {
+        "imports": {
+          "three": "/vendor/three/three.module.js",
+          "three/addons/": "/vendor/three/addons/"
+        }
+      }
     </script>
     <script type="module" src="/js/main.js"></script>
   </body>

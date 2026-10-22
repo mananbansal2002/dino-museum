@@ -28,9 +28,16 @@ function warn(msg) {
 /* ------------------------------------------------------------------ */
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === ".git" || entry === ".vercel") continue;
+    if (["node_modules", ".git", ".vercel", ".claude"].includes(entry)) continue;
+    // headless Chrome profiles from test runs are not project code
+    if (entry.startsWith("prof-")) continue;
     const full = join(dir, entry);
-    const st = statSync(full);
+    let st;
+    try {
+      st = statSync(full);
+    } catch {
+      continue; // dangling symlink or a file deleted mid-walk
+    }
     if (st.isDirectory()) walk(full, out);
     else if (extname(full) === ".js" || extname(full) === ".mjs") out.push(full);
   }
@@ -61,8 +68,6 @@ const { EXHIBITS, BATTLES } = await import(
 const world = await import(pathToFileURL(join(root, "public/js/world.js")).href);
 
 const { PLACEMENTS, ROOMS, GRID_W, GRID_H, CELL, roomAt, isSolid, g2w, g2z } = world;
-const { createDino } = await import(pathToFileURL(join(root, "public/js/dinos.js")).href);
-const THREE = await import("three");
 
 /* species integrity */
 const seen = new Set();
@@ -95,9 +100,10 @@ for (const b of BATTLES) {
 }
 console.log(`✓ ${BATTLES.length} battle screenings`);
 
-/* placements */
+/* placements: every exhibit is a framed image panel on a plinth */
 const placed = new Set();
 const footprints = [];
+const panels = new Map((world.EXHIBIT_PANELS || []).map((p) => [p.id, p]));
 for (const p of PLACEMENTS) {
   if (!SPECIES[p.id]) fail(`placement references unknown species "${p.id}"`);
   if (placed.has(p.id)) fail(`species "${p.id}" is placed twice`);
@@ -108,63 +114,55 @@ for (const p of PLACEMENTS) {
     fail(`placement ${p.id} at ${p.x},${p.z} is inside a wall`);
     continue;
   }
-  // the real model footprint has to sit on walkable tiles
-  const spec = SPECIES[p.id];
-  const dino = createDino(spec, { skeleton: true, scale: p.scale || 1 });
-  const box = new THREE.Box3().setFromObject(dino.group);
-  const ry = p.ry || 0;
-  const cos = Math.cos(ry);
-  const sin = Math.sin(ry);
-  let clipped = null;
-  for (const cx of [box.min.x, box.max.x]) {
-    for (const cz of [box.min.z, box.max.z]) {
-      const wx = p.x + cx * cos + cz * sin;
-      const wz = p.z - cx * sin + cz * cos;
-      if (!roomAt(wx, wz)) clipped = clipped || [wx.toFixed(1), wz.toFixed(1)];
+  const panel = panels.get(p.id);
+  if (!panel) {
+    fail(`placement ${p.id} has no image panel`);
+    continue;
+  }
+  if (!(panel.w >= 1.5 && panel.w <= 4.6)) fail(`panel ${p.id} has an odd width ${panel.w}`);
+  // the whole plinth has to stand on the floor of a single room
+  for (const [cx, cz] of [
+    [panel.minX, panel.minZ],
+    [panel.maxX, panel.minZ],
+    [panel.minX, panel.maxZ],
+    [panel.maxX, panel.maxZ],
+  ]) {
+    const r = roomAt(cx, cz);
+    if (!r || r.id !== room.id) {
+      fail(`panel ${p.id} at ${p.x},${p.z} clips a wall near ${cx.toFixed(1)},${cz.toFixed(1)}`);
+      break;
     }
   }
-  if (clipped) {
-    fail(`placement ${p.id} at ${p.x},${p.z} clips a wall near ${clipped.join(",")}`);
-  }
-  // remember the world footprint so mounts can be compared with each other
-  const corners = [];
-  for (const cx of [box.min.x, box.max.x]) {
-    for (const cz of [box.min.z, box.max.z]) {
-      corners.push([p.x + cx * cos + cz * sin, p.z - cx * sin + cz * cos]);
-    }
-  }
-  footprints.push({
-    id: p.id,
-    minX: Math.min(...corners.map((c) => c[0])),
-    maxX: Math.max(...corners.map((c) => c[0])),
-    minZ: Math.min(...corners.map((c) => c[1])),
-    maxZ: Math.max(...corners.map((c) => c[1])),
-  });
-  dino.dispose();
+  footprints.push({ id: p.id, minX: panel.minX, maxX: panel.maxX, minZ: panel.minZ, maxZ: panel.maxZ });
 }
 const unplaced = SPECIES_LIST.filter((s) => !placed.has(s.id)).map((s) => s.id);
 if (unplaced.length) warn(`not on the floor plan: ${unplaced.join(", ")}`);
-console.log(`✓ ${PLACEMENTS.length} skeletons on the floor plan`);
+console.log(`✓ ${PLACEMENTS.length} exhibit panels on the floor plan`);
 
-/* two skeletons must not share the same spot */
+/* world.js must not need the procedural dinosaur models any more */
+if (/from\s+["']\.\/dinos\.js["']/.test(readFileSync(join(root, "public/js/world.js"), "utf8"))) {
+  fail("world.js still imports dinos.js");
+}
+
+/* two exhibits must not share the same spot */
 for (let i = 0; i < PLACEMENTS.length; i++) {
   for (let j = i + 1; j < PLACEMENTS.length; j++) {
     const a = PLACEMENTS[i];
     const b = PLACEMENTS[j];
     const d = Math.hypot(a.x - b.x, a.z - b.z);
-    if (d < 5) fail(`skeletons ${a.id} and ${b.id} are only ${d.toFixed(1)}m apart`);
+    if (d < 5) fail(`exhibits ${a.id} and ${b.id} are only ${d.toFixed(1)}m apart`);
   }
 }
 
-/* two skeletons must not be modelled inside each other */
+/* two panels must not stand inside each other */
 for (let i = 0; i < footprints.length; i++) {
   for (let j = i + 1; j < footprints.length; j++) {
     const a = footprints[i];
     const b = footprints[j];
     const ox = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
     const oz = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ);
-    if (ox > 0.4 && oz > 0.4) {
-      fail(`skeletons ${a.id} and ${b.id} overlap (${ox.toFixed(1)}m x ${oz.toFixed(1)}m)`);
+    if (ox > -0.8 && oz > -0.8) {
+      fail(`panels ${a.id} and ${b.id} overlap or leave no gap (${ox.toFixed(1)}m x ${oz.toFixed(1)}m)`);
     }
   }
 }
@@ -227,7 +225,7 @@ for (const it of interactables) {
 }
 const exhibitPoints = interactables.filter((i) => i.type === "exhibit").length;
 if (exhibitPoints !== PLACEMENTS.length) {
-  fail(`${exhibitPoints} exhibit points for ${PLACEMENTS.length} skeletons`);
+  fail(`${exhibitPoints} exhibit points for ${PLACEMENTS.length} exhibits`);
 }
 console.log(`✓ ${interactables.length} points of interest`);
 
@@ -286,6 +284,519 @@ for (const room of ROOMS) {
 }
 console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
 
+/* collision has to agree with the drawn walls: no slab between two tiles
+   that resolveCollision lets you walk between, and no invisible walls */
+{
+  const { passable, resolveCollision } = world;
+  let slabsChecked = 0;
+  for (let r = 0; r < GRID_H; r++) {
+    for (let c = 0; c < GRID_W; c++) {
+      if (isSolid(c, r)) continue;
+      for (const [dc, dr] of [
+        [1, 0],
+        [0, 1],
+      ]) {
+        const nc = c + dc;
+        const nr = r + dr;
+        if (isSolid(nc, nr)) continue;
+        const bx = dc ? g2w(c) + CELL / 2 : g2w(c);
+        const bz = dr ? g2z(r) + CELL / 2 : g2z(r);
+        const slab = hasWallAt(bx, bz);
+        const open = passable(c, r, nc, nr);
+        if (slab && open) fail(`a wall slab at ${bx},${bz} separates tiles ${c},${r} and ${nc},${nr} that collision treats as passable`);
+        if (!slab && !open) fail(`an invisible wall blocks ${c},${r} -> ${nc},${nr}`);
+        if (!slab) continue;
+        slabsChecked++;
+        // walk into the middle of the slab from both sides, with a small and
+        // with a huge (slow frame) step: the visitor must stay on its side
+        const R = 0.52;
+        for (const dir of [-1, 1]) {
+          // furniture pushed up against this wall (e.g. the info desk): no
+          // visitor can stand there, so there is nothing to walk in from
+          const [sx, sz] = [bx - dc * dir * (R + 0.3), bz - dr * dir * (R + 0.3)];
+          const blockedByProp = (world.PROP_OBSTACLES || []).some(
+            (o) => sx > o.minX - R && sx < o.maxX + R && sz > o.minZ - R && sz < o.maxZ + R
+          );
+          if (blockedByProp) continue;
+          for (const [step, withPrev] of [
+            [0.4, false],
+            [0.4, true],
+            [2.5, true],
+          ]) {
+            const from = [bx - dc * dir * (R + 0.3), bz - dr * dir * (R + 0.3)];
+            const to = [from[0] + dc * dir * step, from[1] + dr * dir * step];
+            const [x, z] = withPrev
+              ? resolveCollision(to[0], to[1], R, from[0], from[1])
+              : resolveCollision(to[0], to[1], R);
+            const side = dc ? (x - bx) * -dir : (z - bz) * -dir;
+            if (side < R + 0.19) {
+              fail(`resolveCollision lets a visitor through the wall at ${bx},${bz} (step ${step})`);
+            }
+          }
+        }
+      }
+    }
+  }
+  console.log(`✓ ${slabsChecked} internal wall slabs block movement, doorways stay open`);
+}
+
+/* the ice cream court is the reward at the end of the tour */
+{
+  const spawnRoom = roomAt(spawn.x, spawn.z);
+  const court = ROOMS.find((r) => r.id === "court");
+  if (!court) fail("there is no ice cream court");
+  else {
+    const courtTiles = [];
+    for (let c = court.cols[0]; c <= court.cols[1]; c++) {
+      for (let r = court.rows[0]; r <= court.rows[1]; r++) courtTiles.push([c, r]);
+    }
+    // not next to the entrance
+    for (const [c, r] of courtTiles) {
+      for (const [dc, dr] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const n = world.roomAt(g2w(c + dc), g2z(r + dr));
+        if (n && n.id === spawnRoom.id) fail(`the ice cream court touches the ${spawnRoom.name} at ${c},${r}`);
+      }
+    }
+    // reachable only through at least one exhibit hall
+    const halls = new Set(world.EXHIBIT_HALLS || []);
+    if (!halls.size) fail("world.js does not export EXHIBIT_HALLS");
+    const roomSeen = new Set([spawnRoom.id]);
+    const rq = [spawnRoom];
+    while (rq.length) {
+      const room = rq.shift();
+      for (let c = room.cols[0]; c <= room.cols[1]; c++) {
+        for (let r = room.rows[0]; r <= room.rows[1]; r++) {
+          for (const [dc, dr] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            if (!world.passable(c, r, c + dc, r + dr)) continue;
+            const n = world.roomAt(g2w(c + dc), g2z(r + dr));
+            if (!n || roomSeen.has(n.id) || halls.has(n.id)) continue;
+            roomSeen.add(n.id);
+            rq.push(n);
+          }
+        }
+      }
+    }
+    if (roomSeen.has("court")) fail("the ice cream court can be reached from the entrance without visiting a hall");
+
+    // no line of sight from the spawn point to any part of the court
+    const tileOf = (x, z) => [world.w2g(x), world.w2gz(z)];
+    const stepOk = (a, b) => {
+      if (a[0] === b[0] && a[1] === b[1]) return true;
+      const dc = b[0] - a[0];
+      const dr = b[1] - a[1];
+      if (Math.abs(dc) + Math.abs(dr) === 1) return world.passable(a[0], a[1], b[0], b[1]);
+      // corner crossing: visible if either way round the corner is open
+      const viaC = [b[0], a[1]];
+      const viaR = [a[0], b[1]];
+      return (
+        (world.passable(a[0], a[1], viaC[0], viaC[1]) && world.passable(viaC[0], viaC[1], b[0], b[1])) ||
+        (world.passable(a[0], a[1], viaR[0], viaR[1]) && world.passable(viaR[0], viaR[1], b[0], b[1]))
+      );
+    };
+    const lineOfSight = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const n = Math.ceil(len / 0.2);
+      let prev = tileOf(x0, z0);
+      for (let i = 1; i <= n; i++) {
+        const t = i / n;
+        const cur = tileOf(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t);
+        if (!stepOk(prev, cur)) return false;
+        prev = cur;
+      }
+      return true;
+    };
+    let rays = 0;
+    for (const [c, r] of courtTiles) {
+      for (const [ox, oz] of [
+        [0, 0],
+        [-2.8, -2.8],
+        [2.8, -2.8],
+        [-2.8, 2.8],
+        [2.8, 2.8],
+      ]) {
+        rays++;
+        if (lineOfSight(spawn.x, spawn.z, g2w(c) + ox, g2z(r) + oz)) {
+          fail(`the ice cream court tile ${c},${r} is visible from the spawn point`);
+          break;
+        }
+      }
+    }
+    // the guard itself has to work: the spawn room can see itself
+    if (!lineOfSight(spawn.x, spawn.z, g2w(spawnRoom.cols[0]), g2z(spawnRoom.rows[0]))) {
+      fail("line-of-sight check is broken (spawn cannot see its own room)");
+    }
+    console.log(`✓ the ice cream court is hidden from the entrance (${rays} sight lines blocked)`);
+
+    // the stall, its counter, the vendor's spot (main.js: just behind the
+    // counter at stallZ + 0.75) and the exit all belong to the court
+    const C = world.COURT;
+    const counter = (world.PROP_OBSTACLES || []).find((o) => o.id === "prop:counter");
+    for (const [what, x, z] of [
+      ["the ice cream stall", C.stallX, C.stallZ],
+      ["the vendor", C.stallX, C.stallZ + 0.75],
+      ["the exit door", C.exitX + 0.5, C.exitZ],
+    ]) {
+      if (roomAt(x, z)?.id !== "court") fail(`${what} is not in the ice cream court`);
+    }
+    if (!counter) fail("the ice cream counter has no collider");
+    else {
+      if (counter.maxZ > C.stallZ + 0.75 - 0.35) fail("the ice cream counter stands where the vendor works");
+      if (counter.maxX - counter.minX > 8) fail(`the ice cream counter is ${(counter.maxX - counter.minX).toFixed(1)} m wide: too big for one vendor`);
+    }
+    for (const it of interactables.filter((i) => i.type === "icecream" || i.type === "exit")) {
+      if (roomAt(it.x, it.z)?.id !== "court") fail(`the interactable ${it.id} is not in the ice cream court`);
+    }
+  }
+}
+
+/* seats: walkable, reachable, clear of exhibits, facing what they look at */
+{
+  const seats = interactables.filter((i) => i.type === "seat");
+  if (!seats.length) fail("there are no seats");
+  for (const s of seats) {
+    const c = world.w2g(s.x);
+    const r = world.w2gz(s.z);
+    if (isSolid(c, r)) fail(`seat ${s.id} is inside a wall`);
+    else if (!seenCells.has(`${c},${r}`)) fail(`seat ${s.id} is not reachable`);
+    if (!s.seat || !Number.isFinite(s.seat.y) || !Number.isFinite(s.seat.ry)) fail(`seat ${s.id} has no seat pose`);
+    if (s.radius < 0.5 || s.radius > 1.5) fail(`seat ${s.id} has an odd radius ${s.radius}`);
+    // the visitor must be able to stand at the seat
+    const [rx, rz] = world.resolveCollision(s.x, s.z, 0.52);
+    if (Math.hypot(rx - s.x, rz - s.z) > s.radius - 0.1) fail(`seat ${s.id} is too close to a wall to sit on`);
+    for (const f of footprints) {
+      if (s.x > f.minX - 0.4 && s.x < f.maxX + 0.4 && s.z > f.minZ - 0.4 && s.z < f.maxZ + 0.4) {
+        fail(`seat ${s.id} stands in the exhibit ${f.id}`);
+      }
+    }
+    if (s.area === "theatre") {
+      const room = roomAt(s.x, s.z);
+      if (!room || room.id !== "theater") fail(`theatre seat ${s.id} is outside the theatre`);
+      const S = world.SCREEN;
+      const want = Math.atan2(S.x - s.x, S.z - s.z);
+      const diff = Math.abs(((s.seat.ry - want + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (diff > 0.05) fail(`theatre seat ${s.id} does not face the screen`);
+    }
+  }
+  for (let i = 0; i < seats.length; i++) {
+    for (let j = i + 1; j < seats.length; j++) {
+      if (Math.hypot(seats[i].x - seats[j].x, seats[i].z - seats[j].z) < 1.1) {
+        fail(`seats ${seats[i].id} and ${seats[j].id} overlap`);
+      }
+    }
+  }
+  const battle = interactables.find((i) => i.type === "battle");
+  if (!battle || roomAt(battle.x, battle.z)?.id !== "theater") fail("the battle screening console is not in the theatre");
+  console.log(`✓ ${seats.length} seats are walkable and reachable`);
+}
+
+/* fossil display spots in front of the panels: on the floor of the hall,
+   clear of plinths, seats, other displays and every point of interest */
+{
+  const displays = world.DISPLAYS || [];
+  if (displays.length < PLACEMENTS.length * 0.8) {
+    fail(`only ${displays.length} display spots for ${PLACEMENTS.length} exhibits`);
+  }
+  const ids = new Set();
+  for (const d of displays) {
+    if (ids.has(d.speciesId)) fail(`two display spots for ${d.speciesId}`);
+    ids.add(d.speciesId);
+    if (!(d.maxLength > 0 && d.maxHeight > 0)) fail(`display ${d.speciesId} has no size`);
+    const b = d.bounds;
+    const panelRoom = roomAt(PLACEMENTS.find((p) => p.id === d.speciesId).x, PLACEMENTS.find((p) => p.id === d.speciesId).z);
+    for (const [cx, cz] of [
+      [b.minX - 1, b.minZ - 1],
+      [b.maxX + 1, b.minZ - 1],
+      [b.minX - 1, b.maxZ + 1],
+      [b.maxX + 1, b.maxZ + 1],
+    ]) {
+      const r = roomAt(cx, cz);
+      if (!r || r.id !== panelRoom.id) {
+        fail(`display ${d.speciesId} is too close to a wall or doorway`);
+        break;
+      }
+    }
+    for (const f of footprints) {
+      if (f.minX < b.maxX + 0.9 && f.maxX > b.minX - 0.9 && f.minZ < b.maxZ + 0.9 && f.maxZ > b.minZ - 0.9) {
+        if (f.id !== d.speciesId) fail(`display ${d.speciesId} crowds the panel ${f.id}`);
+      }
+    }
+    for (const it of interactables) {
+      if (it.exhibitId === d.speciesId && it.type === "exhibit") continue;
+      if (it.x > b.minX - 0.8 && it.x < b.maxX + 0.8 && it.z > b.minZ - 0.8 && it.z < b.maxZ + 0.8) {
+        fail(`display ${d.speciesId} covers the interactable ${it.id}`);
+      }
+    }
+  }
+  console.log(`✓ ${displays.length} fossil display spots are clear`);
+}
+
+/* era windows */
+{
+  const eras = world.ERAS || {};
+  for (const [id, era] of Object.entries(eras)) {
+    if (!ROOMS.some((r) => r.id === era.hall)) fail(`era ${id} lives in an unknown hall ${era.hall}`);
+    const it = interactables.find((i) => i.type === "era" && i.era === id);
+    if (!it) fail(`era ${id} has no window`);
+    else if (roomAt(it.x, it.z)?.id !== era.hall) fail(`the window to the ${era.name} is not in the ${era.hall} hall`);
+  }
+  console.log(`✓ ${Object.keys(eras).length} era windows`);
+}
+
+/* panel sizes follow the animal's length, also for "~9.5 m" / "up to 7 m" */
+{
+  const { panelWidth } = world;
+  for (const [text, len] of [
+    ["8.5–9.7 m", 8.5],
+    ["~9.5 m", 9.5],
+    ["up to 7 m wingspan", 7],
+    ["~2–3 m", 2],
+  ]) {
+    const want = Math.max(1.8, Math.min(4.5, 1.5 + len * 0.15));
+    const got = panelWidth({ info: { length: text } });
+    if (Math.abs(got - want) > 1e-9) fail(`panelWidth("${text}") is ${got}, expected ${want}`);
+  }
+  for (const s of SPECIES_LIST) {
+    if (!/\d/.test(String(s.info?.length ?? ""))) warn(`${s.id} has no length: its panel gets the default size`);
+  }
+}
+
+/* exhibit placards stand beside their panel and face whoever reads it */
+{
+  let n = 0;
+  for (const p of world.EXHIBIT_PANELS) {
+    const spot = world.placardSpot({ x: p.x, z: p.z, ry: p.face, pedestal: p.w });
+    const nx = Math.sin(spot.rot);
+    const nz = Math.cos(spot.rot);
+    // the side of the panel it stands on, and a visitor 5 m out on that side
+    const side = spot.back ? -1 : 1;
+    const fx = Math.sin(p.face) * side;
+    const fz = Math.cos(p.face) * side;
+    if (nx * fx + nz * fz < 0.5) fail(`the placard of ${p.id} does not face the way its panel does`);
+    const vx = p.x + fx * 5 - spot.px;
+    const vz = p.z + fz * 5 - spot.pz;
+    if ((nx * vx + nz * vz) / Math.hypot(vx, vz) < 0.3) fail(`the placard of ${p.id} is not readable from in front of its panel`);
+    if (roomAt(spot.px, spot.pz)?.id !== p.room) fail(`the placard of ${p.id} is outside its hall`);
+    n++;
+  }
+  console.log(`✓ ${n} exhibit placards face their visitors`);
+}
+
+/* standing in front of a panel, the prompt names that panel. main.js picks
+   the interactable you are inside the radius of with the lowest
+   distance x (1 - 0.3 x facing) score; the visitor here looks at the panel. */
+{
+  const nearest = (x, z, ry) => {
+    const fx = Math.sin(ry);
+    const fz = Math.cos(ry);
+    let best = null;
+    let bestScore = Infinity;
+    for (const it of interactables) {
+      const dx = it.x - x;
+      const dz = it.z - z;
+      const d = Math.hypot(dx, dz);
+      if (d >= it.radius) continue;
+      const facing = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
+      const score = d * (1 - 0.3 * facing);
+      if (score < bestScore) {
+        bestScore = score;
+        best = it;
+      }
+    }
+    return best;
+  };
+  let spots = 0;
+  for (const p of world.EXHIBIT_PANELS) {
+    const fx = Math.sin(p.face);
+    const fz = Math.cos(p.face);
+    for (const d of [1.5, 2.5, 3.5, 4.5]) {
+      for (const l of [-p.w / 2, 0, p.w / 2]) {
+        const x = p.x + fx * d + fz * l;
+        const z = p.z + fz * d - fx * l;
+        if (roomAt(x, z)?.id !== p.room) continue;
+        const [rx, rz] = world.resolveCollision(x, z, 0.52);
+        if (Math.hypot(rx - x, rz - z) > 1e-6) continue; // nobody can stand there
+        spots++;
+        // looking straight at the panel, and at its picture from off to the side
+        for (const ry of [p.face + Math.PI, Math.atan2(p.x - x, p.z - z)]) {
+          const it = nearest(x, z, ry);
+          if (it?.id !== `exhibit:${p.id}`) {
+            fail(`${d} m in front of the ${p.id} panel the prompt offers ${it ? it.id : "nothing"}`);
+            break;
+          }
+        }
+      }
+    }
+  }
+  // no two exhibit prompts may cover the same stretch of floor in front of
+  // their panels: a point never sits inside a neighbour's reach
+  const exhibitIts = interactables.filter((i) => i.type === "exhibit");
+  for (const a of exhibitIts) {
+    for (const b of exhibitIts) {
+      if (a !== b && Math.hypot(a.x - b.x, a.z - b.z) < a.radius) fail(`the prompt of ${b.exhibitId} sits inside the reach of ${a.exhibitId}`);
+    }
+  }
+  console.log(`✓ the prompt names the right exhibit from ${spots} spots in front of the panels`);
+}
+
+/* furniture is solid: every collider stands on the floor of one room, clear
+   of the exhibit panels, and pushes a visitor out */
+{
+  const props = world.PROP_OBSTACLES || [];
+  if (!props.length) fail("world.js exports no PROP_OBSTACLES: furniture has no collision");
+  for (const o of props) {
+    const cx = Number.isFinite(o.r) ? o.x : (o.minX + o.maxX) / 2;
+    const cz = Number.isFinite(o.r) ? o.z : (o.minZ + o.maxZ) / 2;
+    if (!roomAt(cx, cz)) fail(`the collider ${o.id} stands in a wall`);
+    const [rx, rz] = world.resolveCollision(cx, cz, 0.52);
+    if (Math.hypot(rx - cx, rz - cz) < 0.5) fail(`the collider ${o.id} does not push a visitor out`);
+    for (const f of footprints) {
+      if (o.minX < f.maxX && o.maxX > f.minX && o.minZ < f.maxZ && o.maxZ > f.minZ) fail(`the collider ${o.id} overlaps the panel ${f.id}`);
+    }
+  }
+  console.log(`✓ ${props.length} pieces of furniture are solid`);
+}
+
+/* wayfinding to the ice cream court: signs high up, inside their room, clear
+   of the exhibits, and at least one pointing to the court in the atrium and
+   one in the Jurassic Hall (where the exit is) */
+{
+  const signs = world.WAYFINDING || [];
+  const HEADROOM = 2.6; // lowest edge of any sign above the floor
+  for (const s of signs) {
+    const room = roomAt(s.x, s.z);
+    if (!room || room.id !== s.room) {
+      fail(`the wayfinding sign ${s.id} is not in the ${s.room} (found ${room?.id || "a wall"})`);
+      continue;
+    }
+    if (s.y - s.h / 2 < HEADROOM) fail(`the wayfinding sign ${s.id} hangs too low (${(s.y - s.h / 2).toFixed(2)} m): it would block the way`);
+    if (s.y + s.h / 2 > room.h - 0.2) fail(`the wayfinding sign ${s.id} goes through the ceiling of the ${room.name}`);
+    // both ends of the face stay inside the room (a sign never pokes through a wall)
+    const ax = Math.cos(s.ry) * (s.w / 2);
+    const az = -Math.sin(s.ry) * (s.w / 2);
+    for (const [ex, ez] of [
+      [s.x - ax, s.z - az],
+      [s.x + ax, s.z + az],
+    ]) {
+      if (roomAt(ex, ez)?.id !== s.room) fail(`the wayfinding sign ${s.id} pokes into a wall near ${ex.toFixed(1)},${ez.toFixed(1)}`);
+    }
+    // hanging signs are not hung over an exhibit plinth (the mounts are tall)
+    if (s.kind === "hang") {
+      const minX = Math.min(s.x - ax, s.x + ax) - 0.3;
+      const maxX = Math.max(s.x - ax, s.x + ax) + 0.3;
+      const minZ = Math.min(s.z - az, s.z + az) - 0.3;
+      const maxZ = Math.max(s.z - az, s.z + az) + 0.3;
+      for (const f of footprints) {
+        if (minX < f.maxX && maxX > f.minX && minZ < f.maxZ && maxZ > f.minZ) fail(`the wayfinding sign ${s.id} hangs over the exhibit ${f.id}`);
+      }
+    }
+    // wall signs and lightboxes are on a wall: a step behind the face is solid or another room
+    if (s.kind !== "hang") {
+      const bx = s.x - Math.sin(s.ry) * 0.5;
+      const bz = s.z - Math.cos(s.ry) * 0.5;
+      if (roomAt(bx, bz)?.id === s.room) fail(`the wall sign ${s.id} is not on a wall`);
+    }
+    // the arrow points roughly at the next waypoint, which is walkable
+    if (!roomAt(s.to[0] + 0.01, s.to[1] + 0.01) && !roomAt(s.to[0] - 0.01, s.to[1] - 0.01)) fail(`the wayfinding sign ${s.id} points into a wall`);
+    if (typeof world.wayArrow === "function" && Math.abs(world.wayArrow(s)) > Math.PI / 2 + 1e-6) fail(`the wayfinding sign ${s.id} points backwards`);
+  }
+  const toCourt = (roomId) => signs.some((s) => s.dest === "court" && s.room === roomId);
+  // the court is a secret ending: no sign may name it before you get there
+  if (toCourt("lobby")) fail("a sign in the Entrance Atrium gives away the Ice Cream Court");
+  if (!signs.some((s) => s.kind === "lightbox" && s.room === "jurassic")) fail("the exit to the Ice Cream Court has no lightbox");
+  console.log(`✓ ${signs.length} wayfinding sign(s), above head height; the ice cream court stays a secret`);
+}
+
+/* fine-grained walk test with the real collision code: every point of
+   interest must be reachable on foot from the spawn point */
+{
+  const R = 0.52;
+  const STEP = 0.25;
+  const x0 = -(GRID_W * CELL) / 2;
+  const z0 = -(GRID_H * CELL) / 2;
+  const nx = Math.round((GRID_W * CELL) / STEP);
+  const nz = Math.round((GRID_H * CELL) / STEP);
+  const free = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const x = x0 + (i + 0.5) * STEP;
+      const z = z0 + (j + 0.5) * STEP;
+      if (isSolid(world.w2g(x), world.w2gz(z))) continue;
+      const [rx, rz] = world.resolveCollision(x, z, R);
+      if (Math.abs(rx - x) < 1e-6 && Math.abs(rz - z) < 1e-6) free[j * nx + i] = 1;
+    }
+  }
+  const idx = (x, z) => {
+    const i = Math.floor((x - x0) / STEP);
+    const j = Math.floor((z - z0) / STEP);
+    return i < 0 || j < 0 || i >= nx || j >= nz ? -1 : j * nx + i;
+  };
+  const reached = new Uint8Array(nx * nz);
+  const s0 = idx(spawn.x, spawn.z);
+  if (s0 < 0 || !free[s0]) fail("the visitor cannot stand on the spawn point");
+  else {
+    const q = [s0];
+    reached[s0] = 1;
+    while (q.length) {
+      const k = q.pop();
+      const i = k % nx;
+      const j = (k - i) / nx;
+      for (const [di, dj] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const ii = i + di;
+        const jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= nz) continue;
+        const kk = jj * nx + ii;
+        if (!free[kk] || reached[kk]) continue;
+        reached[kk] = 1;
+        q.push(kk);
+      }
+    }
+    // is there a reached sample point (a cell centre, where the walk test
+    // actually stood the visitor) within radius of (x, z)?
+    const reachableNear = (x, z, radius) => {
+      const n = Math.ceil(radius / STEP) + 1;
+      const ci = Math.floor((x - x0) / STEP);
+      const cj = Math.floor((z - z0) / STEP);
+      for (let j = cj - n; j <= cj + n; j++) {
+        for (let i = ci - n; i <= ci + n; i++) {
+          if (i < 0 || j < 0 || i >= nx || j >= nz || !reached[j * nx + i]) continue;
+          const px = x0 + (i + 0.5) * STEP;
+          const pz = z0 + (j + 0.5) * STEP;
+          if (Math.hypot(px - x, pz - z) <= radius - 0.05) return true;
+        }
+      }
+      return false;
+    };
+    let unreachable = 0;
+    for (const it of interactables) {
+      if (!reachableNear(it.x, it.z, it.radius)) {
+        unreachable++;
+        fail(`the interactable ${it.id} cannot be reached on foot`);
+      }
+    }
+    for (const room of ROOMS) {
+      const cx = (g2w(room.cols[0]) + g2w(room.cols[1])) / 2;
+      const cz = (g2z(room.rows[0]) + g2z(room.rows[1])) / 2;
+      if (!reachableNear(cx, cz, CELL)) fail(`the ${room.name} cannot be reached on foot`);
+    }
+    if (!unreachable) console.log(`✓ every point of interest is reachable on foot (collision walk test)`);
+  }
+}
+
 /* the vendored three.js build has to exist */
 for (const asset of [
   "public/vendor/three/three.module.js",
@@ -329,11 +840,15 @@ for (const file of clientFiles) {
   const full = join(clientDir, file);
   const src = readFileSync(full, "utf8");
   for (const m of src.matchAll(/import\s+(?:([\w$]+)\s*,\s*)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
-    const target = join(clientDir, m[3].replace(/^\.\//, ""));
+    // bare "three/addons/..." specifiers map to the vendored copy (see the importmap)
+    const target = m[3].startsWith("three/addons/")
+      ? join(root, "public", "vendor", "three", "addons", m[3].slice("three/addons/".length))
+      : join(clientDir, m[3].replace(/^\.\//, ""));
     if (!existsSync(target)) {
       fail(`${file} imports "${m[3]}" which does not exist`);
       continue;
     }
+    if (!exportCache.has(target)) exportCache.set(target, exportsOf(target));
     const available = exportCache.get(target);
     for (const part of m[2].split(",")) {
       const name = part.split(/\s+as\s+/)[0].trim();

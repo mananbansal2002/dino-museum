@@ -1,0 +1,102 @@
+{
+  "trex": {
+    "file": "/models/real/trex.glb",
+    "kind": "life",
+    "credit": "\"Tyrant King - Tyrannosaurus\" by Marcel Schanz (https://sketchfab.com/mschanz); textures converted/resized",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/tyrant-king-tyrannosaurus-6465a297fa784598adc49f6e0042d449",
+    "upAxis": "+y",
+    "length_m_target": 12.3,
+    "fileLength": 3.31,
+    "forward": "+z",
+    "animations": []
+  },
+  "raptor": {
+    "file": "/models/real/raptor.glb",
+    "kind": "life",
+    "credit": "\"PBR Velociraptor (Animated)\" by Ferocious Industries (https://sketchfab.com/ferociousindustries.matthias); textures resized, animation subset",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/pbr-velociraptor-animated-8f1744af7b0847a2aabe3df90be802f0",
+    "upAxis": "+y",
+    "length_m_target": 2,
+    "fileLength": 3.61,
+    "forward": "+z",
+    "animations": [
+      "Sniff",
+      "Idle_01",
+      "Idle_02",
+      "Roar_01",
+      "Walk",
+      "Jog",
+      "Action_Pose"
+    ],
+    "note": "Scaly film-style raptor (no feathers); also usable for deinonychus at length 3.4"
+  },
+  "deinonychus": {
+    "file": "/models/real/raptor.glb",
+    "kind": "life",
+    "credit": "\"PBR Velociraptor (Animated)\" by Ferocious Industries (https://sketchfab.com/ferociousindustries.matthias); textures resized, animation subset",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/pbr-velociraptor-animated-8f1744af7b0847a2aabe3df90be802f0",
+    "upAxis": "+y",
+    "length_m_target": 3.4,
+    "fileLength": 3.61,
+    "forward": "+z",
+    "animations": [
+      "Sniff",
+      "Idle_01",
+      "Idle_02",
+      "Roar_01",
+      "Walk",
+      "Jog",
+      "Action_Pose"
+    ],
+    "note": "Same mesh as raptor (generic dromaeosaur); not a Deinonychus-specific model"
+  },
+  "diplod": {
+    "file": "/models/real/sauropod.glb",
+    "kind": "life",
+    "credit": "\"Brachiosaurus_AR card\" by Zinaida.Kovrova (https://sketchfab.com/Zinaida.Kovrova); textures resized",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/brachiosaurus-ar-card-751b32784e1a4ddd9c95aa88d7640ab7",
+    "upAxis": "+y",
+    "length_m_target": 26,
+    "fileLength": 22.17,
+    "forward": "-x",
+    "animations": [
+      "Bip001|Take 001|BaseLayer"
+    ],
+    "note": "Titled Brachiosaurus but the shape (low horizontal neck, level back, whip tail; texture named 'mamenxilong') is a generic diplodocid/mamenchisaurid, so it is mapped to diplod rather than brachio"
+  },
+  "ptero": {
+    "file": "/models/real/ptero.glb",
+    "kind": "life",
+    "credit": "\"Animated Flying Pteradactal Dinosaur Loop\" by LasquetiSpice (https://sketchfab.com/LasquetiSpice); textures resized",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/animated-flying-pteradactal-dinosaur-loop-09f6b1ff7bfd4a2d8d9c0b9827f2a708",
+    "upAxis": "+y",
+    "length_m_target": 6,
+    "fileLength": 3.53,
+    "lengthMeasure": "wingspan (x axis)",
+    "forward": "+z",
+    "animations": [
+      "Animation"
+    ],
+    "note": "Pteranodon-like; scale by wingspan, not body length"
+  },
+  "allo": {
+    "file": "/models/real/allo.glb",
+    "kind": "life",
+    "credit": "\"Allosaurus\" by Alexey Zaika (https://sketchfab.com/lexazaixa25); textures converted, animation resampled",
+    "license": "CC-BY-4.0",
+    "source": "https://sketchfab.com/3d-models/allosaurus-f4fc28a57eed418d9f7bf0178805c2ab",
+    "upAxis": "+y",
+    "length_m_target": 8.5,
+    "fileLength": 0.488,
+    "forward": "+z",
+    "animations": [
+      "Take 001"
+    ],
+    "note": "Lower detail than the others (8k triangles), but textured and properly proportioned. 'Take 001' is a 74 s multi-action clip"
+  }
+}

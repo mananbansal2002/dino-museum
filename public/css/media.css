@@ -1,0 +1,541 @@
+/* Media overlays: battle picker (battlepicker.js) + YouTube player (video.js).
+   Uses the design tokens from style.css (--line, --text, --muted, --accent…)
+   with fallbacks so the file also works on its own. */
+
+.media-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at 50% 30%, rgba(28, 40, 52, 0.8), rgba(6, 9, 13, 0.94));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--text, #f3ecdf);
+  animation: media-fade 0.18s ease-out;
+}
+
+.media-overlay.hidden,
+.media-overlay .hidden {
+  display: none !important;
+}
+
+.vp-overlay {
+  z-index: 70;
+}
+
+@keyframes media-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.media-card {
+  position: relative;
+  background: linear-gradient(180deg, #16202b, #101720);
+  border: 1px solid var(--line, rgba(255, 214, 140, 0.22));
+  border-radius: 22px;
+  box-shadow: var(--shadow, 0 18px 50px rgba(0, 0, 0, 0.55));
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.media-close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text, #f3ecdf);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.media-close:hover {
+  background: rgba(255, 200, 87, 0.22);
+}
+
+.media-close:active {
+  transform: scale(0.94);
+}
+
+.media-overlay .media-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 0.1s, filter 0.15s, background 0.15s;
+}
+
+.media-overlay .media-btn.primary {
+  background: linear-gradient(180deg, #ffd166, #f5a524);
+  color: #1b1206;
+  box-shadow: 0 8px 22px rgba(245, 165, 36, 0.25);
+}
+
+.media-overlay .media-btn.ghost {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text, #f3ecdf);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.media-overlay .media-btn:hover {
+  filter: brightness(1.08);
+}
+
+.media-overlay .media-btn:active {
+  transform: translateY(1px);
+}
+
+.media-overlay button:focus-visible,
+.media-overlay a:focus-visible {
+  outline: 2px solid var(--accent, #ffc857);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- picker */
+.bp-card {
+  width: min(1080px, 100%);
+}
+
+.bp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bp-head h2 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  letter-spacing: -0.3px;
+}
+
+.bp-lede {
+  margin: 0;
+  color: var(--muted, #9fb0bf);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.bp-body {
+  overflow-y: auto;
+  padding: 16px 24px 8px;
+  overscroll-behavior: contain;
+}
+
+.bp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.bp-section {
+  margin: 20px 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--accent, #ffc857);
+}
+
+.bp-item {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+
+.bp-item:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.bp-item.focused {
+  border-color: var(--accent, #ffc857);
+  background: rgba(255, 200, 87, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 200, 87, 0.14);
+}
+
+.bp-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bp-badge {
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text, #f3ecdf);
+}
+
+.bp-badge.era {
+  color: #ffe3a3;
+  border-color: rgba(255, 214, 140, 0.32);
+  background: rgba(255, 200, 87, 0.1);
+}
+
+.bp-badge.fossil {
+  color: #b9f2bb;
+  border-color: rgba(126, 224, 129, 0.35);
+  background: rgba(126, 224, 129, 0.1);
+}
+
+.bp-badge.coexisted {
+  color: #bfe3ff;
+  border-color: rgba(120, 190, 255, 0.35);
+  background: rgba(120, 190, 255, 0.1);
+}
+
+.bp-badge.whatif {
+  color: #ffc4d3;
+  border-color: rgba(255, 143, 171, 0.38);
+  background: rgba(255, 143, 171, 0.1);
+}
+
+.bp-badge.video {
+  color: #ffd0d0;
+  border-color: rgba(255, 90, 90, 0.4);
+  background: rgba(255, 60, 60, 0.12);
+}
+
+.bp-item-title {
+  margin: 2px 0 0;
+  font-size: 16.5px;
+  line-height: 1.25;
+}
+
+.bp-item-sub,
+.bp-channel {
+  color: var(--muted, #9fb0bf);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+/* the two fighters' images side by side with a VS badge */
+.bp-art {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  height: 150px;
+  margin: -14px -14px 4px;
+  overflow: hidden;
+  background: #0b1016;
+}
+
+.bp-art-video {
+  display: block;
+  background-size: cover;
+  background-position: center;
+}
+
+.bp-art-side {
+  position: relative;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-color: #14120f;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: flex-end;
+  transition: transform 0.4s ease;
+}
+
+.bp-item:hover .bp-art-side,
+.bp-item.focused .bp-art-side {
+  transform: scale(1.04);
+}
+
+.bp-art-side::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.72));
+  pointer-events: none;
+}
+
+.bp-art-name {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 0 10px 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #fff3d6;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-art-side.b .bp-art-name {
+  text-align: right;
+}
+
+.bp-vs-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #1b1206;
+  border: 3px solid var(--accent, #ffc857);
+  color: #ffd166;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+.bp-credit {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(159, 176, 191, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-credit:empty {
+  display: none;
+}
+
+.bp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+/* one chip per verified clip of the match-up */
+.bp-clips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.bp-clip {
+  font-size: 12px;
+  padding: 4px 10px;
+  min-height: 28px;
+}
+
+.bp-hint {
+  padding: 10px 24px 14px;
+  font-size: 11.5px;
+  color: var(--muted, #9fb0bf);
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ---------------------------------------------------------------- player */
+.vp-card {
+  width: min(1000px, 100%);
+  padding: 16px 18px 14px;
+  gap: 12px;
+}
+
+.vp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.vp-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.vp-channel {
+  margin-top: 3px;
+  color: var(--muted, #9fb0bf);
+  font-size: 13px;
+}
+
+.vp-frame {
+  position: relative;
+  width: 100%;
+  /* keep 16:9 but never taller than the viewport allows */
+  max-width: calc((100vh - 220px) * 16 / 9);
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex: none;
+}
+
+.vp-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.vp-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  flex: none;
+}
+
+.vp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, #f3ecdf);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vp-item:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.vp-item.active {
+  border-color: var(--accent, #ffc857);
+  background: rgba(255, 200, 87, 0.12);
+}
+
+.vp-num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.vp-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.vp-item-text b,
+.vp-item-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vp-item-text small {
+  color: var(--muted, #9fb0bf);
+  font-size: 11px;
+}
+
+.vp-foot {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 12.5px;
+}
+
+.vp-ext {
+  color: var(--accent, #ffc857);
+  text-decoration: none;
+}
+
+.vp-ext:hover {
+  text-decoration: underline;
+}
+
+.vp-search {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 28px 16px 22px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.vp-search p {
+  margin: 0;
+  color: var(--muted, #9fb0bf);
+  max-width: 460px;
+  line-height: 1.5;
+}
+
+.vp-search .vp-query {
+  color: var(--text, #f3ecdf);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.vp-search-icon {
+  font-size: 30px;
+}
+
+@media (max-width: 640px) {
+  .media-overlay {
+    padding: 10px;
+    align-items: flex-start;
+  }
+  .bp-head,
+  .bp-body {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .bp-grid {
+    grid-template-columns: 1fr;
+  }
+  .vp-card {
+    padding: 12px;
+  }
+}

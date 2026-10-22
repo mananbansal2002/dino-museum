@@ -9,10 +9,12 @@ export function createFX(scene, max = 700) {
   const positions = new Float32Array(max * 3);
   const colors = new Float32Array(max * 3);
   const sizes = new Float32Array(max);
+  const hards = new Float32Array(max); // 1: crisp-edged fleck (confetti), 0: soft puff
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute("hard", new THREE.BufferAttribute(hards, 1));
 
   const sprite = makeCanvas(64, 64);
   const sctx = sprite.getContext("2d");
@@ -24,25 +26,47 @@ export function createFX(scene, max = 700) {
   sctx.fillRect(0, 0, 64, 64);
   const spriteTex = new THREE.CanvasTexture(sprite);
 
+  // Point sizes follow the drawing buffer (so they look the same at any
+  // window size or pixel ratio) and are capped: a particle that drifts up
+  // close to the third-person camera must not become a screen-sized blob.
+  const uniforms = {
+    map: { value: spriteTex },
+    uScale: { value: 300 },
+    uMaxPx: { value: 48 },
+  };
   const material = new THREE.ShaderMaterial({
-    uniforms: { map: { value: spriteTex } },
+    uniforms,
     vertexShader: `
       attribute float size;
+      attribute float hard;
+      uniform float uScale;
+      uniform float uMaxPx;
       varying vec3 vColor;
+      varying float vFade;
+      varying float vHard;
       void main() {
         vColor = color;
+        vHard = hard;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * (300.0 / -mv.z);
+        float dist = max(0.001, -mv.z);
+        gl_PointSize = min(size * (uScale / dist), uMaxPx);
+        // fade out what is right in front of the lens
+        vFade = smoothstep(0.8, 2.6, dist);
         gl_Position = projectionMatrix * mv;
       }
     `,
     fragmentShader: `
       uniform sampler2D map;
       varying vec3 vColor;
+      varying float vFade;
+      varying float vHard;
       void main() {
         vec4 t = texture2D(map, gl_PointCoord);
-        if (t.a < 0.02) discard;
-        gl_FragColor = vec4(vColor, t.a);
+        // confetti: a crisp disc cut from the soft sprite
+        float shape = mix(t.a, smoothstep(0.25, 0.4, t.a), vHard);
+        float a = shape * vFade;
+        if (a < 0.02) discard;
+        gl_FragColor = vec4(vColor, a);
       }
     `,
     transparent: true,
@@ -52,6 +76,13 @@ export function createFX(scene, max = 700) {
 
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
+  const bufferSize = new THREE.Vector2();
+  points.onBeforeRender = (renderer) => {
+    renderer.getDrawingBufferSize(bufferSize);
+    // 300 at a ~713px-tall buffer, as the sizes below were tuned for
+    uniforms.uScale.value = bufferSize.y * 0.42;
+    uniforms.uMaxPx.value = Math.max(8, bufferSize.y * 0.06);
+  };
   scene.add(points);
 
   const particles = [];
@@ -72,6 +103,7 @@ export function createFX(scene, max = 700) {
       b: 1,
       gravity: -6,
       drag: 0.98,
+      hard: 0,
     });
   }
 
@@ -90,6 +122,7 @@ export function createFX(scene, max = 700) {
     p.size = opts.size ?? 1;
     p.gravity = opts.gravity ?? -6;
     p.drag = opts.drag ?? 0.985;
+    p.hard = opts.hard ? 1 : 0;
     const c = new THREE.Color(opts.color ?? 0xffffff);
     p.r = c.r;
     p.g = c.g;
@@ -138,15 +171,18 @@ export function createFX(scene, max = 700) {
           gravity: -12,
         });
       } else {
+        // confetti: small flecks that pop around the player's head and rain
+        // down, staying well below the camera that sits behind and above
         spawn({
-          x: x + rand(-0.6, 0.6),
-          y: y + rand(0, 0.8),
-          z: z + rand(-0.6, 0.6),
-          vx: rand(-3.4, 3.4),
-          vy: rand(3, 7),
-          vz: rand(-3.4, 3.4),
-          life: rand(1.4, 2.6),
-          size: rand(2, 4),
+          x: x + rand(-0.5, 0.5),
+          y: y + rand(-0.2, 0.4),
+          z: z + rand(-0.5, 0.5),
+          vx: rand(-2.2, 2.2),
+          vy: rand(1.5, 3.6),
+          vz: rand(-2.2, 2.2),
+          life: rand(1.2, 2.2),
+          size: rand(0.12, 0.24),
+          hard: true,
           color: new THREE.Color().setHSL(Math.random(), 0.85, 0.6).getHex(),
           gravity: -6,
         });
@@ -186,11 +222,13 @@ export function createFX(scene, max = 700) {
       colors[i * 3] = p.r;
       colors[i * 3 + 1] = p.g;
       colors[i * 3 + 2] = p.b;
-      sizes[i] = p.size * fade;
+      sizes[i] = p.size * (p.hard ? Math.min(1, fade * 3) : fade);
+      hards[i] = p.hard;
     }
     geometry.attributes.position.needsUpdate = true;
     geometry.attributes.color.needsUpdate = true;
     geometry.attributes.size.needsUpdate = true;
+    geometry.attributes.hard.needsUpdate = true;
   }
 
   return { burst, spawn, update, points };

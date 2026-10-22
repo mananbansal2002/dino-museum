@@ -11,6 +11,7 @@
     "check": "node scripts/check.mjs",
     "smoke": "node scripts/smoke.mjs",
     "journey": "node scripts/journey.mjs",
+    "e2e": "node scripts/e2e.mjs",
     "test": "npm run check && npm run smoke",
     "deploy": "vercel --prod"
   },
@@ -18,11 +19,11 @@
     "node": ">=20"
   },
   "dependencies": {
-    "express": "^5.3.0",
-    "socket.io": "^4.8.4"
+    "express": "5.3.0",
+    "socket.io": "4.8.4"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.4",
-    "three": "^0.160.0"
+    "socket.io-client": "4.8.4",
+    "three": "0.160.0"
   }
 }

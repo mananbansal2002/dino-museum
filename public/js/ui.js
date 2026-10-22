@@ -1,14 +1,19 @@
 import * as THREE from "three";
 import {
+  BODY_TYPES,
   SKIN_TONES,
   SHIRT_COLORS,
   PANTS_COLORS,
   HAIR_STYLES,
+  HAIR_COLORS,
   ACCESSORIES,
+  DEFAULT_HAIR,
   DEFAULT_LOOK,
   randomLook,
   normalizeLook,
 } from "./character.js";
+import { makeGelato } from "./gelato.js";
+import { createAvatarPreview } from "./avatarpreview.js";
 
 export const FLAVOURS = [
   { id: "strawberry", name: "Strawberry", color: 0xff9aa2 },
@@ -27,134 +32,404 @@ export const TOPPINGS = [
   { id: "cherry", name: "Cherry", color: 0xd7263d },
 ];
 
+const TOPPING_ICONS = { sprinkles: "🌈", chocolate: "🍫", cherry: "🍒" };
+
 const $ = (id) => document.getElementById(id);
+
+let imageManifest = null;
+/** Credits for the exhibit photos, fetched once (see public/images/species). */
+export function speciesImages() {
+  imageManifest ??= fetch("/images/species/manifest.json")
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => ({}));
+  return imageManifest;
+}
+
+/** Panels need a visible cursor, so drop pointer lock when one opens. */
+function releaseMouse() {
+  if (document.pointerLockElement) document.exitPointerLock?.();
+}
 
 /* ------------------------------------------------------------------ */
 /* little 2D paper-doll preview for the character customiser          */
 /* ------------------------------------------------------------------ */
+function shade(hex, f) {
+  const n = parseInt(String(hex).slice(1), 16) || 0;
+  const ch = (v) => Math.max(0, Math.min(255, Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f)));
+  const r = ch((n >> 16) & 255);
+  const g = ch((n >> 8) & 255);
+  const b = ch(n & 255);
+  return `rgb(${r},${g},${b})`;
+}
+
 function drawDoll(canvas, look) {
   const ctx = canvas.getContext("2d");
-  const W = canvas.width;
-  const H = canvas.height;
+  const W = 200;
+  const H = 280;
+  const k = canvas.width / W;
+  ctx.setTransform(k, 0, 0, k, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath();
-  ctx.ellipse(W / 2, H - 22, 46, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
 
+  const female = look.body === "female";
   const cx = W / 2;
-  ctx.fillStyle = look.shirt;
-  roundRect(ctx, cx - 30, 118, 60, 74, 14);
-  ctx.fill();
-  ctx.fillStyle = look.pants;
-  roundRect(ctx, cx - 26, 186, 22, 74, 8);
-  ctx.fill();
-  roundRect(ctx, cx + 4, 186, 22, 74, 8);
-  ctx.fill();
-  ctx.fillStyle = look.skin;
-  ctx.beginPath();
-  ctx.arc(cx, 96, 24, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#2a2320";
-  ctx.beginPath();
-  ctx.arc(cx - 8, 92, 2.6, 0, Math.PI * 2);
-  ctx.arc(cx + 8, 92, 2.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#2a2320";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, 102, 9, 0.15 * Math.PI, 0.85 * Math.PI);
-  ctx.stroke();
+  const hy = 70; // head centre
+  const hr = female ? 23 : 24;
+  const shW = female ? 25 : 33; // half shoulder width
+  const waistW = female ? 17 : 26;
+  const hipW = female ? 30 : 26;
+  const legW = female ? 12 : 15;
+  const armW = female ? 10 : 13;
+  const darkShirt = shade(look.shirt, -0.22);
+  const darkPants = shade(look.pants, -0.25);
+  const capeCol = shade(look.shirt, -0.45);
+  const acc = look.accessory || "none";
+  const style = look.hair || "short";
 
-  // hair
-  ctx.fillStyle = look.hairColor;
-  const style = look.hairStyle || "short";
-  if (style === "short") {
+  // floor shadow
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath();
+  ctx.ellipse(cx, 262, 50, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  /* ---- back layer ---- */
+  if (acc === "cape") {
+    ctx.fillStyle = capeCol;
     ctx.beginPath();
-    ctx.arc(cx, 92, 25, Math.PI * 1.05, Math.PI * 2.05);
+    ctx.moveTo(cx - shW + 2, 104);
+    ctx.lineTo(cx + shW - 2, 104);
+    ctx.quadraticCurveTo(cx + shW + 14, 180, cx + shW + 18, 232);
+    ctx.lineTo(cx - shW - 18, 232);
+    ctx.quadraticCurveTo(cx - shW - 14, 180, cx - shW + 2, 104);
     ctx.fill();
-  } else if (style === "long") {
-    ctx.beginPath();
-    ctx.arc(cx, 92, 25, Math.PI * 1.05, Math.PI * 2.05);
+  }
+  if (acc === "backpack") {
+    ctx.fillStyle = shade(look.shirt, -0.5);
+    roundRect(ctx, cx - shW - 4, 108, shW * 2 + 8, 58, 14);
     ctx.fill();
-    roundRect(ctx, cx - 27, 88, 12, 60, 6);
-    ctx.fill();
-    roundRect(ctx, cx + 15, 88, 12, 60, 6);
-    ctx.fill();
-  } else if (style === "bun") {
-    ctx.beginPath();
-    ctx.arc(cx, 92, 25, Math.PI * 1.05, Math.PI * 2.05);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, 66, 11, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (style === "mohawk") {
-    ctx.beginPath();
-    ctx.moveTo(cx - 4, 74);
-    ctx.lineTo(cx, 44);
-    ctx.lineTo(cx + 4, 74);
-    ctx.closePath();
-    ctx.fill();
-  } else if (style === "bald") {
-    /* nothing */
-  } else if (style === "cap") {
-    ctx.fillStyle = look.shirt;
-    ctx.beginPath();
-    ctx.arc(cx, 92, 26, Math.PI * 1.02, Math.PI * 2.02);
-    ctx.fill();
-    roundRect(ctx, cx - 30, 88, 34, 7, 3);
+  }
+  if (style === "long") {
+    ctx.fillStyle = look.hairColor;
+    roundRect(ctx, cx - hr - 4, hy - 8, hr * 2 + 8, 78, 18);
     ctx.fill();
   }
 
-  // accessory
-  const acc = look.accessory || "none";
-  if (acc === "glasses") {
-    ctx.strokeStyle = "#20242b";
-    ctx.lineWidth = 3;
+  /* ---- legs + shoes ---- */
+  ctx.fillStyle = look.pants;
+  const legTop = 164;
+  const legBot = 246;
+  roundRect(ctx, cx - legW - 3, legTop, legW, legBot - legTop, 7);
+  ctx.fill();
+  roundRect(ctx, cx + 3, legTop, legW, legBot - legTop, 7);
+  ctx.fill();
+  ctx.fillStyle = "#2a2d34";
+  ctx.beginPath();
+  ctx.ellipse(cx - legW / 2 - 4, 249, legW / 2 + 4, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + legW / 2 + 4, 249, legW / 2 + 4, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#e9e4da";
+  ctx.fillRect(cx - legW - 8, 253, legW + 8, 3);
+  ctx.fillRect(cx, 253, legW + 8, 3);
+
+  /* ---- hips / skirt ---- */
+  ctx.fillStyle = look.pants;
+  if (female) {
     ctx.beginPath();
-    ctx.arc(cx - 9, 92, 7, 0, Math.PI * 2);
-    ctx.arc(cx + 9, 92, 7, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx - 2, 92);
-    ctx.lineTo(cx + 2, 92);
-    ctx.stroke();
-  } else if (acc === "backpack") {
-    ctx.fillStyle = "#5a4632";
-    roundRect(ctx, cx - 16, 126, 32, 44, 10);
+    ctx.moveTo(cx - waistW - 4, 148);
+    ctx.lineTo(cx + waistW + 4, 148);
+    ctx.quadraticCurveTo(cx + hipW + 4, 172, cx + hipW + 10, 204);
+    ctx.lineTo(cx - hipW - 10, 204);
+    ctx.quadraticCurveTo(cx - hipW - 4, 172, cx - waistW - 4, 148);
     ctx.fill();
-  } else if (acc === "cape") {
-    ctx.fillStyle = "#c0392b";
+    ctx.fillStyle = darkPants;
+    ctx.fillRect(cx - hipW - 10, 200, (hipW + 10) * 2, 4);
+  } else {
+    roundRect(ctx, cx - hipW, 152, hipW * 2, 26, 8);
+    ctx.fill();
+  }
+
+  /* ---- arms (behind torso edge) ---- */
+  const armTop = 102;
+  const armLen = 70;
+  for (const s of [-1, 1]) {
+    const ax = cx + s * (shW - armW / 2 + 3) - armW / 2 + s * (female ? 4 : 2);
+    ctx.save();
+    ctx.translate(ax + armW / 2, armTop);
+    ctx.rotate(-s * (female ? 0.14 : 0.08));
+    ctx.fillStyle = look.skin;
+    roundRect(ctx, -armW / 2, 4, armW, armLen, armW / 2);
+    ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(cx - 26, 122);
-    ctx.lineTo(cx + 26, 122);
-    ctx.lineTo(cx + 34, 210);
-    ctx.lineTo(cx - 34, 210);
+    ctx.arc(0, armLen + 4, armW * 0.62, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = look.shirt;
+    roundRect(ctx, -armW / 2 - 2, 0, armW + 4, 30, armW / 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ---- torso ---- */
+  ctx.fillStyle = look.shirt;
+  ctx.beginPath();
+  if (female) {
+    ctx.moveTo(cx - shW, 108);
+    ctx.quadraticCurveTo(cx - shW, 100, cx - 10, 99);
+    ctx.lineTo(cx + 10, 99);
+    ctx.quadraticCurveTo(cx + shW, 100, cx + shW, 108);
+    ctx.quadraticCurveTo(cx + shW + 1, 124, cx + waistW, 138);
+    ctx.quadraticCurveTo(cx + waistW - 1, 146, cx + waistW + 4, 152);
+    ctx.lineTo(cx - waistW - 4, 152);
+    ctx.quadraticCurveTo(cx - waistW + 1, 146, cx - waistW, 138);
+    ctx.quadraticCurveTo(cx - shW - 1, 124, cx - shW, 108);
+  } else {
+    ctx.moveTo(cx - shW, 110);
+    ctx.quadraticCurveTo(cx - shW, 98, cx - 12, 97);
+    ctx.lineTo(cx + 12, 97);
+    ctx.quadraticCurveTo(cx + shW, 98, cx + shW, 110);
+    ctx.lineTo(cx + waistW, 156);
+    ctx.lineTo(cx - waistW, 156);
+  }
+  ctx.closePath();
+  ctx.fill();
+  // belt (male) / waist seam (female)
+  ctx.fillStyle = female ? darkShirt : "#3a2a1e";
+  ctx.fillRect(cx - (female ? waistW + 3 : waistW), female ? 148 : 152, (female ? waistW + 3 : waistW) * 2, 4);
+  if (!female) {
+    ctx.fillStyle = "#d4b36a";
+    ctx.fillRect(cx - 4, 151, 8, 6);
+  }
+  // collar
+  ctx.fillStyle = darkShirt;
+  ctx.beginPath();
+  ctx.ellipse(cx, 98, 11, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (acc === "backpack") {
+    ctx.fillStyle = "#3b3328";
+    roundRect(ctx, cx - shW + 6, 98, 6, 50, 3);
+    ctx.fill();
+    roundRect(ctx, cx + shW - 12, 98, 6, 50, 3);
+    ctx.fill();
+  }
+  if (acc === "cape") {
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(cx, 102, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* ---- neck + head ---- */
+  ctx.fillStyle = shade(look.skin, -0.12);
+  roundRect(ctx, cx - 7, hy + 16, 14, 16, 5);
+  ctx.fill();
+  ctx.fillStyle = look.skin;
+  ctx.beginPath();
+  ctx.ellipse(cx - hr + 1, hy + 2, 4.5, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + hr - 1, hy + 2, 4.5, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx, hy, hr, hr * 1.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // face
+  const ink = "#1f1a18";
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.ellipse(cx - 8.5, hy + 1, female ? 4.4 : 4, female ? 5 : 4.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 8.5, hy + 1, female ? 4.4 : 4, female ? 5 : 4.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.arc(cx - 8.5, hy + 1.6, 2.4, 0, Math.PI * 2);
+  ctx.arc(cx + 8.5, hy + 1.6, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = look.hairColor;
+  ctx.lineWidth = female ? 1.6 : 2.6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx - 13, hy - 7);
+  ctx.lineTo(cx - 4.5, hy - (female ? 9 : 8));
+  ctx.moveTo(cx + 13, hy - 7);
+  ctx.lineTo(cx + 4.5, hy - (female ? 9 : 8));
+  ctx.stroke();
+  if (female) {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(cx - 12.5, hy - 2);
+    ctx.lineTo(cx - 15, hy - 4.5);
+    ctx.moveTo(cx + 12.5, hy - 2);
+    ctx.lineTo(cx + 15, hy - 4.5);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(255,138,128,0.35)";
+  ctx.beginPath();
+  ctx.ellipse(cx - 13, hy + 9, 4, 2.4, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 13, hy + 9, 4, 2.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = female ? "#b8505a" : "#7d3b3b";
+  ctx.lineWidth = female ? 2.4 : 2;
+  ctx.beginPath();
+  ctx.arc(cx, hy + 9, 6.5, 0.18 * Math.PI, 0.82 * Math.PI);
+  ctx.stroke();
+
+  /* ---- hair ---- */
+  ctx.fillStyle = look.hairColor;
+  const crown = () => {
+    ctx.beginPath();
+    ctx.ellipse(cx, hy - 2, hr + 2, hr * 1.06 + 1, 0, Math.PI * 1.0, Math.PI * 2.0);
     ctx.closePath();
     ctx.fill();
-  } else if (acc === "headphones") {
+  };
+  if (style === "short") {
+    crown();
+    ctx.beginPath();
+    ctx.ellipse(cx + 6, hy - 14, 13, 5.5, -0.35, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (style === "long") {
+    crown();
+    roundRect(ctx, cx - hr - 4, hy - 6, 10, 62, 5);
+    ctx.fill();
+    roundRect(ctx, cx + hr - 6, hy - 6, 10, 62, 5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx - 5, hy - 14, 16, 6, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (style === "bun") {
+    crown();
+    ctx.beginPath();
+    ctx.arc(cx, hy - hr - 9, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff8fab";
+    ctx.fillRect(cx - 8, hy - hr - 1, 16, 3);
+  } else if (style === "spiky") {
+    crown();
+    ctx.beginPath();
+    const n = 6;
+    ctx.moveTo(cx - hr - 1, hy - 8);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const a = Math.PI * (1 + t);
+      const bx = cx + Math.cos(a) * (hr + 2);
+      const by = hy - 4 + Math.sin(a) * (hr + 2);
+      if (i > 0) ctx.lineTo(bx, by);
+      if (i < n) {
+        const a2 = Math.PI * (1 + (i + 0.5) / n);
+        ctx.lineTo(cx + Math.cos(a2) * (hr + 13), hy - 4 + Math.sin(a2) * (hr + 13));
+      }
+    }
+    ctx.closePath();
+    ctx.fill();
+  } else if (style === "buzz") {
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.ellipse(cx, hy - 3, hr + 0.5, hr * 1.04, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (style === "mohawk") {
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.ellipse(cx, hy - 3, hr + 0.5, hr * 1.04, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, hy - hr + 6);
+    ctx.lineTo(cx - 4, hy - hr - 18);
+    ctx.lineTo(cx, hy - hr - 12);
+    ctx.lineTo(cx + 3, hy - hr - 22);
+    ctx.lineTo(cx + 6, hy - hr + 6);
+    ctx.closePath();
+    ctx.fill();
+  } else if (style === "curly") {
+    for (let i = 0; i < 11; i++) {
+      const a = Math.PI * (0.95 + (i / 10) * 1.1);
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * (hr + 1), hy - 3 + Math.sin(a) * (hr + 1), 7.5 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(cx - 7, hy - hr + 2, 8, 0, Math.PI * 2);
+    ctx.arc(cx + 7, hy - hr + 2, 8, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (style === "bald") {
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(cx - 8, hy - 15, 6, 3, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* ---- head accessories ---- */
+  if (acc === "glasses") {
     ctx.strokeStyle = "#20242b";
+    ctx.lineWidth = 2.2;
+    ctx.fillStyle = "rgba(159,211,255,0.25)";
+    ctx.beginPath();
+    ctx.arc(cx - 8.5, hy + 1, 6.5, 0, Math.PI * 2);
+    ctx.moveTo(cx + 15, hy + 1);
+    ctx.arc(cx + 8.5, hy + 1, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 2, hy);
+    ctx.lineTo(cx + 2, hy);
+    ctx.moveTo(cx - 15, hy);
+    ctx.lineTo(cx - hr, hy - 2);
+    ctx.moveTo(cx + 15, hy);
+    ctx.lineTo(cx + hr, hy - 2);
+    ctx.stroke();
+  } else if (acc === "cap") {
+    ctx.fillStyle = look.shirt;
+    ctx.beginPath();
+    ctx.ellipse(cx, hy - 8, hr + 3, hr * 0.95, 0, Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = darkShirt;
+    ctx.beginPath();
+    ctx.ellipse(cx + 4, hy - 8, hr + 8, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(cx, hy - 20, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (acc === "headphones") {
+    ctx.strokeStyle = "#22252b";
     ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(cx, 88, 26, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.arc(cx, hy - 1, hr + 5, Math.PI * 1.08, Math.PI * 1.92);
     ctx.stroke();
-    ctx.fillStyle = "#20242b";
-    roundRect(ctx, cx - 32, 84, 10, 18, 4);
+    ctx.fillStyle = "#22252b";
+    roundRect(ctx, cx - hr - 9, hy - 8, 10, 20, 4);
     ctx.fill();
-    roundRect(ctx, cx + 22, 84, 10, 18, 4);
+    roundRect(ctx, cx + hr - 1, hy - 8, 10, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = "#ff8fab";
+    ctx.fillRect(cx - hr - 1, hy - 5, 2, 14);
+    ctx.fillRect(cx + hr - 1, hy - 5, 2, 14);
+  } else if (acc === "headlamp") {
+    ctx.fillStyle = "#22252b";
+    ctx.fillRect(cx - hr - 1, hy - 14, hr * 2 + 2, 5);
+    ctx.fillStyle = "#ffb703";
+    roundRect(ctx, cx - 7, hy - 19, 14, 11, 3);
+    ctx.fill();
+    const glow = ctx.createRadialGradient(cx, hy - 13.5, 1, cx, hy - 13.5, 16);
+    glow.addColorStop(0, "rgba(255,246,194,0.95)");
+    glow.addColorStop(1, "rgba(255,246,194,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, hy - 13.5, 16, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
 function roundRect(ctx, x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
 }
 
@@ -164,28 +439,50 @@ function roundRect(ctx, x, y, w, h, r) {
 export function createUI(callbacks = {}) {
   const look = normalizeLook({ ...DEFAULT_LOOK });
   const preview = $("lookPreview");
+  // the rigged 3D avatar when WebGL is available, the 2D paper doll otherwise
+  let preview3d = createAvatarPreview(preview);
+  // until the visitor picks a hair style, switching body swaps the default hair
+  let hairPicked = false;
 
   function renderLook() {
-    drawDoll(preview, look);
+    if (preview3d) preview3d.setLook(look);
+    else drawDoll(preview, look);
   }
 
-  function swatchRow(containerId, colors, current, onPick, asText = false) {
+  /**
+   * kind: "color" (items {id,name,hex}, value = hex),
+   *       "text"  (items {id,name}, value = id),
+   *       "body"  (BODY_TYPES, value = id, icon + name)
+   */
+  function swatchRow(containerId, items, current, onPick, kind = "color") {
     const box = $(containerId);
     if (!box) return;
     box.innerHTML = "";
-    for (const c of colors) {
+    for (const item of items) {
+      const value = kind === "color" ? item.hex : item.id;
       const b = document.createElement("button");
-      b.className = "sw" + (asText ? " txt" : "");
-      if (asText) {
-        b.textContent = c;
+      b.type = "button";
+      b.className = "sw" + (kind === "text" ? " txt" : kind === "body" ? " body" : "");
+      b.title = item.name;
+      b.setAttribute("aria-label", item.name);
+      if (kind === "color") {
+        b.style.background = item.hex;
+      } else if (kind === "body") {
+        const icon = document.createElement("span");
+        icon.className = "ico";
+        icon.textContent = item.icon;
+        const label = document.createElement("span");
+        label.textContent = item.name;
+        b.append(icon, label);
       } else {
-        b.style.background = c;
+        b.textContent = item.name;
       }
-      if (c === current) b.classList.add("active");
+      const active = String(value).toLowerCase() === String(current).toLowerCase();
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
       b.onclick = () => {
-        onPick(c);
-        for (const child of box.children) child.classList.remove("active");
-        b.classList.add("active");
+        onPick(value);
+        refreshSwatches();
         renderLook();
         callbacks.onLookChange?.(look);
       };
@@ -194,18 +491,39 @@ export function createUI(callbacks = {}) {
   }
 
   function refreshSwatches() {
+    swatchRow(
+      "swBody",
+      BODY_TYPES,
+      look.body,
+      (v) => {
+        if (!hairPicked && look.hair === DEFAULT_HAIR[look.body]) look.hair = DEFAULT_HAIR[v];
+        look.body = v;
+      },
+      "body"
+    );
     swatchRow("swSkin", SKIN_TONES, look.skin, (v) => (look.skin = v));
     swatchRow("swShirt", SHIRT_COLORS, look.shirt, (v) => (look.shirt = v));
     swatchRow("swPants", PANTS_COLORS, look.pants, (v) => (look.pants = v));
-    swatchRow("swHair", HAIR_STYLES, look.hairStyle, (v) => (look.hairStyle = v), true);
-    swatchRow("swAcc", ACCESSORIES, look.accessory, (v) => (look.accessory = v), true);
+    swatchRow(
+      "swHair",
+      HAIR_STYLES,
+      look.hair,
+      (v) => {
+        hairPicked = true;
+        look.hair = v;
+      },
+      "text"
+    );
+    swatchRow("swHairColor", HAIR_COLORS, look.hairColor, (v) => (look.hairColor = v));
+    swatchRow("swAcc", ACCESSORIES, look.accessory, (v) => (look.accessory = v), "text");
   }
 
   refreshSwatches();
   renderLook();
 
   $("randomLook").onclick = () => {
-    Object.assign(look, randomLook());
+    Object.assign(look, normalizeLook(randomLook()));
+    hairPicked = false;
     refreshSwatches();
     renderLook();
     callbacks.onLookChange?.(look);
@@ -240,6 +558,9 @@ export function createUI(callbacks = {}) {
   const chatInput = $("chatInput");
 
   function enterGame() {
+    // the join screen is gone: free the preview's WebGL context
+    preview3d?.dispose();
+    preview3d = null;
     $("join").classList.add("hidden");
     hud.classList.remove("hidden");
     $("loading").classList.add("hidden");
@@ -248,17 +569,43 @@ export function createUI(callbacks = {}) {
   function setHall(name) {
     $("hallName").textContent = name;
   }
-  function setRoom(code) {
-    $("roomCode").textContent = code;
+  // solo visits have no server room: there is nothing to share or invite to
+  let soloRoom = false;
+  function setRoom(code, { solo = false } = {}) {
+    soloRoom = solo;
+    $("roomCode").textContent = solo ? "Solo visit" : code;
+    $("copyRoom").classList.toggle("hidden", solo);
   }
   function setCounters({ discovered, total, fossils, scoops }) {
     if (discovered != null) {
       $("statDiscovered").textContent = discovered;
-      $("statTotal").textContent = total;
+      if (total != null) $("statTotal").textContent = total;
     }
     if (fossils != null) $("statFossils").textContent = fossils;
     if (scoops != null) $("statScoops").textContent = scoops;
   }
+
+  // the prompt is also a button: a tap (touch) or click does what E does
+  $("prompt").style.cursor = "pointer";
+  $("prompt").addEventListener("click", (e) => {
+    e.stopPropagation();
+    callbacks.onPromptTap?.();
+  });
+
+  // sound on/off for players without an L key (phones), next to the room code
+  const soundBtn = document.createElement("button");
+  soundBtn.type = "button";
+  soundBtn.className = "chip";
+  soundBtn.id = "soundToggle";
+  soundBtn.onclick = () => callbacks.onToggleSound?.();
+  $("copyRoom").after(soundBtn);
+  function setSound(muted) {
+    soundBtn.textContent = muted ? "🔇 sound" : "🔊 sound";
+    soundBtn.title = muted ? "Sound is off (L)" : "Sound is on (L)";
+    soundBtn.setAttribute("aria-pressed", muted ? "false" : "true");
+    soundBtn.setAttribute("aria-label", "Sound");
+  }
+  setSound(false);
 
   function setPrompt(text, key) {
     const el = $("prompt");
@@ -319,6 +666,7 @@ export function createUI(callbacks = {}) {
   }
 
   $("copyRoom").onclick = async () => {
+    if (soloRoom) return;
     const code = $("roomCode").textContent;
     const url = `${location.origin}/?room=${code}`;
     try {
@@ -338,6 +686,9 @@ export function createUI(callbacks = {}) {
   function openChat() {
     chatInput.classList.add("open");
     chatInput.focus();
+    // the input can't take focus while the HUD is hidden (e.g. immersive era
+    // view); left "open" without focus it would never blur and lock all keys
+    if (document.activeElement !== chatInput) chatInput.classList.remove("open");
   }
   function closeChat() {
     chatInput.classList.remove("open");
@@ -357,9 +708,12 @@ export function createUI(callbacks = {}) {
   chatInput.addEventListener("blur", () => chatInput.classList.remove("open"));
 
   // ---------------- exhibit card ----------------
+  speciesImages(); // fetch early so the first card already has its toggle and credit
   function showExhibit(ex) {
     const body = $("exhibitCardBody");
     const stats = ex.stats || {};
+    // main.js decides whether there is anything to play; without that hint we assume yes
+    const hasVideos = !!callbacks.onExhibitVideos && (callbacks.hasExhibitVideos?.(ex) ?? true);
     const bar = (label, value) => `
       <div class="barRow">
         <span>${label}</span>
@@ -372,8 +726,19 @@ export function createUI(callbacks = {}) {
           <div class="exEra">${escapeHtml(ex.era || "")}</div>
           <h2 class="exTitle">${escapeHtml(ex.title)}</h2>
         </div>
-        <button class="chip" id="closeExhibit">close ✕</button>
+        <div class="exActions">
+          ${
+            hasVideos
+              ? `<button type="button" class="chip" id="exhibitVideos" aria-label="Watch ${escapeHtml(ex.title)} videos">▶ videos</button>`
+              : ""
+          }
+          <button type="button" class="chip" id="closeExhibit">close ✕</button>
+        </div>
       </div>
+      <figure class="exHero" id="exHero">
+        <img src="/images/species/${encodeURIComponent(ex.id)}.jpg" alt="${escapeHtml(ex.title)} life restoration" />
+        <figcaption id="exCredit"></figcaption>
+      </figure>
       <p class="lead">${escapeHtml(ex.blurb || "")}</p>
       <div class="exGrid">
         <div class="stat"><span>Period</span><b>${escapeHtml(ex.period || "—")}</b></div>
@@ -393,10 +758,123 @@ export function createUI(callbacks = {}) {
       }
     `;
     $("closeExhibit").onclick = hideExhibit;
+    const videos = $("exhibitVideos");
+    if (videos) videos.onclick = () => callbacks.onExhibitVideos?.(ex);
+    setupHero($("exHero"), ex);
+    releaseMouse();
     $("exhibitCard").classList.remove("hidden");
   }
   function hideExhibit() {
     $("exhibitCard").classList.add("hidden");
+  }
+
+  /**
+   * The card's hero photo. Once the manifest says what we have it adds a
+   * Life | Fossil toggle (when a skeleton photo exists), a "Specimen" tag
+   * (when the main photo already is a mounted fossil) and a linked credit.
+   * Species without any photo get a quiet placeholder instead.
+   */
+  function setupHero(hero, ex) {
+    const img = hero.querySelector("img");
+    const cap = hero.querySelector("figcaption");
+    let views = null; // { life, fossil } manifest entries, once known
+    let view = "life";
+    let blank = false;
+
+    const placeholder = () => {
+      blank = true;
+      hero.className = "exHero exHeroBlank";
+      hero.innerHTML = `
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <!-- a bone broken in two: "fragmentary" at a glance -->
+          <g transform="translate(-1.5 1.5)">
+            <circle cx="9.5" cy="33" r="4.6" /><circle cx="15" cy="38.5" r="4.6" />
+            <path d="M12.5 35.5 21.5 26.5" />
+          </g>
+          <g transform="translate(1.5 -1.5)">
+            <circle cx="33" cy="9.5" r="4.6" /><circle cx="38.5" cy="15" r="4.6" />
+            <path d="M35.5 12.5 26.5 21.5" />
+          </g>
+        </svg>
+        <figcaption>
+          <b>Known only from fragmentary fossils</b>
+          <span>No complete skeleton or reliable restoration of ${escapeHtml(ex.title)} to show yet.</span>
+        </figcaption>`;
+    };
+
+    const credit = (info) => {
+      const who = escapeHtml(info.credit || "Unknown");
+      const src = /^https?:\/\//i.test(info.source || "") ? info.source : "";
+      const link = src
+        ? `<a href="${escapeHtml(src)}" target="_blank" rel="noopener">${who}</a>`
+        : who;
+      cap.innerHTML = `Image: ${link}${info.license ? ` · ${escapeHtml(info.license)}` : ""}`;
+    };
+
+    const show = (next) => {
+      const info = views?.[next];
+      if (!info || blank) return;
+      view = next;
+      const fossil = next === "fossil";
+      img.alt = `${ex.title} ${fossil ? "fossil skeleton" : views.specimen ? "museum specimen" : "life restoration"}`;
+      if (!img.src.endsWith(info.file)) {
+        img.src = info.file;
+        // a blurred copy fills the frame around the uncropped photo
+        hero.style.setProperty("--hero-bg", `url("${info.file}")`);
+        // replay the fade so the swap reads as a change, not a flicker
+        img.style.animation = "none";
+        void img.offsetWidth;
+        img.style.animation = "";
+      }
+      credit(info);
+      hero.querySelectorAll(".exHeroToggle button").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.dataset.view === next));
+      });
+    };
+
+    img.onerror = () => {
+      if (blank) return;
+      if (view === "fossil") {
+        // the skeleton photo is missing — fall back to life and drop the toggle
+        views.fossil = null;
+        hero.querySelector(".exHeroToggle")?.remove();
+        show("life");
+      } else {
+        placeholder();
+      }
+    };
+
+    speciesImages().then((m) => {
+      if (!hero.isConnected || blank) return;
+      const info = m[ex.id];
+      if (!info) {
+        // an empty manifest means the fetch failed; only a real gap gets the placeholder
+        if (Object.keys(m).length) placeholder();
+        return;
+      }
+      const specimen = info.note === "museum specimen photo";
+      views = {
+        specimen,
+        life: { ...info, file: info.file || `/images/species/${encodeURIComponent(ex.id)}.jpg` },
+        fossil: !specimen && info.skeleton?.file ? info.skeleton : null,
+      };
+      if (specimen) {
+        hero.insertAdjacentHTML("beforeend", `<span class="exHeroTag">Specimen</span>`);
+      } else if (views.fossil) {
+        hero.insertAdjacentHTML(
+          "beforeend",
+          `<div class="exHeroToggle" role="group" aria-label="Picture">
+            <button type="button" data-view="life" aria-pressed="true">Life</button>
+            <button type="button" data-view="fossil" aria-pressed="false">Fossil</button>
+          </div>`
+        );
+        hero.querySelectorAll(".exHeroToggle button").forEach((b) => {
+          b.onclick = () => show(b.dataset.view);
+        });
+        new Image().src = views.fossil.file; // warm the cache so the first swap is instant
+      }
+      show("life");
+    });
   }
   $("exhibitCard").addEventListener("click", (e) => {
     if (e.target.id === "exhibitCard") hideExhibit();
@@ -452,21 +930,30 @@ export function createUI(callbacks = {}) {
       };
       styleSeg.appendChild(b);
     }
-    const top = document.createElement("button");
-    top.textContent = "🍫 toppings";
-    top.onclick = () => {
-      const cur = ice.toppings;
-      const next = cur.includes("sprinkles")
-        ? cur.filter((t) => t !== "sprinkles")
-        : [...cur, "sprinkles"];
-      ice.toppings = next;
-      toast(next.length ? "Added sprinkles 🍓" : "Removed sprinkles");
-    };
-    styleSeg.appendChild(top);
+
+    const topSeg = $("toppingSeg");
+    if (topSeg) {
+      topSeg.innerHTML = "";
+      for (const t of TOPPINGS) {
+        const on = ice.toppings.includes(t.id);
+        const b = document.createElement("button");
+        b.textContent = `${TOPPING_ICONS[t.id] || ""} ${t.name}`;
+        b.className = on ? "active" : "";
+        b.setAttribute("aria-pressed", String(on));
+        b.onclick = () => {
+          ice.toppings = on
+            ? ice.toppings.filter((x) => x !== t.id)
+            : [...ice.toppings, t.id];
+          renderIce();
+        };
+        topSeg.appendChild(b);
+      }
+    }
   }
   renderIce();
 
   function openIce() {
+    releaseMouse();
     $("iceCream").classList.remove("hidden");
   }
   function closeIce() {
@@ -502,6 +989,7 @@ export function createUI(callbacks = {}) {
   // ---------------- modal ----------------
   function modal(html) {
     $("modalBody").innerHTML = html;
+    releaseMouse();
     $("modal").classList.remove("hidden");
   }
   function closeModal() {
@@ -519,6 +1007,7 @@ export function createUI(callbacks = {}) {
     setRoom,
     setCounters,
     setPrompt,
+    setSound,
     toast,
     chat,
     setPlayers,
@@ -532,6 +1021,7 @@ export function createUI(callbacks = {}) {
     iceOrder: () => ice,
     showBattle,
     hideBattle,
+    isBattleOpen: () => !$("battleOverlay").classList.contains("hidden"),
     setBattleCaption,
     setBattleProgress,
     modal,
@@ -558,6 +1048,12 @@ function escapeHtml(s) {
 /* ice cream prop shown in the player's hand                            */
 /* ------------------------------------------------------------------ */
 export function makeIceCream(order) {
+  // the realistic gelato (gelato.js); the primitive version below is the fallback
+  try {
+    return makeGelato(order);
+  } catch (err) {
+    console.warn("gelato: falling back to the simple ice cream", err);
+  }
   const g = new THREE.Group();
   const flavour = order.flavour;
   const color = flavour?.color ?? 0xff9aa2;
@@ -587,13 +1083,48 @@ export function makeIceCream(order) {
     g.add(cup);
   }
 
-  if (order.toppings?.includes("sprinkles")) {
-    const spr = new THREE.Mesh(
-      new THREE.SphereGeometry(0.02, 6, 5),
-      new THREE.MeshStandardMaterial({ color: 0xff6b9d, roughness: 0.6 })
+  const topY = 0.34 + (order.scoops - 1) * 0.2;
+  const toppings = order.toppings || [];
+  if (toppings.includes("chocolate")) {
+    const sauce = new THREE.Mesh(
+      new THREE.SphereGeometry(0.136, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.38),
+      new THREE.MeshStandardMaterial({ color: 0x4a2c17, roughness: 0.35 })
     );
-    spr.position.set(0.05, 0.44 + (order.scoops - 1) * 0.2, 0.04);
-    g.add(spr);
+    sauce.position.y = topY;
+    g.add(sauce);
+  }
+  if (toppings.includes("sprinkles")) {
+    const colors = [0xff6b9d, 0xffd166, 0x7de2fc, 0xa0e77d, 0xffffff];
+    const geo = new THREE.CylinderGeometry(0.008, 0.008, 0.04, 5);
+    const mats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 }));
+    for (let i = 0; i < 18; i++) {
+      // golden-angle spiral over the cap of the top scoop
+      const a = i * 2.39996;
+      const r = 0.02 + (i % 6) * 0.016;
+      const spr = new THREE.Mesh(geo, mats[i % mats.length]);
+      spr.position.set(
+        Math.cos(a) * r,
+        topY + Math.sqrt(Math.max(0, 0.0169 - r * r)) + 0.004,
+        Math.sin(a) * r
+      );
+      spr.rotation.set(a, a * 0.7, 0);
+      g.add(spr);
+    }
+  }
+  if (toppings.includes("cherry")) {
+    const cherry = new THREE.Mesh(
+      new THREE.SphereGeometry(0.04, 12, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd7263d, roughness: 0.25 })
+    );
+    cherry.position.y = topY + 0.16;
+    g.add(cherry);
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.004, 0.004, 0.07, 4),
+      new THREE.MeshStandardMaterial({ color: 0x3d5a1e })
+    );
+    stem.position.set(0.01, topY + 0.22, 0);
+    stem.rotation.z = -0.3;
+    g.add(stem);
   }
 
   g.rotation.x = -0.35;

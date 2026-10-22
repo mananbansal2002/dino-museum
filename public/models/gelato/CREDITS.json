@@ -1,0 +1,12 @@
+{
+  "source": "Poly Haven (https://polyhaven.com) — all assets CC0 1.0 Universal (public domain, no attribution required; credited anyway).",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "processing": "Official 1k glTF downloads (.gltf + .bin + JPEG textures), geometry untouched. JPEG textures over 200 KB re-encoded at 1024px, quality 62 (macOS sips) to keep each model under 2 MB. No Draco/meshopt/KTX2/WebP. Used by public/js/gelato.js.",
+  "assets": [
+    { "file": "bar_chair_round_01/bar_chair_round_01.gltf", "asset": "Bar Chair Round 01", "id": "bar_chair_round_01", "authors": ["Dairon Sanchez"], "url": "https://polyhaven.com/a/bar_chair_round_01", "license": "CC0-1.0", "modified": "textures re-encoded" },
+    { "file": "CashRegister_01/CashRegister_01.gltf", "asset": "Cash Register 01", "id": "CashRegister_01", "authors": ["Joe Seabuhr"], "url": "https://polyhaven.com/a/CashRegister_01", "license": "CC0-1.0" },
+    { "file": "hanging_industrial_lamp/hanging_industrial_lamp.gltf", "asset": "Hanging Industrial Lamp", "id": "hanging_industrial_lamp", "authors": ["Kuutti Siitonen"], "url": "https://polyhaven.com/a/hanging_industrial_lamp", "license": "CC0-1.0", "modified": "textures re-encoded; transmissive glass swapped for a cheap transparent material at runtime" }
+  ],
+  "procedural": "Everything else in the gelateria (display freezer, pans, gelato, cones, cups, dispensers, menu board, signage) is generated in code by gelato.js — no external assets."
+}
