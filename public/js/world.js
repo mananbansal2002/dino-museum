@@ -185,13 +185,29 @@ export function resolveCollision(x, z, radius, prevX, prevZ) {
       if (!isSolid(c, r + 1) && !passable(c, r, c, r + 1)) slabZ(maxZ, minX, maxX);
     }
   }
-  // roped-off plinths
-  for (const o of OBSTACLES) {
-    if (x < o.minX - radius || x > o.maxX + radius || z < o.minZ - radius || z > o.maxZ + radius) continue;
-    const p = pushOutOfBox(x, z, radius, o.minX, o.maxX, o.minZ, o.maxZ);
-    if (p) [x, z] = p;
+  // roped-off plinths and the furniture
+  for (const list of [OBSTACLES, PROP_OBSTACLES]) {
+    for (const o of list) {
+      if (x < o.minX - radius || x > o.maxX + radius || z < o.minZ - radius || z > o.maxZ + radius) continue;
+      const p = Number.isFinite(o.r)
+        ? pushOutOfCircle(x, z, radius, o.x, o.z, o.r)
+        : pushOutOfBox(x, z, radius, o.minX, o.maxX, o.minZ, o.maxZ);
+      if (p) [x, z] = p;
+    }
   }
   return [x, z];
+}
+
+function pushOutOfCircle(x, z, radius, cx, cz, r) {
+  const dx = x - cx;
+  const dz = z - cz;
+  const min = r + radius;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= min * min) return null;
+  const d = Math.sqrt(d2);
+  // dead centre: leave towards +z (any way out is as good as another)
+  if (d < 1e-6) return [x, cz + min];
+  return [cx + (dx / d) * min, cz + (dz / d) * min];
 }
 
 /**
@@ -229,6 +245,49 @@ export function buildWallData() {
     }
   }
   return walls;
+}
+
+/** Doorway signs: 0.85 m tall planes drawn from 110 px tall canvases. */
+const SIGN_H = 0.85;
+const SIGN_H_PX = 110;
+
+let measureCtx = null;
+/** Largest font size (<= size, >= 60% of it) at which makeTextTexture's text fits maxW px. */
+function fitFontSize(text, size, maxW) {
+  measureCtx = measureCtx || makeCanvas(8, 8).getContext("2d");
+  const min = Math.ceil(size * 0.6);
+  let fs = size;
+  for (; fs > min; fs -= 2) {
+    measureCtx.font = `600 ${fs}px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+    // makeTextTexture adds 1px letter spacing
+    if (measureCtx.measureText(text).width + text.length <= maxW) break;
+  }
+  return fs;
+}
+
+/**
+ * A 1 x 1 picture with a front face at z = +gap looking along +z and a back
+ * face at z = -gap looking along -z, both reading left-to-right (the back is
+ * not mirrored). One draw call for both sides of a panel.
+ */
+function twoSidedPlane(gap) {
+  const front = new THREE.PlaneGeometry(1, 1).translate(0, 0, gap);
+  const back = new THREE.PlaneGeometry(1, 1).rotateY(Math.PI).translate(0, 0, -gap);
+  const geo = new THREE.BufferGeometry();
+  for (const name of ["position", "normal", "uv"]) {
+    const a = front.getAttribute(name);
+    const b = back.getAttribute(name);
+    const arr = new Float32Array(a.array.length + b.array.length);
+    arr.set(a.array, 0);
+    arr.set(b.array, a.array.length);
+    geo.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize));
+  }
+  const n = front.getAttribute("position").count;
+  const index = [...front.getIndex().array, ...[...back.getIndex().array].map((v) => v + n)];
+  geo.setIndex(index);
+  front.dispose();
+  back.dispose();
+  return geo;
 }
 
 function radialTexture(inner, outer) {
@@ -403,9 +462,14 @@ export const BENCHES = [
 /** Depth of a panel's plinth (front to back). */
 export const PANEL_DEPTH = 0.9;
 
-/** Image panel width: bigger animals get bigger pictures (1.8 m .. 4.5 m). */
+/**
+ * Image panel width: bigger animals get bigger pictures (1.8 m .. 4.5 m).
+ * Lengths are free text ("8.5–9.7 m", "~9.5 m", "up to 7 m wingspan"): the
+ * first number in the string is the length, 4 m when there is none.
+ */
 export function panelWidth(spec) {
-  const len = parseFloat(spec?.info?.length) || 4;
+  const m = /(\d+(?:\.\d+)?)/.exec(String(spec?.info?.length ?? ""));
+  const len = m ? parseFloat(m[1]) : 4;
   return Math.max(1.8, Math.min(4.5, 1.5 + len * 0.15));
 }
 
@@ -450,6 +514,105 @@ export const OBSTACLES = EXHIBIT_PANELS.map((p) => ({
   minZ: p.minZ,
   maxZ: p.maxZ,
 }));
+
+/* ------------------------------------------------------------------ */
+/* furniture                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Where the solid furniture stands. buildWorld draws it from these numbers
+ * and PROP_OBSTACLES turns the same numbers into colliders, so the two can
+ * never drift apart. Boxes are w (x) by d (z); round things have a radius r.
+ */
+export const PROPS = {
+  desk: { x: -16, z: 52, w: 8, d: 2.2 }, // atrium information desk
+  puzzle: { x: -78, z: 34, w: 5.5, d: 3.2 }, // bone assembly table
+  console: { x: 0, z: -51.6, w: 2.2, d: 1 }, // battle projection console
+  counter: { x: COURT.stallX, z: COURT.stallZ, w: 11.4, d: 3 }, // ice cream counter (with its top)
+  volcano: { x: 54, z: 36, r: 4.6 }, // cone base
+  pillar: { x: -16, z: 8, r: 1.45 }, // timeline pillar (bottom radius)
+  statue: { x: 62, z: 60, r: 1.2 }, // ice cream cone statue
+};
+
+/** Free-standing atrium benches: { x, z, ry }, not sittable. */
+export const ATRIUM_BENCHES = [
+  { x: -6, z: 38, ry: 0 },
+  { x: 6, z: 38, ry: Math.PI },
+  { x: -26, z: 50, ry: Math.PI / 2 },
+];
+
+/** Potted plants: [x, z]. */
+export const PLANTERS = [
+  [-30, 44], [30, 44], [-36, 50], [36, 50], // atrium
+  [52, 52], [86, 81], [52, 66], // ice cream court
+];
+
+/** Café tables in the ice cream court: [x, z]. */
+export const CAFE_TABLES = [
+  [76, 58],
+  [80, 66],
+  [56, 70],
+  [72, 66],
+];
+
+const BENCH_LEN = 3.2;
+const BENCH_DEPTH = 0.9;
+
+/**
+ * A bench's collision box. Its back is at local -z and a visitor sits facing
+ * local +z. On a sittable bench the front of the seat stays free, so a
+ * visitor can step right up to the seat spot (seat radius 0.9) to sit down;
+ * the backrest and the rest of the seat still block. Benches only ever turn
+ * in 90° steps, so the box stays axis-aligned.
+ */
+function benchBox(b, sittable) {
+  const back = -BENCH_DEPTH / 2 - 0.01;
+  const front = sittable ? -0.05 : BENCH_DEPTH / 2;
+  const s = Math.round(Math.sin(b.ry));
+  const c = Math.round(Math.cos(b.ry));
+  // local (lx, lz) -> world (x + lx*c + lz*s, z - lx*s + lz*c)
+  const xs = [];
+  const zs = [];
+  for (const lx of [-BENCH_LEN / 2, BENCH_LEN / 2]) {
+    for (const lz of [back, front]) {
+      xs.push(b.x + lx * c + lz * s);
+      zs.push(b.z - lx * s + lz * c);
+    }
+  }
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) };
+}
+
+function circleObstacle(id, x, z, r) {
+  return { id, x, z, r, minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r };
+}
+
+function boxObstacle(id, { x, z, w, d }) {
+  return { id, minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 };
+}
+
+/**
+ * Colliders of the furniture: desks, tables, the counter, the volcano, the
+ * timeline pillar, benches, planters... Kept apart from OBSTACLES (which
+ * other modules treat as exhibit plinths) but resolveCollision checks both.
+ * An entry with r is a circle around (x, z); minX..maxZ is then its bounding
+ * box. Theatre seats are left out on purpose: the rows stay walkable.
+ */
+export const PROP_OBSTACLES = [
+  // the desk's back is 0.9 m off the atrium's south wall, too narrow for a
+  // visitor: the collider runs on to the wall so nobody gets wedged in there
+  { ...boxObstacle("prop:desk", PROPS.desk), maxZ: g2z(roomAt(PROPS.desk.x, PROPS.desk.z).rows[1]) + CELL / 2 - WALL_HALF },
+  boxObstacle("prop:puzzle", PROPS.puzzle),
+  boxObstacle("prop:console", PROPS.console),
+  boxObstacle("prop:counter", PROPS.counter),
+  // the cone narrows quickly: collide with its girth at knee height
+  circleObstacle("prop:volcano", PROPS.volcano.x, PROPS.volcano.z, PROPS.volcano.r * (1 - 0.5 / 5.8)),
+  circleObstacle("prop:pillar", PROPS.pillar.x, PROPS.pillar.z, PROPS.pillar.r),
+  circleObstacle("prop:statue", PROPS.statue.x, PROPS.statue.z, PROPS.statue.r),
+  ...CAFE_TABLES.map(([x, z], i) => circleObstacle(`prop:table-${i + 1}`, x, z, 1.3)),
+  ...PLANTERS.map(([x, z], i) => circleObstacle(`prop:planter-${i + 1}`, x, z, 0.7)),
+  ...ATRIUM_BENCHES.map((b, i) => ({ id: `prop:bench-atrium-${i + 1}`, ...benchBox(b, false) })),
+  ...BENCHES.map((b) => ({ id: `prop:bench-${b.id}`, ...benchBox(b, true) })),
+];
 
 /**
  * Free floor in front of (or behind) each panel where main.js may stand a 3D
@@ -533,7 +696,43 @@ const ERA_WINDOW_H = 4.4;
 
 function insideObstacle(x, z, margin = 0) {
   const hit = (o) => x > o.minX - margin && x < o.maxX + margin && z > o.minZ - margin && z < o.maxZ + margin;
-  return OBSTACLES.some(hit) || DISPLAYS.some((d) => hit(d.bounds));
+  return OBSTACLES.some(hit) || PROP_OBSTACLES.some(hit) || DISPLAYS.some((d) => hit(d.bounds));
+}
+
+/**
+ * Where an exhibit's information placard stands: the first of a few spots
+ * around the panel that is on walkable floor and clear of plinths, displays
+ * and furniture. `ry` is the panel's facing. Candidates sit beside the panel
+ * on its front (else its back) and are turned relative to the panel, toed in
+ * by 0.6 rad so a visitor standing in front of the panel reads the placard
+ * face on. Returns { px, pz, rot, back } with rot the placard's world
+ * rotation.y (a PlaneGeometry faces +z, so its normal is (sin rot, cos rot))
+ * and back = true when it stands behind the panel.
+ */
+export function placardSpot(spot) {
+  const ry = spot.ry || 0;
+  const fx = Math.sin(ry);
+  const fz = Math.cos(ry);
+  const rx = Math.cos(ry);
+  const rz = -Math.sin(ry);
+  const reach = (spot.pedestal || 0) / 2 + 1.7;
+  // turning by +a swings the placard's normal towards the panel's right
+  const candidates = [
+    [fx * 2.6 + rx * reach, fz * 2.6 + rz * reach, ry - 0.6, false],
+    [fx * 2.6 - rx * reach, fz * 2.6 - rz * reach, ry + 0.6, false],
+    [fx * (reach + 1.4), fz * (reach + 1.4), ry, false],
+    [-fx * 2.6 + rx * reach, -fz * 2.6 + rz * reach, ry + Math.PI + 0.6, true],
+    [-fx * 2.6 - rx * reach, -fz * 2.6 - rz * reach, ry + Math.PI - 0.6, true],
+  ];
+  for (const [ox, oz, rot, back] of candidates) {
+    const px = spot.x + ox;
+    const pz = spot.z + oz;
+    const clear =
+      roomAt(px, pz) && roomAt(px + 1, pz) && roomAt(px - 1, pz) &&
+      roomAt(px, pz + 1) && roomAt(px, pz - 1) && !insideObstacle(px, pz, 0.8);
+    if (clear) return { px, pz, rot, back };
+  }
+  return { px: spot.x, pz: spot.z, rot: ry, back: false };
 }
 
 function benchSeats(b) {
@@ -544,6 +743,10 @@ function benchSeats(b) {
     ry: b.ry,
   }));
 }
+
+/** How far in front of its panel an exhibit's interaction point is, and its reach. */
+const EXHIBIT_POINT_AHEAD = 3;
+const EXHIBIT_POINT_RADIUS = 5;
 
 export function buildInteractables() {
   const list = [];
@@ -575,15 +778,18 @@ export function buildInteractables() {
       });
     }
   }
-  for (const spot of PLACEMENTS) {
-    const spec = SPECIES[spot.id];
+  // The point sits on the floor in front of the picture, not on the plinth:
+  // whoever stands in front of a panel is always nearest to that panel's
+  // point, even when the next panel is only 6 m away or right behind them.
+  for (const p of EXHIBIT_PANELS) {
+    const spec = SPECIES[p.id];
     if (!spec) continue;
     list.push({
       id: `exhibit:${spec.id}`,
       type: "exhibit",
-      x: spot.x,
-      z: spot.z,
-      radius: 8,
+      x: p.x + Math.sin(p.face) * EXHIBIT_POINT_AHEAD,
+      z: p.z + Math.cos(p.face) * EXHIBIT_POINT_AHEAD,
+      radius: EXHIBIT_POINT_RADIUS,
       label: `Examine ${spec.name}`,
       key: "E",
       exhibitId: spec.id,
@@ -710,7 +916,6 @@ export function buildWorld(scene) {
   scene.add(group);
 
   const interactables = buildInteractables();
-  const dinos = []; // exhibits are image panels now; kept for main.js compatibility
   const animated = [];
 
   // ---------------- floors & ceilings ----------------
@@ -807,22 +1012,25 @@ export function buildWorld(scene) {
   scene.add(sun);
   scene.add(sun.target);
 
+  // Real point lights are expensive: three.js does no light culling, so every
+  // lit fragment in the museum loops over every point light. Each hall gets
+  // one (two in the big halls, spread along the long side); passages get
+  // none and are lit by their neighbours, the hemisphere/ambient fill and
+  // their emissive ceiling fixtures. That keeps the scene under 20 lights.
+  const fixtureGeo = new THREE.CylinderGeometry(0.55, 0.72, 0.22, 12);
+  const fixtureMats = new Map(); // accent -> material
   for (const room of ROOMS) {
     const w = (room.cols[1] - room.cols[0] + 1) * CELL;
     const d = (room.rows[1] - room.rows[0] + 1) * CELL;
     const cx = (g2w(room.cols[0]) + g2w(room.cols[1])) / 2;
     const cz = (g2z(room.rows[0]) + g2z(room.rows[1])) / 2;
-    const lights = Math.max(1, Math.min(6, Math.round((w * d) / 420)));
-    for (let i = 0; i < lights; i++) {
-      const lx = cx + (i % 2 === 0 ? -1 : 1) * w * 0.26;
-      const lz = cz + (i < 2 ? -d * 0.26 : d * 0.26);
-      // mostly warm museum white with a hint of the hall's accent colour
-      const tint = new THREE.Color(room.accent).lerp(new THREE.Color(0xffe2bd), 0.65);
-      const pl = new THREE.PointLight(tint, 110, Math.max(w, d) * 0.95, 2);
-      pl.position.set(lx, room.h - 1.8, lz);
-      group.add(pl);
-      const fix = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.55, 0.72, 0.22, 12),
+    const hall = room.h > 6;
+    const lights = hall && w * d >= 1000 ? 2 : 1;
+    // mostly warm museum white with a hint of the hall's accent colour
+    const tint = new THREE.Color(room.accent).lerp(new THREE.Color(0xffe2bd), 0.65);
+    if (!fixtureMats.has(room.accent)) {
+      fixtureMats.set(
+        room.accent,
         new THREE.MeshStandardMaterial({
           color: 0x1b1f24,
           emissive: new THREE.Color(room.accent),
@@ -830,6 +1038,19 @@ export function buildWorld(scene) {
           roughness: 0.5,
         })
       );
+    }
+    for (let i = 0; i < lights; i++) {
+      // one light: the middle; two: a quarter of the way in from each end
+      const t = lights === 1 ? 0 : i === 0 ? -0.25 : 0.25;
+      const lx = cx + (w >= d ? w * t : 0);
+      const lz = cz + (w >= d ? 0 : d * t);
+      if (hall) {
+        // fewer lights than before, so each one carries a bit more
+        const pl = new THREE.PointLight(tint, 160, Math.max(w, d) * 0.95, 2);
+        pl.position.set(lx, room.h - 1.8, lz);
+        group.add(pl);
+      }
+      const fix = new THREE.Mesh(fixtureGeo, fixtureMats.get(room.accent));
       fix.position.set(lx, room.h - 0.25, lz);
       group.add(fix);
       tag(fix, "emissive");
@@ -915,13 +1136,16 @@ export function buildWorld(scene) {
         [d.b, d.a, 1],
       ]) {
         const text = destName(to, from).toUpperCase();
+        // the canvas has the plane's aspect (110 px per 0.85 m both ways), so
+        // a narrow one-cell doorway gets a narrower canvas, not squashed text
+        const canvasW = Math.round((SIGN_H_PX * width) / SIGN_H);
         const sign = new THREE.Mesh(
-          new THREE.PlaneGeometry(width, 0.85),
+          new THREE.PlaneGeometry(width, SIGN_H),
           new THREE.MeshBasicMaterial({
             map: makeTextTexture(text, {
-              width: 1024,
-              height: 110,
-              fontSize: text.length > 24 ? 44 : 60,
+              width: canvasW,
+              height: SIGN_H_PX,
+              fontSize: fitFontSize(text, text.length > 24 ? 44 : 60, canvasW - 48),
               color: `#${new THREE.Color(to.accent).getHexString()}`,
               bg: "#0d1217",
             }),
@@ -949,12 +1173,14 @@ export function buildWorld(scene) {
     metalness: 0.85,
   });
 
-  function addPlacard(x, y, z, ry, title, sub) {
+  /** A placard on a brass post. withPost = false when the caller instances the posts itself. */
+  function addPlacard(x, y, z, ry, title, sub, withPost = true) {
     const p = makePlacard(title, sub);
     p.position.set(x, y, z);
     p.rotation.y = ry;
     group.add(p);
     tag(p, "skip");
+    if (!withPost) return p;
     const post = new THREE.Mesh(
       new THREE.CylinderGeometry(0.07, 0.07, Math.max(0.2, y - 0.5), 8),
       brassMat
@@ -1009,35 +1235,6 @@ export function buildWorld(scene) {
     }
   }
 
-  // ---------------- mounted skeletons ----------------
-  // The information placard always ends up on walkable floor: we try the
-  // spots around the mount and keep the first one that is inside the hall.
-  function placardSpot(spot) {
-    const ry = spot.ry || 0;
-    const fx = Math.sin(ry);
-    const fz = Math.cos(ry);
-    const rx = Math.cos(ry);
-    const rz = -Math.sin(ry);
-    const reach = (spot.pedestal || 0) / 2 + 1.7;
-    const candidates = [
-      [fx * 2.6 + rx * reach, fz * 2.6 + rz * reach, 0.6],
-      [fx * 2.6 - rx * reach, fz * 2.6 - rz * reach, -0.6],
-      [fx * (reach + 1.4), fz * (reach + 1.4), 0],
-      [-fx * 2.6 + rx * reach, -fz * 2.6 + rz * reach, Math.PI - 0.6],
-      [-fx * 2.6 - rx * reach, -fz * 2.6 - rz * reach, Math.PI + 0.6],
-      [0, 0, 0],
-    ];
-    for (const [ox, oz, rot] of candidates) {
-      const px = spot.x + ox;
-      const pz = spot.z + oz;
-      const clear =
-        roomAt(px, pz) && roomAt(px + 1, pz) && roomAt(px - 1, pz) &&
-        roomAt(px, pz + 1) && roomAt(px, pz - 1) && !insideObstacle(px, pz, 0.8);
-      if (clear) return { px, pz, rot };
-    }
-    return { px: spot.x, pz: spot.z, rot: 0 };
-  }
-
   const exhibits = [];
   const spotPoolGeo = new THREE.CircleGeometry(1, 28);
   const spotPoolMat = new THREE.MeshBasicMaterial({
@@ -1065,7 +1262,6 @@ export function buildWorld(scene) {
   // A framed, double-sided photo / painting of every species on a plinth.
   // The picture is /images/species/<id>.jpg; until it arrives (or if it is
   // missing) a name card is shown instead.
-  const unitPlane = new THREE.PlaneGeometry(1, 1);
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2118, roughness: 0.55, metalness: 0.25 });
   const plinthMat = new THREE.MeshStandardMaterial({ color: 0x2b2f35, roughness: 0.8 });
@@ -1073,6 +1269,42 @@ export function buildWorld(scene) {
   const PANEL_BOTTOM = DISPLAY_PANEL_BOTTOM;
   const PANEL_MAX_H = 3.4;
   const captions = [];
+
+  // Draw calls: the parts every panel shares (plinth, brass trim, frame,
+  // backboard, placard post, light pool and beam) are one InstancedMesh
+  // each for all 53 panels; the picture and the caption plate are one mesh
+  // each with a front and a back face. Instance i of a part belongs to
+  // EXHIBIT_PANELS[i] (frame/backboard: 2i and 2i+1).
+  const nPanels = EXHIBIT_PANELS.length;
+  const instanced = (geo, mat, count, surface, extra) => {
+    const m = new THREE.InstancedMesh(geo, mat, count);
+    m.count = 0;
+    group.add(m);
+    tag(m, surface, extra);
+    return m;
+  };
+  const plinths = instanced(unitBox, plinthMat, nPanels, "plinth");
+  plinths.castShadow = true;
+  plinths.receiveShadow = true;
+  const trims = instanced(unitBox, brassMat, nPanels, "metal", { metal: "brass" });
+  const frames = instanced(unitBox, frameMat, nPanels * 2, "wood");
+  const postGeo = new THREE.CylinderGeometry(0.07, 0.07, 1, 8);
+  const posts = instanced(postGeo, brassMat, nPanels, "metal", { metal: "brass" });
+  const pools = instanced(spotPoolGeo, spotPoolMat, nPanels, "skip");
+  const beams = instanced(spotBeamGeo, spotBeamMat, nPanels, "skip");
+  const imageGeo = twoSidedPlane(0.052);
+  const captionGeo = twoSidedPlane(0.055);
+  const partMatrix = new THREE.Matrix4();
+  const partLocal = new THREE.Matrix4();
+  const IDENTITY = new THREE.Matrix4(); // parts placed straight in world space
+  /** Instance matrix: the panel's transform x a part offset (x, y, z) and scale. */
+  const setPart = (mesh, i, base, x, y, z, sx, sy, sz) => {
+    partLocal.makeScale(sx, sy, sz).setPosition(x, y, z);
+    mesh.setMatrixAt(i, partMatrix.multiplyMatrices(base, partLocal));
+    mesh.count = Math.max(mesh.count, i + 1);
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.boundingSphere = null; // recomputed (lazily) from the instances
+  };
 
   function placeholderTexture(spec, accent) {
     const c = makeCanvas(768, 512);
@@ -1122,42 +1354,28 @@ export function buildWorld(scene) {
     caption.tex.needsUpdate = true;
   }
 
+  const spotDummy = new THREE.Object3D();
+  let k = 0; // instance index of the next panel
   for (const panel of EXHIBIT_PANELS) {
     const spec = SPECIES[panel.id];
     if (!spec) continue;
+    const i = k++;
     const room = roomAt(panel.x, panel.z);
     const accent = `#${new THREE.Color(room ? room.accent : 0xffc857).getHexString()}`;
     const g = new THREE.Group();
     g.position.set(panel.x, 0, panel.z);
     g.rotation.y = panel.face;
+    g.updateMatrix();
     group.add(g);
+    const base = g.matrix;
 
-    const plinth = new THREE.Mesh(unitBox, plinthMat);
-    plinth.scale.set(panel.w + 0.3, 0.8, PANEL_DEPTH);
-    plinth.position.y = 0.4;
-    plinth.castShadow = true;
-    plinth.receiveShadow = true;
-    g.add(plinth);
-    tag(plinth, "plinth");
-    const brass = new THREE.Mesh(unitBox, brassMat);
-    brass.scale.set(panel.w + 0.4, 0.06, PANEL_DEPTH + 0.1);
-    brass.position.y = 0.8;
-    g.add(brass);
-    tag(brass, "metal", { metal: "brass" });
+    setPart(plinths, i, base, 0, 0.4, 0, panel.w + 0.3, 0.8, PANEL_DEPTH);
+    setPart(trims, i, base, 0, 0.8, 0, panel.w + 0.4, 0.06, PANEL_DEPTH + 0.1);
 
     const imageMat = new THREE.MeshBasicMaterial({ map: placeholderTexture(spec, accent) });
-    const frame = new THREE.Mesh(unitBox, frameMat);
-    const front = new THREE.Mesh(unitPlane, imageMat);
-    const back = new THREE.Mesh(unitPlane, imageMat);
-    back.rotation.y = Math.PI;
-    g.add(frame, front, back);
-    tag(frame, "wood");
-    tag(front, "image");
-    tag(back, "image");
-    // backboard lifting the picture above a fossil model standing in front
-    const backboard = new THREE.Mesh(unitBox, frameMat);
-    g.add(backboard);
-    tag(backboard, "wood");
+    const picture = new THREE.Mesh(imageGeo, imageMat);
+    g.add(picture);
+    tag(picture, "image");
 
     const layout = (aspect) => {
       let w = panel.w;
@@ -1167,14 +1385,11 @@ export function buildWorld(scene) {
         w = h * aspect;
       }
       const y = PANEL_BOTTOM + h / 2;
-      frame.scale.set(w + 0.22, h + 0.22, 0.1);
-      frame.position.y = y;
-      front.scale.set(w, h, 1);
-      front.position.set(0, y, 0.052);
-      back.scale.set(w, h, 1);
-      back.position.set(0, y, -0.052);
-      backboard.scale.set(w + 0.22, PANEL_BOTTOM - 0.8 + 0.05, 0.09);
-      backboard.position.set(0, 0.8 + (PANEL_BOTTOM - 0.8) / 2, 0);
+      setPart(frames, 2 * i, base, 0, y, 0, w + 0.22, h + 0.22, 0.1);
+      // backboard lifting the picture above a fossil model standing in front
+      setPart(frames, 2 * i + 1, base, 0, 0.8 + (PANEL_BOTTOM - 0.8) / 2, 0, w + 0.22, PANEL_BOTTOM - 0.8 + 0.05, 0.09);
+      picture.scale.set(w, h, 1);
+      picture.position.set(0, y, 0);
       entry.y = PANEL_BOTTOM + h + 0.11;
       entry.width = w;
       entry.height = h;
@@ -1189,20 +1404,18 @@ export function buildWorld(scene) {
     drawCaption(caption);
     captions.push(caption);
     // caption plate on the backboard, just under the picture (above any
-    // model up to DISPLAY_MAX_H standing in front)
+    // model up to DISPLAY_MAX_H standing in front), front and back
     const capW = Math.min(panel.w, 2.4);
-    const capMat = new THREE.MeshBasicMaterial({ map: capTex });
-    for (const side of [1, -1]) {
-      const cap = new THREE.Mesh(unitPlane, capMat);
-      cap.scale.set(capW, capW * (220 / 1024), 1);
-      cap.position.set(0, PANEL_BOTTOM - 0.33, side * 0.055);
-      if (side < 0) cap.rotation.y = Math.PI;
-      g.add(cap);
-      tag(cap, "skip");
-    }
+    const cap = new THREE.Mesh(captionGeo, new THREE.MeshBasicMaterial({ map: capTex }));
+    cap.scale.set(capW, capW * (220 / 1024), 1);
+    cap.position.set(0, PANEL_BOTTOM - 0.33, 0);
+    g.add(cap);
+    tag(cap, "skip");
 
     const { px, pz, rot } = placardSpot({ x: panel.x, z: panel.z, ry: panel.face, pedestal: panel.w });
-    const placard = addPlacard(px, 1.5, pz, rot, spec.name, spec.info.era);
+    const placard = addPlacard(px, 1.5, pz, rot, spec.name, spec.info.era, false);
+    // post: from the floor to 0.5 m under the placard's centre (as addPlacard does)
+    setPart(posts, i, IDENTITY, px, 0.5, pz, 1, 1.0, 1);
 
     const entry = {
       id: spec.id,
@@ -1250,23 +1463,22 @@ export function buildWorld(scene) {
     // real lights (swiftshader stays fast).
     const ceiling = room ? room.h : 10;
     const reach = Math.max(2.4, panel.w * 0.75);
-    const pool = new THREE.Mesh(spotPoolGeo, spotPoolMat);
-    pool.scale.set(reach, reach, 1);
-    pool.rotation.x = -Math.PI / 2;
-    pool.position.set(panel.x, 0.03, panel.z);
-    group.add(pool);
-    tag(pool, "skip");
+    spotDummy.position.set(panel.x, 0.03, panel.z);
+    spotDummy.rotation.set(-Math.PI / 2, 0, 0);
+    spotDummy.scale.set(reach, reach, 1);
+    spotDummy.updateMatrix();
+    pools.setMatrixAt(i, spotDummy.matrix);
+    pools.count = i + 1;
     const beamH = ceiling - 0.4;
-    const beam = new THREE.Mesh(spotBeamGeo, spotBeamMat);
-    beam.scale.set(reach, beamH, reach);
-    beam.position.set(panel.x, beamH / 2, panel.z);
-    group.add(beam);
-    tag(beam, "skip");
+    setPart(beams, i, IDENTITY, panel.x, beamH / 2, panel.z, reach, beamH, reach);
+    // the fixture stays a mesh of its own: the lookdev pass gives every
+    // ceiling fixture a housing and lens, and it skips instanced meshes
     const fixture = new THREE.Mesh(spotFixtureGeo, spotFixtureMat);
     fixture.position.set(panel.x, ceiling - 0.2, panel.z);
     group.add(fixture);
     tag(fixture, "emissive");
   }
+  pools.instanceMatrix.needsUpdate = true;
 
   // image credits, fetched once
   if (typeof fetch === "function") {
@@ -1433,10 +1645,10 @@ export function buildWorld(scene) {
 
   // projection console by the entrance (the "battle" interactable)
   const console_ = new THREE.Mesh(
-    new THREE.BoxGeometry(2.2, 1.1, 1),
+    new THREE.BoxGeometry(PROPS.console.w, 1.1, PROPS.console.d),
     new THREE.MeshStandardMaterial({ color: 0x20262e, roughness: 0.6, metalness: 0.4 })
   );
-  console_.position.set(0, 0.55, -51.6);
+  console_.position.set(PROPS.console.x, 0.55, PROPS.console.z);
   group.add(console_);
   tag(console_, "plinth");
   const consoleTop = new THREE.Mesh(
@@ -1452,8 +1664,8 @@ export function buildWorld(scene) {
 
 
   // ---------------- atrium ----------------
-  const desk = new THREE.Mesh(new THREE.BoxGeometry(8, 1.1, 2.2), pedestalMat);
-  desk.position.set(-16, 0.55, 52);
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(PROPS.desk.w, 1.1, PROPS.desk.d), pedestalMat);
+  desk.position.set(PROPS.desk.x, 0.55, PROPS.desk.z);
   desk.castShadow = true;
   group.add(desk);
   tag(desk, "plinth");
@@ -1477,19 +1689,11 @@ export function buildWorld(scene) {
   group.add(backdrop);
   tag(backdrop, "skip");
 
-  for (const [x, z, ry] of [
-    [-6, 38, 0],
-    [6, 38, Math.PI],
-    [-26, 50, Math.PI / 2],
-  ]) {
-    addBench(x, z, ry);
-  }
+  for (const b of ATRIUM_BENCHES) addBench(b.x, b.z, b.ry);
   // benches in front of the big centrepieces (each holds two "seat" spots)
   for (const b of BENCHES) addBench(b.x, b.z, b.ry);
-  addPlanter(-30, 44);
-  addPlanter(30, 44);
-  addPlanter(-36, 50);
-  addPlanter(36, 50);
+  // potted plants (the atrium's and the ice cream court's)
+  for (const [x, z] of PLANTERS) addPlanter(x, z);
 
   // ---------------- triassic extras ----------------
   const pit = new THREE.Mesh(
@@ -1511,8 +1715,8 @@ export function buildWorld(scene) {
     tag(bone, "skip");
   }
 
-  const table = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.25, 3.2), pedestalMat);
-  table.position.set(-78, 1.0, 34);
+  const table = new THREE.Mesh(new THREE.BoxGeometry(PROPS.puzzle.w, 0.25, PROPS.puzzle.d), pedestalMat);
+  table.position.set(PROPS.puzzle.x, 1.0, PROPS.puzzle.z);
   group.add(table);
   tag(table, "plinth");
   for (const sx of [-2.3, 2.3]) {
@@ -1535,10 +1739,10 @@ export function buildWorld(scene) {
 
   // ---------------- jurassic volcano diorama ----------------
   const volcano = new THREE.Mesh(
-    new THREE.ConeGeometry(4.6, 5.8, 16),
+    new THREE.ConeGeometry(PROPS.volcano.r, 5.8, 16),
     new THREE.MeshStandardMaterial({ color: 0x3b2b22, roughness: 1 })
   );
-  volcano.position.set(54, 2.9, 36);
+  volcano.position.set(PROPS.volcano.x, 2.9, PROPS.volcano.z);
   volcano.castShadow = true;
   group.add(volcano);
   tag(volcano, "skip");
@@ -1552,7 +1756,7 @@ export function buildWorld(scene) {
     })
   );
   lava.rotation.x = -Math.PI / 2;
-  lava.position.set(54, 5.6, 36);
+  lava.position.set(PROPS.volcano.x, 5.6, PROPS.volcano.z);
   group.add(lava);
   tag(lava, "emissive");
   animated.push({ type: "lava", mesh: lava, base: 2.2 });
@@ -1680,7 +1884,7 @@ export function buildWorld(scene) {
     new THREE.ConeGeometry(1.7, 3.8, 20),
     new THREE.MeshStandardMaterial({ color: 0xd9a05b, roughness: 0.85 })
   );
-  statueCone.position.set(62, 1.9, 60);
+  statueCone.position.set(PROPS.statue.x, 1.9, PROPS.statue.z);
   statueCone.rotation.x = Math.PI;
   statueCone.castShadow = true;
   group.add(statueCone);
@@ -1689,17 +1893,12 @@ export function buildWorld(scene) {
     new THREE.SphereGeometry(1.8, 20, 14),
     new THREE.MeshStandardMaterial({ color: 0xff9aa2, roughness: 0.7 })
   );
-  scoop.position.set(62, 4.6, 60);
+  scoop.position.set(PROPS.statue.x, 4.6, PROPS.statue.z);
   scoop.castShadow = true;
   group.add(scoop);
   tag(scoop, "skip");
 
-  for (const [x, z] of [
-    [76, 58],
-    [80, 66],
-    [56, 70],
-    [72, 66],
-  ]) {
+  for (const [x, z] of CAFE_TABLES) {
     const t = new THREE.Mesh(
       new THREE.CylinderGeometry(1.3, 1.3, 0.12, 18),
       new THREE.MeshStandardMaterial({ color: 0xe8e3d5, roughness: 0.7 })
@@ -1726,9 +1925,6 @@ export function buildWorld(scene) {
     group.add(stick);
     tag(stick, "metal", { metal: "steel" });
   }
-  addPlanter(52, 52);
-  addPlanter(86, 81);
-  addPlanter(52, 66);
 
   // string lights criss-crossing the court
   const bulbColors = [0xff8fab, 0xffe066, 0x7ee081, 0x7ad7f0];
@@ -1775,32 +1971,76 @@ export function buildWorld(scene) {
   tag(doorSign, "skip");
 
   // ---------------- timeline pillar ----------------
-  const pillar = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.2, 1.45, 4.8, 20),
-    new THREE.MeshStandardMaterial({ color: 0x353b44, roughness: 0.8 })
-  );
-  pillar.position.set(-16, 2.4, 8);
-  pillar.castShadow = true;
-  group.add(pillar);
-  tag(pillar, "plinth");
-  const eraPlane = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.26, 1.26, 4.4, 20, 1, true),
-    new THREE.MeshStandardMaterial({
-      map: makeTextTexture("MESOZOIC", {
-        width: 512,
-        height: 1024,
-        fontSize: 64,
-        color: "#ffb703",
-        sub: "TRIASSIC · JURASSIC · CRETACEOUS",
-        subSize: 24,
-      }),
-      side: THREE.DoubleSide,
-      roughness: 0.8,
-    })
-  );
-  eraPlane.position.set(-16, 2.6, 8);
-  group.add(eraPlane);
-  tag(eraPlane, "skip");
+  // A tapered pillar wrapped in a sleeve that follows the taper 2 cm outside
+  // it (so no part of the label sinks into the pillar). The sleeve's canvas
+  // has the aspect of the unrolled sleeve and carries the timeline three
+  // times round, so it reads undistorted from any side.
+  {
+    const P = PROPS.pillar;
+    const H = 4.8;
+    const rBottom = P.r;
+    const rTop = 1.2;
+    const radiusAt = (y) => rBottom + ((rTop - rBottom) * y) / H;
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(rTop, rBottom, H, 20),
+      new THREE.MeshStandardMaterial({ color: 0x353b44, roughness: 0.8 })
+    );
+    pillar.position.set(P.x, H / 2, P.z);
+    pillar.castShadow = true;
+    group.add(pillar);
+    tag(pillar, "plinth");
+
+    const y0 = 0.4;
+    const y1 = H;
+    const sleeveH = y1 - y0;
+    const r0 = radiusAt(y0) + 0.02;
+    const r1 = radiusAt(y1) + 0.02;
+    const around = Math.PI * (r0 + r1); // mean circumference
+    const texH = 1024;
+    const texW = Math.round((texH * around) / sleeveH / 3) * 3;
+    const c = makeCanvas(texW, texH);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#353b44"; // the pillar's own colour: the sleeve is opaque
+    ctx.fillRect(0, 0, texW, texH);
+    const eras = [
+      ["TRIASSIC", "252 – 201 MILLION YEARS AGO", "#e09a4a"],
+      ["JURASSIC", "201 – 145 MILLION YEARS AGO", "#7bc47f"],
+      ["CRETACEOUS", "145 – 66 MILLION YEARS AGO", "#ff8a5c"],
+    ];
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const third = texW / 3;
+    for (let k = 0; k < 3; k++) {
+      const mx = third * (k + 0.5);
+      ctx.fillStyle = "#ffb703";
+      ctx.font = "800 96px Inter, system-ui, sans-serif";
+      ctx.fillText("MESOZOIC", mx, 120);
+      ctx.fillStyle = "rgba(255,246,230,0.75)";
+      ctx.font = "500 30px Inter, system-ui, sans-serif";
+      ctx.fillText("THE AGE OF DINOSAURS", mx, 196);
+      // oldest at the bottom, like rock layers
+      eras.forEach(([name, span, color], i) => {
+        const top = texH - (i + 1) * 250;
+        ctx.fillStyle = color;
+        ctx.fillRect(mx - third * 0.36, top + 30, third * 0.72, 8);
+        ctx.font = "800 64px Inter, system-ui, sans-serif";
+        ctx.fillText(name, mx, top + 110);
+        ctx.fillStyle = "rgba(255,246,230,0.8)";
+        ctx.font = "500 28px Inter, system-ui, sans-serif";
+        ctx.fillText(span, mx, top + 180);
+      });
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const sleeve = new THREE.Mesh(
+      new THREE.CylinderGeometry(r1, r0, sleeveH, 20, 1, true),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })
+    );
+    sleeve.position.set(P.x, y0 + sleeveH / 2, P.z);
+    group.add(sleeve);
+    tag(sleeve, "skip");
+  }
 
   // ---------------- structure ----------------
   const spawn = SPAWN;
@@ -1823,7 +2063,6 @@ export function buildWorld(scene) {
     displays: DISPLAYS.map((d) => ({ ...d, bounds: { ...d.bounds } })),
     eras: ERAS,
     eraWindows: ERA_WINDOWS,
-    dinos,
     animated,
     spawn,
     screen,

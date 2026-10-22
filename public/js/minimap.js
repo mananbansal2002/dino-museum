@@ -3,6 +3,12 @@ import { ROOMS, PLACEMENTS, CELL, GRID_W, GRID_H, g2w, g2z, isSolid, roomAt } fr
 /**
  * Top-down minimap. The static floor plan is rendered once into an offscreen
  * canvas; every frame we blit it and draw the visitors on top.
+ *
+ * All drawing is done in "map units": the canvas's width/height attributes
+ * as written in the page (260 x 240). The backing store is sized to the
+ * canvas's on-screen size times devicePixelRatio, so the map stays sharp on
+ * HiDPI screens and when it is enlarged (the .big class), and one transform
+ * maps map units onto it.
  */
 export function createMinimap(canvas, { exhibits = [], revealAll = false } = {}) {
   const ctx = canvas.getContext("2d");
@@ -12,27 +18,76 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
   const revealed = new Set(revealAll ? ROOMS.map((r) => r.id) : ROOMS.filter((r) => !r.secret).map((r) => r.id));
   const shown = (room) => !!room && revealed.has(room.id);
   const cellShown = (c, r) => !isSolid(c, r) && shown(roomAt(g2w(c), g2z(r)));
-  const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
+
+  // map units (fixed) vs backing-store pixels (follow the on-screen size)
+  const W = canvas.width;
+  const H = canvas.height;
+  let px = 1; // backing-store pixels per map unit
 
   const worldW = GRID_W * CELL;
   const worldH = GRID_H * CELL;
   const base = document.createElement("canvas");
-  base.width = canvas.width * dpr;
-  base.height = canvas.height * dpr;
   const bctx = base.getContext("2d");
-  bctx.scale(dpr, dpr);
 
-  const scale = Math.min(canvas.width / worldW, canvas.height / worldH);
-  const offX = (canvas.width - worldW * scale) / 2;
-  const offY = (canvas.height - worldH * scale) / 2;
+  const scale = Math.min(W / worldW, H / worldH);
+  const offX = (W - worldW * scale) / 2;
+  const offY = (H - worldH * scale) / 2;
 
   const toX = (wx) => offX + (wx + worldW / 2) * scale;
   const toY = (wz) => offY + (wz + worldH / 2) * scale;
 
+  /**
+   * Match the backing store to the on-screen size. Returns true when it
+   * changed (the static layer then has to be redrawn).
+   */
+  function fit() {
+    const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
+    // a hidden canvas (display: none) measures 0: keep drawing at map size
+    const cssW = canvas.clientWidth || W;
+    const next = Math.max(0.5, (cssW * dpr) / W);
+    const bw = Math.round(W * next);
+    const bh = Math.round(H * next);
+    if (canvas.width === bw && canvas.height === bh && base.width === bw) return false;
+    px = next;
+    canvas.width = bw;
+    canvas.height = bh;
+    base.width = bw;
+    base.height = bh;
+    return true;
+  }
+
+  /**
+   * Room label: shrink the 9px type to fit the room, else wrap it onto up to
+   * three lines, else leave the room unlabelled. Never wider than the room,
+   * so it never runs over a wall or off the canvas.
+   */
+  function drawLabel(text, x0, x1, z0, z1) {
+    const maxW = x1 - x0 - 6;
+    const maxH = z1 - z0 - 6;
+    const words = text.split(" ");
+    for (const size of [9, 8, 7]) {
+      bctx.font = `600 ${size}px Inter, system-ui, sans-serif`;
+      const lines = [];
+      for (const word of words) {
+        const last = lines.length ? `${lines[lines.length - 1]} ${word}` : word;
+        if (lines.length && bctx.measureText(last).width <= maxW) lines[lines.length - 1] = last;
+        else lines.push(word);
+      }
+      const lineH = size + 1;
+      if (lines.length > 3 || lines.length * lineH > maxH) continue;
+      if (lines.some((l) => bctx.measureText(l).width > maxW)) continue;
+      const cx = (x0 + x1) / 2;
+      const top = (z0 + z1) / 2 - ((lines.length - 1) * lineH) / 2;
+      lines.forEach((l, i) => bctx.fillText(l, cx, top + i * lineH));
+      return;
+    }
+  }
+
   function drawStatic() {
-    bctx.clearRect(0, 0, canvas.width, canvas.height);
+    bctx.setTransform(px, 0, 0, px, 0, 0);
+    bctx.clearRect(0, 0, W, H);
     bctx.fillStyle = "rgba(6,10,14,0.9)";
-    bctx.fillRect(0, 0, canvas.width, canvas.height);
+    bctx.fillRect(0, 0, W, H);
 
     for (const room of ROOMS) {
       if (!shown(room)) continue;
@@ -48,9 +103,9 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
       bctx.strokeRect(x0 + 0.5, z0 + 0.5, x1 - x0 - 1, z1 - z0 - 1);
       if (x1 - x0 > 46 && z1 - z0 > 22) {
         bctx.fillStyle = hexA(accent, 0.85);
-        bctx.font = "600 9px Inter, system-ui, sans-serif";
         bctx.textAlign = "center";
-        bctx.fillText(room.name.toUpperCase(), (x0 + x1) / 2, (z0 + z1) / 2);
+        bctx.textBaseline = "middle";
+        drawLabel(room.name.toUpperCase(), x0, x1, z0, z1);
       }
     }
 
@@ -107,14 +162,34 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
     }
   }
 
+  fit();
   drawStatic();
 
+  // follow the on-screen size (HiDPI, the M key's big map, phone layouts)
+  let sizeDirty = false;
+  let lastDpr = globalThis.devicePixelRatio;
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => {
+      sizeDirty = true;
+    }).observe(canvas);
+  }
+
   function draw({ local, remotes = [] }) {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // (a window dragged to a screen with another pixel ratio resizes nothing)
+    if (sizeDirty || typeof ResizeObserver !== "function" || globalThis.devicePixelRatio !== lastDpr) {
+      sizeDirty = false;
+      lastDpr = globalThis.devicePixelRatio;
+      if (fit()) drawStatic();
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(base, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(base, 0, 0);
+    ctx.setTransform(px, 0, 0, px, 0, 0);
 
     for (const r of remotes) {
+      // a friend inside a room you have not found yet stays off the map:
+      // their dot would give the secret room away
+      if (!shown(roomAt(r.x, r.z))) continue;
       const x = toX(r.x);
       const y = toY(r.z);
       ctx.fillStyle = r.color || "#8ecae6";
@@ -131,9 +206,13 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
       if (here && !revealed.has(here.id)) reveal(here.id);
       const x = toX(local.x);
       const y = toY(local.z);
+      // the player faces world (sin ry, cos ry); the map draws world +x to
+      // the right and +z down, and the arrow is drawn pointing up (0, -1):
+      // turning it by PI - ry lands its tip on (sin ry, cos ry)
+      const heading = Math.PI - local.ry;
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(-local.ry);
+      ctx.rotate(heading);
       ctx.fillStyle = "#ffc857";
       ctx.beginPath();
       ctx.moveTo(0, -6);
@@ -150,7 +229,7 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
       // view cone
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(-local.ry);
+      ctx.rotate(heading);
       const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
       grad.addColorStop(0, "rgba(255,200,87,0.35)");
       grad.addColorStop(1, "rgba(255,200,87,0)");

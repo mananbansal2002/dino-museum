@@ -1,0 +1,622 @@
+{
+  "eoraptor": {
+    "file": "/images/species/eoraptor.jpg",
+    "credit": "Gonce",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Eoraptor_lunensis_real.jpg",
+    "skeleton": {
+      "file": "/images/species/eoraptor-skeleton.jpg",
+      "credit": "Etemenanki3",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Eoraptor_Museum_of_Anchient_Life.jpg"
+    }
+  },
+  "herrerasaurus": {
+    "file": "/images/species/herrerasaurus.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Herrerasaurus_ischigualastensis_Illustration.jpg",
+    "skeleton": {
+      "file": "/images/species/herrerasaurus-skeleton.jpg",
+      "credit": "Dallas Krentzel",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Herrerasaurus_front_(Field_museum).jpg"
+    }
+  },
+  "riojasaurus": {
+    "file": "/images/species/riojasaurus.jpg",
+    "credit": "Nobu Tamura (background replaced)",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Riojasaurus_NT.jpg",
+    "skeleton": {
+      "file": "/images/species/riojasaurus-skeleton.jpg",
+      "credit": "FunkMonk",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Riojasaurus_skull.jpg"
+    }
+  },
+  "coelo": {
+    "file": "/images/species/coelo.jpg",
+    "credit": "User Firsfron on en.wikipedia",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Coelophysis_Animatronics_model_NHM2.jpg",
+    "skeleton": {
+      "file": "/images/species/coelo-skeleton.jpg",
+      "credit": "James St. John",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Coelophysis_bauri_mount.jpg"
+    }
+  },
+  "plateosaurus": {
+    "file": "/images/species/plateosaurus.jpg",
+    "credit": "Nobu Tamura",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Plateosaurus_BW.jpg",
+    "skeleton": {
+      "file": "/images/species/plateosaurus-skeleton.jpg",
+      "credit": "FunkMonk",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Plateosaurus_Skelett_2.jpg"
+    }
+  },
+  "massospondylus": {
+    "file": "/images/species/massospondylus.jpg",
+    "credit": "Nobu Tamura",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Massospondylus_BW.jpg",
+    "skeleton": {
+      "file": "/images/species/massospondylus-skeleton.jpg",
+      "credit": "Fernando Losada Rodríguez",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Massospondylus_carinatus.001_-_Natural_History_Museum_of_London.JPG"
+    }
+  },
+  "brachio": {
+    "file": "/images/species/brachio.jpg",
+    "credit": "Levi bernardo",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Brachiosaurus_althi.jpg",
+    "skeleton": {
+      "file": "/images/species/brachio-skeleton.jpg",
+      "credit": "Gary Todd",
+      "license": "CC0",
+      "source": "https://commons.wikimedia.org/wiki/File:Brachiosaurus_inside_Field_Museum.jpg"
+    }
+  },
+  "diplod": {
+    "file": "/images/species/diplod.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Diplodocus_carnegii_flipped.jpg",
+    "skeleton": {
+      "file": "/images/species/diplod-skeleton.jpg",
+      "credit": "Dosseman",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Diplodocus_Carnegii_skeleton_(foreground)_in_Museum_f%C3%BCr_Naturkunde_Berlin_0876.jpg"
+    }
+  },
+  "apo": {
+    "file": "/images/species/apo.jpg",
+    "credit": "Durbed",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Apatosaurus_louisae_by_durbed_flipped.jpg",
+    "skeleton": {
+      "file": "/images/species/apo-skeleton.jpg",
+      "credit": "JJonahJackalope",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Apatosaurus_at_Tellus_Science_Museum.jpg"
+    }
+  },
+  "barosaurus": {
+    "file": "/images/species/barosaurus.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Barosaurus_lentus1.jpg",
+    "skeleton": {
+      "file": "/images/species/barosaurus-skeleton.jpg",
+      "credit": "Greg from New York, NY, America",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Barosaurus_mount_1.jpg"
+    }
+  },
+  "stego": {
+    "file": "/images/species/stego.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Stegosaurus_stenops_Life_Reconstruction.png",
+    "skeleton": {
+      "file": "/images/species/stego-skeleton.jpg",
+      "credit": "Evolutionnumber9",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:HMNS_Stegosaurus.jpg"
+    }
+  },
+  "kentrosaurus": {
+    "file": "/images/species/kentrosaurus.jpg",
+    "credit": "Connor Ashbridge",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kentrosaurus_aethiopicus.png",
+    "skeleton": {
+      "file": "/images/species/kentrosaurus-skeleton.jpg",
+      "credit": "Sebastian Wallroth",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Fossil_Kentrosaurus_aethiopicus_in_Museum_f%C3%BCr_Naturkunde_Berlin_001.JPG"
+    }
+  },
+  "wuerho": {
+    "file": "/images/species/wuerho.jpg",
+    "credit": "Jonathan Chen",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Wuerhosaurus-Paleozoological_Museum_of_China.jpg",
+    "note": "museum specimen photo",
+    "skeleton": {
+      "file": "/images/species/wuerho-skeleton.jpg",
+      "credit": "Jonathan Chen",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Wuerhosaurus-Paleozoological_Museum_of_China.jpg"
+    }
+  },
+  "allo": {
+    "file": "/images/species/allo.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Allosaurus_Revised.jpg",
+    "skeleton": {
+      "file": "/images/species/allo-skeleton.jpg",
+      "credit": "ScottRobertAnselmo",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:AMNH_Allosaurus.jpg"
+    }
+  },
+  "torvo": {
+    "file": "/images/species/torvo.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Torvosaurus_tanneri_Reconstruction.png",
+    "skeleton": {
+      "file": "/images/species/torvo-skeleton.jpg",
+      "credit": "Etemenanki3",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Torvosaurus_Museum_of_Ancient_Life_2.jpg"
+    }
+  },
+  "dilo": {
+    "file": "/images/species/dilo.jpg",
+    "credit": "Petr Menshikov",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dilophosaurus_2020.jpg",
+    "skeleton": {
+      "file": "/images/species/dilo-skeleton.jpg",
+      "credit": "Eduard Solà",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:DilophosaurusROM1.JPG"
+    }
+  },
+  "baryonyx": {
+    "file": "/images/species/baryonyx.jpg",
+    "credit": "Andrey Atuchin",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Baryonyx_Andrey_Atuchin.jpg",
+    "skeleton": {
+      "file": "/images/species/baryonyx-skeleton.jpg",
+      "credit": "★Kumiko★",
+      "license": "CC BY-SA 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Baryonyx_walkeri_mount_NMNS.jpg"
+    }
+  },
+  "archaeopteryx": {
+    "file": "/images/species/archaeopteryx.jpg",
+    "credit": "Durbed",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Archaeopteryx_lithographica_by_durbed.jpg",
+    "skeleton": {
+      "file": "/images/species/archaeopteryx-skeleton.jpg",
+      "credit": "H. Raab ( Vesta",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Archaeopteryx_lithographica_(Berlin_specimen).jpg"
+    }
+  },
+  "rhampho": {
+    "file": "/images/species/rhampho.jpg",
+    "credit": "Oleg Kuznetsov - 3depix - http://3depix.com",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Rhamphorhynchus_muensteri_rendering.jpg",
+    "skeleton": {
+      "file": "/images/species/rhampho-skeleton.jpg",
+      "credit": "M0tty",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Rhamphorhynchus_munsteri.jpg"
+    }
+  },
+  "trex": {
+    "file": "/images/species/trex.jpg",
+    "credit": "DerpyDuckAnimation",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tyrannosaurus_rex_3D_render.png",
+    "skeleton": {
+      "file": "/images/species/trex-skeleton.jpg",
+      "credit": "Zissoudisctrucker",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:FMNH_Tyrannosaurus_rex_Sue.jpg"
+    }
+  },
+  "trike": {
+    "file": "/images/species/trike.jpg",
+    "credit": "Dmitry Bogdanov",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Triceratops_liveDB.jpg",
+    "skeleton": {
+      "file": "/images/species/trike-skeleton.jpg",
+      "credit": "Source: Allie_Caulfield Derivative: MathKnight",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:LA-Triceratops_mount-2.jpg"
+    }
+  },
+  "styraco": {
+    "file": "/images/species/styraco.jpg",
+    "credit": "Connor Ashbridge",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Styracosaurus_albertensis.png",
+    "skeleton": {
+      "file": "/images/species/styraco-skeleton.jpg",
+      "credit": "Jonathan Chen",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Styracosaurus_%22parksi%22_AMNH.jpg"
+    }
+  },
+  "centro": {
+    "file": "/images/species/centro.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Centrosaurus.png",
+    "skeleton": {
+      "file": "/images/species/centro-skeleton.jpg",
+      "credit": "ArticCynda",
+      "license": "CC0",
+      "source": "https://commons.wikimedia.org/wiki/File:Centrosaurus_in_Munich_Palaeontology_Museum.jpg"
+    }
+  },
+  "proto": {
+    "file": "/images/species/proto.jpg",
+    "credit": "PaleoNeolitic",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Protoceratops_andrewsi_Restoration.png",
+    "skeleton": {
+      "file": "/images/species/proto-skeleton.jpg",
+      "credit": "ACKnapp",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Protoceratops_andrewsi_AMNH_6251.jpg"
+    }
+  },
+  "edmont": {
+    "file": "/images/species/edmont.jpg",
+    "credit": "Connor Ashbridge",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Edmontosaurus_annectens.png",
+    "skeleton": {
+      "file": "/images/species/edmont-skeleton.jpg",
+      "credit": "Ninjatacoshell",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Edmontosaurus_skeletons.JPG"
+    }
+  },
+  "para": {
+    "file": "/images/species/para.jpg",
+    "credit": "Connor Ashbridge",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Life_reconstruction_of_Parasaurolophus_walkeri.png",
+    "skeleton": {
+      "file": "/images/species/para-skeleton.jpg",
+      "credit": "Zissoudisctrucker",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:FMNH_Parasaurolophus_fossil.jpg"
+    }
+  },
+  "ankylo": {
+    "file": "/images/species/ankylo.jpg",
+    "credit": "Emily Willoughby",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ankylosaurus_magniventris_reconstruction.png",
+    "skeleton": {
+      "file": "/images/species/ankylo-skeleton.jpg",
+      "credit": "jasonwoodhead23",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Royal_Alberta_museum_Ankylosaurus.jpg"
+    }
+  },
+  "doed": {
+    "file": "/images/species/doed.jpg",
+    "credit": "Nobu Tamura",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Doedicurus_BW.jpg",
+    "skeleton": null
+  },
+  "pachy": {
+    "file": "/images/species/pachy.jpg",
+    "credit": "TotalDino",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Pachycephalosaurus_TD.png",
+    "skeleton": {
+      "file": "/images/species/pachy-skeleton.jpg",
+      "credit": "PePeEfe",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Pachycephalosaurus_wyomingensis_-_Din%C3%B3polis.JPG"
+    }
+  },
+  "stygi": {
+    "file": "/images/species/stygi.jpg",
+    "credit": "Anagoria",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:20190331_134158_Stygimoloch_spinifer_Museum_f%C3%BCr_Naturkunde_Berlin_anagoria.jpg",
+    "note": "museum specimen photo",
+    "skeleton": {
+      "file": "/images/species/stygi-skeleton.jpg",
+      "credit": "Anagoria",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:20190331_134158_Stygimoloch_spinifer_Museum_f%C3%BCr_Naturkunde_Berlin_anagoria.jpg"
+    }
+  },
+  "spino": {
+    "file": "/images/species/spino.jpg",
+    "credit": "Petr Menshikov",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Spinosaurus_Model_(2).png",
+    "skeleton": {
+      "file": "/images/species/spino-skeleton.jpg",
+      "credit": "Didier Descouens",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Spinosaurus_Crane.jpg"
+    }
+  },
+  "carchar": {
+    "file": "/images/species/carchar.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Carcharodontosaurus.png",
+    "skeleton": {
+      "file": "/images/species/carchar-skeleton.jpg",
+      "credit": "Matthew Deery",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Ultimate_Dinosaurs_Carcharodontosaurus.jpg"
+    }
+  },
+  "giganoto": {
+    "file": "/images/species/giganoto.jpg",
+    "credit": "TotalDino",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Giganotosaurus_TD.png",
+    "skeleton": {
+      "file": "/images/species/giganoto-skeleton.jpg",
+      "credit": "James Emery from Douglasville, United States",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Giganotosaurus_Fernbank.jpg"
+    }
+  },
+  "mapu": {
+    "file": "/images/species/mapu.jpg",
+    "credit": "Mario Lanzas",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mapusaurus_reconstruction.jpg",
+    "skeleton": {
+      "file": "/images/species/mapu-skeleton.jpg",
+      "credit": "Kabacchi",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Mapusaurus.jpg"
+    }
+  },
+  "acro": {
+    "file": "/images/species/acro.jpg",
+    "credit": "Julian Johnson (Julian Johnson Mortimer)",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Julian_Johnson_Mortimer_-_Acrocanthosaurus_4.png",
+    "skeleton": {
+      "file": "/images/species/acro-skeleton.jpg",
+      "credit": "Evolutionnumber9",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Acrocanthosaurus_atokensis_cast.jpg"
+    }
+  },
+  "raptor": {
+    "file": "/images/species/raptor.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Velociraptor_Restoration.png",
+    "skeleton": {
+      "file": "/images/species/raptor-skeleton.jpg",
+      "credit": "Jens Lallensack",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Velociraptor_fruita_2.jpg"
+    }
+  },
+  "utahraptor": {
+    "file": "/images/species/utahraptor.jpg",
+    "credit": "Emily Willoughby (User:Ferahgo the Assassin)",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Utahraptor_updated.png",
+    "skeleton": {
+      "file": "/images/species/utahraptor-skeleton.jpg",
+      "credit": "Jaren Wilkey (BYU Photo)",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:BYU_Utahraptor_skeletal_mount.jpg"
+    }
+  },
+  "deinonychus": {
+    "file": "/images/species/deinonychus.jpg",
+    "credit": "Fred Wierum",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Deinonychus_Restoration.png",
+    "skeleton": {
+      "file": "/images/species/deinonychus-skeleton.jpg",
+      "credit": "FunkMonk",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Deinonychus_in_Copenhagen.jpg"
+    }
+  },
+  "camarasaurus": {
+    "file": "/images/species/camarasaurus.jpg",
+    "credit": "TotalDino",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Camarasaurus_TD.png",
+    "skeleton": {
+      "file": "/images/species/camarasaurus-skeleton.jpg",
+      "credit": "IJReid",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Camarasaurus_supremus_RTMP.jpg"
+    }
+  },
+  "oviraptor": {
+    "file": "/images/species/oviraptor.jpg",
+    "credit": "PaleoNeolitic",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Oviraptor_Restoration.png",
+    "skeleton": {
+      "file": "/images/species/oviraptor-skeleton.jpg",
+      "credit": "Jonathan Chen",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Citipati_AMNH.jpg"
+    }
+  },
+  "iguanodon": {
+    "file": "/images/species/iguanodon.jpg",
+    "credit": "Davide Bonadonna",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Iguanodon_bernissartensis_(Davide_Bonadonna,_cropped).png",
+    "skeleton": null
+  },
+  "quetzal": {
+    "file": "/images/species/quetzal.jpg",
+    "credit": "Johnson Mortimer",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Quetzalcoatlus_by_johnson_mortimer-d9n2d3a.jpg",
+    "skeleton": {
+      "file": "/images/species/quetzal-skeleton.jpg",
+      "credit": "Geekgecko",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Quetzalcoatlus_in_flight_Perot.jpg"
+    }
+  },
+  "ptero": {
+    "file": "/images/species/ptero.jpg",
+    "credit": "DinoTeam",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Pteranodon,_DinoPark_Košice.jpg",
+    "skeleton": {
+      "file": "/images/species/ptero-skeleton.jpg",
+      "credit": "régine debatty (via Flickr: https://www.flickr.com/photos/nearnearfuture/28747524441/)",
+      "license": "CC BY-SA 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Pteranodon_model_in_Vienna.jpg"
+    }
+  },
+  "mosa": {
+    "file": "/images/species/mosa.jpg",
+    "credit": "Corbin Rainbolt",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mosasaurus_missouriensis_paleoart.jpg",
+    "skeleton": {
+      "file": "/images/species/mosa-skeleton.jpg",
+      "credit": "Ghedoghedo",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Mosasaurus_hoffmannii_-_skeleton.jpg"
+    }
+  },
+  "plesio": {
+    "file": "/images/species/plesio.jpg",
+    "credit": "DataBase Center for Life Science (DBCLS)",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:202006_Plesiosaurus_dolichodeirus.png",
+    "skeleton": {
+      "file": "/images/species/plesio-skeleton.jpg",
+      "credit": "Michael Barera",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Milwaukee_Public_Museum_November_2022_169_(Plesiosaurus_cast_skeleton).jpg"
+    }
+  },
+  "ichthyo": {
+    "file": "/images/species/ichthyo.jpg",
+    "credit": "DataBase Center for Life Science (DBCLS)",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:202006_Ichthyosaurus_communis.png",
+    "skeleton": {
+      "file": "/images/species/ichthyo-skeleton.jpg",
+      "credit": "Gary Todd",
+      "license": "CC0",
+      "source": "https://commons.wikimedia.org/wiki/File:Ichthyosaurus_communis_in_London.jpg"
+    }
+  },
+  "deino": {
+    "file": "/images/species/deino.jpg",
+    "credit": "Andrey Atuchin",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Deinosuchus_illustration_Andrey_Atuchin.jpg",
+    "skeleton": {
+      "file": "/images/species/deino-skeleton.jpg",
+      "credit": "Daderot",
+      "license": "CC0",
+      "source": "https://commons.wikimedia.org/wiki/File:Deinosuchus_hatcheri_-_Natural_History_Museum_of_Utah_-_DSC07251.JPG"
+    }
+  },
+  "dimetrodon": {
+    "file": "/images/species/dimetrodon.jpg",
+    "credit": "Max Bellomio",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dimetrodon_grandis_3D_Model_Reconstruction.png",
+    "skeleton": {
+      "file": "/images/species/dimetrodon-skeleton.jpg",
+      "credit": "Chris Woodrich",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Dimetrodon_sp._(TMP_1995.044.0003),_Royal_Tyrrell_Museum,_Drumheller,_Alberta,_2025-07-13.jpg"
+    }
+  },
+  "elasmo": {
+    "file": "/images/species/elasmo.jpg",
+    "credit": "JJonahJackalope",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Elasmosaurus_fossil,_Tellus_Science_Museum.jpg",
+    "note": "museum specimen photo",
+    "skeleton": {
+      "file": "/images/species/elasmo-skeleton.jpg",
+      "credit": "JJonahJackalope",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Elasmosaurus_fossil,_Tellus_Science_Museum.jpg"
+    }
+  },
+  "krono": {
+    "file": "/images/species/krono.jpg",
+    "credit": "Tim Sackton",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kronosaurus_queenslandicus.jpg",
+    "note": "museum specimen photo",
+    "skeleton": {
+      "file": "/images/species/krono-skeleton.jpg",
+      "credit": "Tim Sackton",
+      "license": "CC BY-SA 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Kronosaurus_queenslandicus.jpg"
+    }
+  },
+  "liopleurodon": {
+    "file": "/images/species/liopleurodon.jpg",
+    "credit": "Ghedoghedo",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Liopleurodon_ferox_Tubingen.JPG",
+    "note": "museum specimen photo",
+    "skeleton": {
+      "file": "/images/species/liopleurodon-skeleton.jpg",
+      "credit": "Ghedoghedo",
+      "license": "CC BY-SA 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Liopleurodon_ferox_Tubingen.JPG"
+    }
+  },
+  "archelon": {
+    "file": "/images/species/archelon.jpg",
+    "credit": "Paul Hermans",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Archelon_ischyros_Naturhistorisches_Museum_Wenen_7-06-2023_10-43-31.jpg",
+    "note": "museum specimen photo",
+    "skeleton": {
+      "file": "/images/species/archelon-skeleton.jpg",
+      "credit": "Paul Hermans",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Archelon_ischyros_Naturhistorisches_Museum_Wenen_7-06-2023_10-43-31.jpg"
+    }
+  }
+}

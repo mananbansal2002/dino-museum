@@ -293,8 +293,8 @@ const SIT_HIP_Y = SIT_SEAT_OFFSET + 0.11; // hip joint sits one thigh-radius abo
 /**
  * Builds a stylised visitor character.
  *
- * API: { group, head, handAnchor, tag, look, setLook, setName, playAction,
- *        setHeld, setSitting, update }
+ * API: { group, body, attachments, head, handAnchor, tag, look, setLook, setName,
+ *        playAction, setHeld, setSitting, update, dispose }
  */
 export function createCharacter(lookInput = {}, opts = {}) {
   const look = normalizeLook(lookInput);
@@ -609,6 +609,12 @@ export function createCharacter(lookInput = {}, opts = {}) {
     group: root,
     /** every procedural body mesh (not the name tag / blob shadow) — hide to swap in another avatar */
     body,
+    /**
+     * the look's add-ons, rebuilt in place by setLook: hair + head accessory (centred on
+     * the head) and the back group (cape / backpack, origin at the spine base). Another
+     * avatar can re-parent them onto its own bones (models.js) and put them back here.
+     */
+    attachments: { hair: hairGroup, accessory: accessoryGroup, back },
     disposed: false,
     head,
     handAnchor,

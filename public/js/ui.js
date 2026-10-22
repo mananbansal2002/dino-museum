@@ -561,8 +561,12 @@ export function createUI(callbacks = {}) {
   function setHall(name) {
     $("hallName").textContent = name;
   }
-  function setRoom(code) {
-    $("roomCode").textContent = code;
+  // solo visits have no server room: there is nothing to share or invite to
+  let soloRoom = false;
+  function setRoom(code, { solo = false } = {}) {
+    soloRoom = solo;
+    $("roomCode").textContent = solo ? "Solo visit" : code;
+    $("copyRoom").classList.toggle("hidden", solo);
   }
   function setCounters({ discovered, total, fossils, scoops }) {
     if (discovered != null) {
@@ -572,6 +576,28 @@ export function createUI(callbacks = {}) {
     if (fossils != null) $("statFossils").textContent = fossils;
     if (scoops != null) $("statScoops").textContent = scoops;
   }
+
+  // the prompt is also a button: a tap (touch) or click does what E does
+  $("prompt").style.cursor = "pointer";
+  $("prompt").addEventListener("click", (e) => {
+    e.stopPropagation();
+    callbacks.onPromptTap?.();
+  });
+
+  // sound on/off for players without an L key (phones), next to the room code
+  const soundBtn = document.createElement("button");
+  soundBtn.type = "button";
+  soundBtn.className = "chip";
+  soundBtn.id = "soundToggle";
+  soundBtn.onclick = () => callbacks.onToggleSound?.();
+  $("copyRoom").after(soundBtn);
+  function setSound(muted) {
+    soundBtn.textContent = muted ? "🔇 sound" : "🔊 sound";
+    soundBtn.title = muted ? "Sound is off (L)" : "Sound is on (L)";
+    soundBtn.setAttribute("aria-pressed", muted ? "false" : "true");
+    soundBtn.setAttribute("aria-label", "Sound");
+  }
+  setSound(false);
 
   function setPrompt(text, key) {
     const el = $("prompt");
@@ -632,6 +658,7 @@ export function createUI(callbacks = {}) {
   }
 
   $("copyRoom").onclick = async () => {
+    if (soloRoom) return;
     const code = $("roomCode").textContent;
     const url = `${location.origin}/?room=${code}`;
     try {
@@ -651,6 +678,9 @@ export function createUI(callbacks = {}) {
   function openChat() {
     chatInput.classList.add("open");
     chatInput.focus();
+    // the input can't take focus while the HUD is hidden (e.g. immersive era
+    // view); left "open" without focus it would never blur and lock all keys
+    if (document.activeElement !== chatInput) chatInput.classList.remove("open");
   }
   function closeChat() {
     chatInput.classList.remove("open");
@@ -686,7 +716,7 @@ export function createUI(callbacks = {}) {
           <h2 class="exTitle">${escapeHtml(ex.title)}</h2>
         </div>
         <div class="exActions">
-          <button class="chip" id="exhibitVideos">▶ videos</button>
+          ${callbacks.onExhibitVideos ? `<button class="chip" id="exhibitVideos">▶ videos</button>` : ""}
           <button class="chip" id="closeExhibit">close ✕</button>
         </div>
       </div>
@@ -713,7 +743,8 @@ export function createUI(callbacks = {}) {
       }
     `;
     $("closeExhibit").onclick = hideExhibit;
-    $("exhibitVideos").onclick = () => callbacks.onExhibitVideos?.(ex);
+    const videos = $("exhibitVideos");
+    if (videos) videos.onclick = () => callbacks.onExhibitVideos?.(ex);
     const hero = $("exHero");
     hero.querySelector("img").onerror = () => hero.remove();
     speciesImages().then((m) => {
@@ -860,6 +891,7 @@ export function createUI(callbacks = {}) {
     setRoom,
     setCounters,
     setPrompt,
+    setSound,
     toast,
     chat,
     setPlayers,
@@ -873,6 +905,7 @@ export function createUI(callbacks = {}) {
     iceOrder: () => ice,
     showBattle,
     hideBattle,
+    isBattleOpen: () => !$("battleOverlay").classList.contains("hidden"),
     setBattleCaption,
     setBattleProgress,
     modal,

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { createCharacter } from "./character.js";
 import { clamp, damp, angleLerp } from "./util.js";
-import { resolveCollision, buildWallData, roomAt } from "./world.js";
+import { resolveCollision, buildWallData, roomAt, w2g } from "./world.js";
 
 /* ------------------------------------------------------------------ */
 /* tuning                                                               */
@@ -25,7 +25,11 @@ const MAX_FRAME = 0.25; // never simulate more than this per frame
 const CAM_MIN = 1.8;
 const CAM_MAX = 9;
 const CAM_DEFAULT = 4.6;
-const CAM_RADIUS = 0.28; // how close the camera may get to a wall
+const CAM_MARGIN = 0.04; // extra air between the near plane and a wall face
+const CAM_STEP_MIN = 0.2; // shortest raymarch step of the third-person probe
+const FP_NUDGE = 0.25; // first-person eye sits this far in front of the body centre
+const LINTEL_DROP = 1.3; // doorway lintels hang this far below the lower room's ceiling (world.js)
+const SIT_HOLD_STAND = 0.4; // s a move key held through sitting down must stay held to stand up
 const PITCH_MIN = -1.15;
 const PITCH_MAX = 0.75;
 const MOUSE_SENS = 0.0024;
@@ -41,11 +45,17 @@ const MOVE_CODES = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "Arr
  * through them.
  */
 let innerWalls = null;
+// Half the thickness of the drawn wall slabs. Grid collision stops at the
+// cell edge, but a slab is centred on that edge, so its visible face is this
+// much closer. Read from buildWallData below; 0.2 matches world.js.
+let wallHalf = 0.2;
 function getInnerWalls() {
   if (innerWalls) return innerWalls;
   innerWalls = [];
   try {
+    let thinnest = Infinity;
     for (const w of buildWallData()) {
+      thinnest = Math.min(thinnest, w.sx, w.sz);
       const e = 0.5;
       const vertical = w.sx < w.sz; // wall runs along z
       const a = vertical ? roomAt(w.x - e, w.z) : roomAt(w.x, w.z - e);
@@ -59,6 +69,7 @@ function getInnerWalls() {
         });
       }
     }
+    if (Number.isFinite(thinnest)) wallHalf = thinnest / 2;
   } catch {
     /* world data unavailable: fall back to grid collision only */
   }
@@ -108,10 +119,40 @@ function isBlocked(x, z, radius) {
   return Math.abs(cx - x) > 1e-4 || Math.abs(cz - z) > 1e-4;
 }
 
+/**
+ * Yes/no overlap test for camera probes: one resolveCollision pass (corner
+ * settling only matters when the result is used as a position) plus a plain
+ * overlap check against the inner slabs.
+ */
+function probeBlocked(x, z, radius) {
+  const [cx, cz] = resolveCollision(x, z, radius);
+  if (Math.abs(cx - x) > 1e-4 || Math.abs(cz - z) > 1e-4) return true;
+  for (const b of getInnerWalls()) {
+    const dx = x - Math.max(b.minX, Math.min(x, b.maxX));
+    const dz = z - Math.max(b.minZ, Math.min(z, b.maxZ));
+    if (dx * dx + dz * dz < radius * radius) return true;
+  }
+  return false;
+}
+
+/**
+ * How far the camera centre has to stay from collision geometry so the near
+ * plane never reaches a wall face: the slab's half thickness (grid collision
+ * stops at the cell edge, the face is in front of it) plus the distance from
+ * the eye to the near plane's corners, plus a little margin.
+ */
+function cameraClearance(camera) {
+  getInnerWalls(); // makes sure wallHalf has been read
+  const near = camera?.near ?? 0.1;
+  const tanY = Math.tan(((camera?.fov ?? 55) * Math.PI) / 360);
+  const aspect = camera?.aspect || 1;
+  return wallHalf + near * Math.hypot(1, tanY, tanY * aspect) + CAM_MARGIN;
+}
+
 /* ------------------------------------------------------------------ */
 /* player                                                               */
 /* ------------------------------------------------------------------ */
-export function createPlayer({ scene, camera, look, name, color }) {
+export function createPlayer({ scene, camera, look, name, color, onTouchAction = null }) {
   const character = createCharacter(look, { name, tagColor: color });
   scene.add(character.group);
 
@@ -143,6 +184,8 @@ export function createPlayer({ scene, camera, look, name, color }) {
   let lastNow = 0;
   let camDistNow = CAM_DEFAULT;
   let camReady = false;
+  let sitHold = 0; // s a move / jump key has been held continuously while seated
+  const probe = { valid: false, px: 0, py: 0, pz: 0, dx: 0, dy: 0, dz: 0, want: 0, r: 0, free: 0 };
   let lastRy = state.ry;
   let lastX = state.x;
   let lastZ = state.z;
@@ -163,12 +206,17 @@ export function createPlayer({ scene, camera, look, name, color }) {
     const code = e.code;
     const isMove = MOVE_CODES.includes(code);
     if (isMove || code === "Space") e.preventDefault();
-    if (keys.has(code)) return; // auto-repeat
-    keys.add(code);
     if (state.sitting && (isMove || code === "Space")) {
-      stand();
+      // a fresh press stands up at once; a key that was already down when we
+      // sat (its auto-repeat lands here) is handled by the hold timer in update()
+      if (!keys.has(code)) {
+        keys.add(code);
+        stand();
+      }
       return;
     }
+    if (keys.has(code)) return; // auto-repeat
+    keys.add(code);
     if (code === "Space") {
       jumpBuffer = JUMP_BUFFER;
       jumpHeld = true;
@@ -278,8 +326,27 @@ export function createPlayer({ scene, camera, look, name, color }) {
       "position:absolute;right:22px;bottom:96px;width:72px;height:72px;border-radius:50%;" +
       "border:2px solid rgba(255,255,255,.45);background:rgba(0,0,0,.3);color:#fff;" +
       "font:600 14px system-ui,sans-serif;pointer-events:auto;touch-action:none;";
+    // E on a keyboard: examine / order / sit / screen / open, shown only while
+    // something is in reach (main.js sets its label from the prompt)
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "touch-use";
+    useBtn.style.cssText =
+      "position:absolute;right:106px;min-width:72px;height:72px;padding:0 14px;" +
+      "border-radius:36px;border:2px solid rgba(255,200,87,.75);background:rgba(255,200,87,.28);" +
+      "color:#fff;font:700 14px system-ui,sans-serif;pointer-events:auto;touch-action:none;" +
+      "display:none;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    // same row as Jump, just left of it (the stylesheet's `.touch-controls
+    // button { bottom: ... !important }` is meant for Jump; this keeps the row
+    // in line with it on every layout)
+    useBtn.style.setProperty(
+      "bottom",
+      "calc(var(--touch-safe-bottom, 170px) - 74px + var(--safe-b, 0px))",
+      "important"
+    );
     root.appendChild(base);
     root.appendChild(jumpBtn);
+    root.appendChild(useBtn);
     document.body.appendChild(root);
 
     let moveId = null;
@@ -365,6 +432,13 @@ export function createPlayer({ scene, camera, look, name, color }) {
     document.addEventListener("touchcancel", onEnd);
     jumpBtn.addEventListener("touchstart", onJump, { passive: false });
     jumpBtn.addEventListener("touchend", onJumpEnd);
+    function onUse(e) {
+      e.preventDefault();
+      if (!inputEnabled) return;
+      onTouchAction?.();
+    }
+    useBtn.addEventListener("touchstart", onUse, { passive: false });
+    let useLabel = null;
 
     return {
       reset() {
@@ -374,6 +448,18 @@ export function createPlayer({ scene, camera, look, name, color }) {
       },
       setVisible(v) {
         root.style.display = v ? "block" : "none";
+      },
+      /** Label for the interact button, or null to hide it. */
+      setAction(label) {
+        const next = label || null;
+        if (next === useLabel) return;
+        useLabel = next;
+        useBtn.style.display = next ? "block" : "none";
+        if (next) {
+          // the first word is the verb ("Examine T. rex" -> "Examine")
+          useBtn.textContent = next.split(" ")[0];
+          useBtn.setAttribute("aria-label", next);
+        }
       },
       dispose() {
         document.removeEventListener("touchstart", onStart);
@@ -508,6 +594,19 @@ export function createPlayer({ scene, camera, look, name, color }) {
     const dt = frameDt(dtIn);
     syncExternalChanges();
 
+    // "press W to stand": while seated, keys only stay in `keys` when they were
+    // already held as we sat down (a fresh press stands up in onKeyDown).
+    // Keep holding one and you get up, so the prompt works without having to
+    // release the key first; letting go right after sitting keeps you seated.
+    if (state.sitting && inputEnabled) {
+      let held = false;
+      for (const code of keys) if (code === "Space" || MOVE_CODES.includes(code)) held = true;
+      sitHold = held ? sitHold + dt : 0;
+      if (sitHold >= SIT_HOLD_STAND) stand();
+    } else {
+      sitHold = 0;
+    }
+
     const axis = state.sitting ? { f: 0, r: 0, mag: 0 } : inputAxis();
     const running = inputEnabled && (key("ShiftLeft") || key("ShiftRight") || (touch.active && axis.mag > 0.95));
 
@@ -554,24 +653,113 @@ export function createPlayer({ scene, camera, look, name, color }) {
   }
 
   /* ---------------- camera ---------------- */
-  /** Longest free distance (<= want) from pivot along -dir before hitting a wall. */
+  /** Ray point at distance d behind the pivot (along -camDir), in xz. */
+  function rayX(d) {
+    return pivot.x - camDir.x * d;
+  }
+  function rayZ(d) {
+    return pivot.z - camDir.z * d;
+  }
+  function rayY(d) {
+    return pivot.y - camDir.y * d;
+  }
+  function rayBlocked(d, r) {
+    const x = rayX(d);
+    const z = rayZ(d);
+    return !roomAt(x, z) || probeBlocked(x, z, r);
+  }
+
+  /**
+   * Where the ray crosses from room `a` (at lo) into another room (at hi):
+   * returns the crossing distance and how fast the ray moves away from that
+   * doorway plane per metre along it.
+   */
+  function doorwayCrossing(lo, hi, a) {
+    for (let i = 0; i < 7; i++) {
+      const mid = (lo + hi) / 2;
+      if (roomAt(rayX(mid), rayZ(mid)) === a) lo = mid;
+      else hi = mid;
+    }
+    // cell edges are axis aligned: a column change means an x = const plane
+    const acrossX = w2g(rayX(lo)) !== w2g(rayX(hi));
+    const perp = Math.max(0.05, Math.abs(acrossX ? camDir.x : camDir.z));
+    return { d: (lo + hi) / 2, perp };
+  }
+
+  /**
+   * Longest free distance (<= want) from the pivot along -camDir. The camera
+   * centre keeps `cameraClearance` from walls and exhibits, so the near plane
+   * never reaches a wall face, and stays on the player's side of a doorway
+   * when the line of sight back to the player would pass through its lintel.
+   *
+   * Raymarches in steps of the clearance radius (a probe that wide cannot
+   * step over a wall), then binary-searches the hit. The result is reused
+   * while the pivot, direction and zoom stay put, so standing still costs
+   * nothing.
+   */
   function freeDistance(want) {
-    const stepLen = 0.12;
+    const r = cameraClearance(camera);
+    const same = (a, b) => Math.abs(a - b) < 1e-5;
+    if (
+      probe.valid &&
+      probe.want === want &&
+      probe.r === r &&
+      same(probe.px, pivot.x) &&
+      same(probe.py, pivot.y) &&
+      same(probe.pz, pivot.z) &&
+      same(probe.dx, camDir.x) &&
+      same(probe.dy, camDir.y) &&
+      same(probe.dz, camDir.z)
+    ) {
+      return probe.free;
+    }
+
+    const step = Math.max(CAM_STEP_MIN, r);
     let free = want;
-    for (let d = stepLen; d <= want + 1e-6; d += stepLen) {
-      const px = pivot.x - camDir.x * d;
-      const pz = pivot.z - camDir.z * d;
-      if (isBlocked(px, pz, CAM_RADIUS) || !roomAt(px, pz)) {
-        free = Math.max(0, d - stepLen);
-        break;
+    let prevD = 0;
+    let prevRoom = roomAt(pivot.x, pivot.z);
+    // look a clearance radius past the camera for doorways too: a lintel just
+    // behind the camera would still cut through the near plane
+    const reach = want + r;
+    // samples: every step up to the camera distance itself, then `reach`
+    const next = (d) => (d < want ? Math.min(d + step, want) : reach);
+    for (let d = next(0); prevD < reach; d = next(d)) {
+      const room = roomAt(rayX(d), rayZ(d));
+      if (room && prevRoom && room !== prevRoom) {
+        const c = doorwayCrossing(prevD, d, prevRoom);
+        const span = wallHalf / c.perp; // lintel thickness along the ray
+        const lintelBottom = Math.min(room.h, prevRoom.h) - LINTEL_DROP;
+        const a = Math.max(0, Math.min(want, c.d - span));
+        const b = Math.max(0, Math.min(want, c.d + span));
+        if (Math.max(rayY(a), rayY(b)) + r > lintelBottom) free = Math.min(free, Math.max(0, c.d - r / c.perp));
       }
+      if (d <= want && rayBlocked(d, r)) {
+        let lo = prevD;
+        let hi = d;
+        for (let i = 0; i < 6; i++) {
+          const mid = (lo + hi) / 2;
+          if (rayBlocked(mid, r)) hi = mid;
+          else lo = mid;
+        }
+        free = Math.min(free, lo);
+      }
+      if (free < want) break;
+      prevD = d;
+      prevRoom = room;
     }
-    // final exact check at the end point
-    if (free === want) {
-      const px = pivot.x - camDir.x * want;
-      const pz = pivot.z - camDir.z * want;
-      if (isBlocked(px, pz, CAM_RADIUS) || !roomAt(px, pz)) free = Math.max(0, want - stepLen);
-    }
+
+    Object.assign(probe, {
+      valid: true,
+      px: pivot.x,
+      py: pivot.y,
+      pz: pivot.z,
+      dx: camDir.x,
+      dy: camDir.y,
+      dz: camDir.z,
+      want,
+      r,
+      free,
+    });
     return free;
   }
 
@@ -583,13 +771,24 @@ export function createPlayer({ scene, camera, look, name, color }) {
       character.group.visible = false;
       const eyeY = state.sitting ? state.y + EYE * 0.72 : state.y + EYE;
       camPos.set(state.x, eyeY, state.z);
-      // nudge forward a little, but never into a wall
-      const fx = state.x + Math.sin(state.camYaw) * 0.25;
-      const fz = state.z + Math.cos(state.camYaw) * 0.25;
-      if (!isBlocked(fx, fz, 0.12)) {
-        camPos.x = fx;
-        camPos.z = fz;
+      // nudge forward a little, but only as far as keeps the near plane off
+      // the wall face (the body radius alone leaves just ~0.3 m to the face)
+      const r = cameraClearance(camera);
+      const sx = Math.sin(state.camYaw);
+      const sz = Math.cos(state.camYaw);
+      let nudge = FP_NUDGE;
+      if (probeBlocked(state.x + sx * nudge, state.z + sz * nudge, r)) {
+        let lo = 0;
+        let hi = nudge;
+        for (let i = 0; i < 5; i++) {
+          const mid = (lo + hi) / 2;
+          if (probeBlocked(state.x + sx * mid, state.z + sz * mid, r)) hi = mid;
+          else lo = mid;
+        }
+        nudge = lo;
       }
+      camPos.x += sx * nudge;
+      camPos.z += sz * nudge;
       camera.position.copy(camPos);
       camera.lookAt(camPos.x + camDir.x * 6, camPos.y + camDir.y * 6, camPos.z + camDir.z * 6);
       camReady = false;
@@ -652,6 +851,7 @@ export function createPlayer({ scene, camera, look, name, color }) {
     state.sitting = true;
     state.anim = "sit";
     jumpBuffer = 0;
+    sitHold = 0;
     camReady = false;
     lastX = state.x;
     lastZ = state.z;
@@ -721,6 +921,8 @@ export function createPlayer({ scene, camera, look, name, color }) {
       return state.cameraMode;
     },
     setInputEnabled,
+    /** Touch devices: show the interact button for `label` (null hides it). */
+    setTouchAction: (label) => touchUi?.setAction(label),
     sit,
     stand,
     dispose() {

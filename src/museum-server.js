@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createHash } from "node:crypto";
 import express from "express";
 import { Server } from "socket.io";
 import { createSync } from "./sync.js";
@@ -34,9 +35,33 @@ export const ACTION_TYPES = new Set([
   "dig",
   "battle",
   "wave",
-  "sit",
   "cheer",
 ]);
+/** Ice cream orders, mirroring FLAVOURS / TOPPINGS in public/js/ui.js. */
+export const ICE_FLAVOURS = new Set([
+  "strawberry",
+  "mintchoco",
+  "dinodust",
+  "volcano",
+  "blueberry",
+  "caramel",
+  "matcha",
+  "vanilla",
+]);
+export const ICE_TOPPINGS = new Set(["sprinkles", "chocolate", "cherry"]);
+export const ICE_STYLES = new Set(["cone", "cup"]);
+const ICE_SCOOPS_MAX = 3;
+
+// Battle ids come straight from the client's programme so the two cannot
+// drift. If that module fails to load, ids are only shape-checked.
+const BATTLE_IDS = await import("../public/js/exhibits.js")
+  .then((m) => new Set(m.BATTLES.map((b) => b.id)))
+  .catch((e) => {
+    console.warn("[museum] battle list unavailable, ids are only shape-checked", e?.message);
+    return null;
+  });
+const BATTLE_ID_RE = /^[a-z0-9-]{1,40}$/;
+
 const LOOK_COLOR_KEYS = new Set(["skin", "shirt", "pants", "hairColor"]);
 const LOOK_STRING_KEYS = new Set(["hair", "accessory"]);
 const LOOK_BODIES = new Set(["male", "female"]);
@@ -45,6 +70,22 @@ const NAME_MAX = 18;
 const CHAT_MAX = 240;
 const ACTION_PAYLOAD_MAX = 512; // bytes of JSON
 const SCORE_MAX_STEP = 50;
+/** A battle restarts the overlay for the whole room: at most one per window. */
+const BATTLE_COOLDOWN_MS = 15000;
+/** Receivers flash their screen for a nearby photo: one per player per window. */
+const PHOTO_COOLDOWN_MS = 2500;
+/** Resume tokens let a reconnecting client take over its old player. */
+const RESUME_RE = /^[\w-]{16,64}$/;
+/** How long a dropped connection's player is held for its owner to resume. */
+const RESUME_GRACE_MS = 5000;
+/** Cross-instance: refresh this instance's roster entries + resync mirrors. */
+const ROSTER_HEARTBEAT_MS = 15000;
+/** Cross-instance: an unchanged state is republished at most this often. */
+const STATE_KEEPALIVE_MS = 2000;
+/** Cross-instance: a mirror missing from the roster is dropped once this quiet. */
+const MIRROR_QUIET_MS = 5000;
+/** Disconnect reasons where the client may come back on a new socket. */
+const RESUMABLE_REASONS = new Set(["transport close", "transport error", "ping timeout"]);
 
 /** Per-socket rate limits: { max events, per window ms }. */
 const LIMITS = {
@@ -102,13 +143,59 @@ export function sanitizeState(p) {
   let ry = nums.ry % TAU;
   if (ry > Math.PI) ry -= TAU;
   if (ry < -Math.PI) ry += TAU;
-  return {
+  const out = {
     x: clamp(nums.x, -WORLD_BOUNDS.x, WORLD_BOUNDS.x),
     y: clamp(nums.y, WORLD_BOUNDS.yMin, WORLD_BOUNDS.yMax),
     z: clamp(nums.z, -WORLD_BOUNDS.z, WORLD_BOUNDS.z),
     ry,
     anim: ANIMS.has(p.anim) ? p.anim : "idle",
   };
+  // Optional sender clock (ms, the sender's performance.now()): receivers use
+  // it to space snapshots by when they were sent, not when they arrived.
+  // Always present (undefined when absent) so Object.assign clears a stale one.
+  const ts = p.ts;
+  out.ts = typeof ts === "number" && Number.isFinite(ts) && ts >= 0 && ts < 1e12 ? Math.round(ts) : undefined;
+  return out;
+}
+
+/** Returns a clean ice cream order or null when the order is not valid. */
+export function sanitizeIceCream(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (typeof raw.flavour !== "string" || !ICE_FLAVOURS.has(raw.flavour)) return null;
+  const n = Number(raw.scoops);
+  const toppings = Array.isArray(raw.toppings)
+    ? [...new Set(raw.toppings.filter((t) => typeof t === "string" && ICE_TOPPINGS.has(t)))]
+    : [];
+  return {
+    flavour: raw.flavour,
+    scoops: Number.isFinite(n) ? clamp(Math.round(n), 1, ICE_SCOOPS_MAX) : 1,
+    style: ICE_STYLES.has(raw.style) ? raw.style : "cone",
+    toppings,
+  };
+}
+
+/**
+ * Returns the payload to relay for an action, or undefined when the action
+ * must be dropped. Every receiving client acts on these, so nothing is
+ * relayed as-is.
+ */
+export function sanitizeActionPayload(type, payload) {
+  switch (type) {
+    case "score": {
+      const n = Number(payload);
+      return Number.isFinite(n) ? clamp(Math.round(n), 1, SCORE_MAX_STEP) : 1;
+    }
+    case "iceCream":
+      return sanitizeIceCream(payload) ?? undefined;
+    case "battle": {
+      const id = payload?.id;
+      if (typeof id !== "string" || !BATTLE_ID_RE.test(id)) return undefined;
+      if (BATTLE_IDS && !BATTLE_IDS.has(id)) return undefined;
+      return { id };
+    }
+    default:
+      return ACTION_TYPES.has(type) ? {} : undefined;
+  }
 }
 
 function payloadSize(v) {
@@ -138,7 +225,7 @@ function rateLimiter() {
  * Builds the Express + Socket.IO application used both by the local dev
  * server and by the Vercel serverless function.
  */
-export function createMuseumServer({ staticDir = null, mountPath = null } = {}) {
+export function createMuseumServer({ staticDir = null, mountPath = null, sync: syncOptions = {} } = {}) {
   const app = express();
   const server = createServer(app);
 
@@ -162,14 +249,20 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
     maxHttpBufferSize: 1e5,
   });
 
-  const sync = createSync();
-  /** code -> { code, players: Map<id, player>, createdAt } */
+  const sync = createSync(syncOptions);
+  // Never wait longer than a roster entry takes to go stale.
+  const mirrorQuietMs = Math.min(MIRROR_QUIET_MS, sync.staleMs);
+  /**
+   * code -> { code, players: Map<id, player>, createdAt, battleAt, gone }
+   * `gone` remembers ids that recently left so a roster read that raced the
+   * leave cannot bring them back as ghosts.
+   */
   const rooms = new Map();
 
   function getRoom(code) {
     let room = rooms.get(code);
     if (!room) {
-      room = { code, players: new Map(), createdAt: Date.now() };
+      room = { code, players: new Map(), createdAt: Date.now(), battleAt: 0, gone: new Map() };
       rooms.set(code, room);
     }
     return room;
@@ -180,6 +273,24 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
     for (const p of room.players.values()) if (!p.remote) n++;
     return n;
   }
+
+  /** True while players from other instances share the room. */
+  function hasRemote(room) {
+    if (!room) return false;
+    for (const p of room.players.values()) if (p.remote) return true;
+    return false;
+  }
+
+  function tombstone(room, id) {
+    const now = Date.now();
+    room.gone.set(id, now);
+    for (const [gid, at] of room.gone) if (now - at > sync.staleMs) room.gone.delete(gid);
+  }
+
+  const isGone = (room, id) => {
+    const at = room.gone.get(id);
+    return at !== undefined && Date.now() - at <= sync.staleMs;
+  };
 
   /** Drop a room once no player on this instance is left in it. */
   function maybeDeleteRoom(code) {
@@ -232,53 +343,270 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
     return Array.from(room.players.values()).map(publicPlayer);
   }
 
+  /** Shared-roster entry: public fields + the resume key (never sent to clients). */
+  const rosterEntry = (p) => (p.k ? { ...publicPlayer(p), k: p.k } : publicPlayer(p));
+
+  const hashToken = (token) => createHash("sha256").update(token).digest("base64url").slice(0, 22);
+
   /** Emit to every local socket in the room except (optionally) one. */
   function fanOut(code, type, payload, exceptId = null) {
     const target = exceptId ? io.to(code).except(exceptId) : io.to(code);
     target.emit(type, payload);
   }
 
-  function pushEvent(code, type, payload, exceptId = null) {
+  /** Fan out locally and publish to other instances (`meta` rides along unseen by clients). */
+  function pushEvent(code, type, payload, exceptId = null, meta = null) {
     if (!code) return;
     fanOut(code, type, payload, exceptId);
-    sync.publish(code, { t: type, p: payload });
+    sync.publish(code, { ...meta, t: type, p: payload });
+  }
+
+  function publishState(code, player) {
+    const s = { id: player.id, x: player.x, y: player.y, z: player.z, ry: player.ry, anim: player.anim };
+    if (player.ts !== undefined) s.ts = player.ts;
+    player.pubKey = `${s.x},${s.y},${s.z},${s.ry},${s.anim}`;
+    player.pubAt = Date.now();
+    sync.publish(code, { t: "state", p: s });
+  }
+
+  /**
+   * Another instance just joined the room: states are only published while
+   * someone elsewhere is listening, so send it where our players stand now.
+   */
+  function republishLocalStates(code, room) {
+    for (const p of room.players.values()) if (!p.remote && !p.away) publishState(code, p);
+  }
+
+  /** Mirror of a player on another instance, rebuilt from untrusted data. */
+  function mirrorFrom(e, k) {
+    const s = sanitizeState(e) || { x: 0, y: 0, z: 0, ry: 0, anim: "idle" };
+    const score = Number(e.score);
+    return {
+      id: e.id,
+      name: sanitizeName(e.name),
+      color: typeof e.color === "string" && HEX_RE.test(e.color) ? e.color : PLAYER_PALETTE[0],
+      score: Number.isFinite(score) ? Math.max(0, Math.round(score)) : 0,
+      iceCream: sanitizeIceCream(e.iceCream),
+      look: sanitizeLook(e.look),
+      ...s,
+      remote: true,
+      k: typeof k === "string" ? k : undefined,
+      seenAt: Date.now(),
+    };
+  }
+
+  /**
+   * Add a mirror for a player on another instance and announce it to our
+   * sockets. A no-op for players we already have (or who just left), so a
+   * player seen in a roster and then in its own playerJoined event is only
+   * announced once.
+   */
+  function addMirror(code, room, entry, k) {
+    if (!entry || typeof entry.id !== "string" || !entry.id) return null;
+    if (entry.inst === sync.instanceId) return null; // our own roster entry
+    if (room.players.has(entry.id) || isGone(room, entry.id)) return null;
+    const m = mirrorFrom(entry, k ?? entry.k);
+    room.players.set(m.id, m);
+    fanOut(code, "playerJoined", publicPlayer(m));
+    republishLocalStates(code, room);
+    return m;
+  }
+
+  /** Remove a local player (and its socket) without announcing a leave. */
+  function evictLocal(code, room, prev) {
+    clearTimeout(prev.graceTimer);
+    room.players.delete(prev.id);
+    tombstone(room, prev.id);
+    sync.removePlayer(code, prev.id);
+    const old = io.sockets.sockets.get(prev.id);
+    if (old && old.data.room === code) {
+      old.data.room = null;
+      old.leave(code);
+      old.disconnect(true);
+    }
+  }
+
+  /** The player a reconnecting client left behind, if its resume key matches. */
+  function findResumable(room, k, prevId) {
+    const byId = typeof prevId === "string" ? room.players.get(prevId) : null;
+    if (byId && byId.k === k) return byId;
+    for (const p of room.players.values()) if (p.k === k) return p;
+    return null;
+  }
+
+  /** A player reconnected through another instance: swap ids silently. */
+  function onRemoteRejoin(code, r, p, k) {
+    if (typeof p.id !== "string" || !p.id) return;
+    const oldId = typeof p.oldId === "string" ? p.oldId : null;
+    const prev = oldId ? r.players.get(oldId) : null;
+    let swapped = false;
+    if (prev && k && prev.k === k) {
+      if (prev.remote) {
+        r.players.delete(oldId);
+        tombstone(r, oldId);
+      } else {
+        evictLocal(code, r, prev);
+      }
+      swapped = true;
+    }
+    if (r.players.has(p.id) || isGone(r, p.id)) return;
+    const m = mirrorFrom(p, k);
+    r.players.set(m.id, m);
+    if (swapped) fanOut(code, "playerRejoined", { ...publicPlayer(m), oldId });
+    else fanOut(code, "playerJoined", publicPlayer(m));
+    republishLocalStates(code, r);
   }
 
   /** Apply an event relayed from another instance to our mirror of the room. */
   function onRemoteEvent(code, ev) {
     const r = rooms.get(code);
-    if (!r || !ev || !ev.p) return;
-    const id = ev.p.id;
-    if (ev.t === "playerJoined") {
-      if (id && !r.players.has(id)) r.players.set(id, { ...ev.p, remote: true });
-    } else if (ev.t === "playerLeft") {
-      const p = r.players.get(id);
-      if (p && p.remote) r.players.delete(id);
-    } else {
-      const p = r.players.get(id);
-      if (p && p.remote) {
-        if (ev.t === "state") Object.assign(p, sanitizeState(ev.p) || {});
-        if (ev.t === "look") p.look = sanitizeLook(ev.p.look);
-        if (ev.t === "action" && ev.p.type === "score") p.score = ev.p.score ?? p.score;
-        if (ev.t === "action" && ev.p.type === "iceCream") p.iceCream = ev.p.payload || null;
+    if (!r || !ev || !ev.p || typeof ev.p !== "object") return;
+    const p = ev.p;
+    const id = p.id;
+    const k = typeof ev.k === "string" ? ev.k : undefined;
+    const mirror = r.players.get(id);
+    const remote = mirror && mirror.remote ? mirror : null;
+    if (remote) remote.seenAt = Date.now();
+
+    switch (ev.t) {
+      case "playerJoined":
+        // A join event is ordered after any earlier leave of the same id in
+        // the stream, so it overrides the tombstone (which only guards
+        // against stale roster reads).
+        if (typeof id === "string") r.gone.delete(id);
+        addMirror(code, r, p, k);
+        return;
+      case "playerRejoined":
+        onRemoteRejoin(code, r, p, k);
+        return;
+      case "playerLeft":
+        // Only announce leaves we actually applied (duplicates, resends).
+        if (!remote) return;
+        r.players.delete(id);
+        tombstone(r, id);
+        fanOut(code, "playerLeft", { id, name: remote.name });
+        return;
+      case "state": {
+        // Unknown ids would make clients spawn an avatar out of nowhere.
+        if (!remote) return;
+        const s = sanitizeState(p);
+        if (!s) return;
+        Object.assign(remote, s);
+        fanOut(code, "state", { id, ...s });
+        return;
       }
+      case "look":
+        if (!remote) return;
+        remote.look = sanitizeLook(p.look);
+        fanOut(code, "look", { id, look: remote.look });
+        return;
+      case "action": {
+        if (!remote || typeof p.type !== "string" || !ACTION_TYPES.has(p.type)) return;
+        const payload = sanitizeActionPayload(p.type, p.payload);
+        if (payload === undefined) return;
+        if (p.type === "iceCream") remote.iceCream = payload;
+        const score = Number(p.score);
+        if (Number.isFinite(score)) remote.score = Math.max(0, Math.round(score));
+        fanOut(code, "action", { id, name: remote.name, type: p.type, payload, score: remote.score || 0 });
+        return;
+      }
+      case "chat":
+        if (typeof p.text !== "string" || !p.text.trim()) return;
+        fanOut(code, "chat", { id, name: sanitizeName(p.name), text: p.text.slice(0, CHAT_MAX) });
+        return;
+      default:
     }
-    fanOut(code, ev.t, ev.p);
   }
 
-  /** Remove the socket's player from its current room (if any). */
-  function leaveRoom(socket) {
+  /**
+   * Bring our mirrors in line with the shared roster: drop players whose
+   * leave we never heard about (lost publish, trimmed stream, killed
+   * instance) and add players whose join we missed.
+   */
+  async function reconcile(code) {
+    const room = rooms.get(code);
+    if (!room || !sync.enabled) return;
+    const roster = await sync.getRoster(code);
+    if (!roster || rooms.get(code) !== room) return;
+    const now = Date.now();
+    const live = new Map();
+    for (const e of roster) {
+      if (!e || typeof e.id !== "string") continue;
+      if (e.inst === sync.instanceId) {
+        // Ours, but no such player here any more: a write that raced a leave.
+        if (!room.players.has(e.id)) sync.removePlayer(code, e.id);
+        continue;
+      }
+      live.set(e.id, e);
+    }
+    for (const [id, p] of room.players) {
+      // A brand-new mirror may simply not be in the roster yet, so only drop
+      // mirrors that have also gone quiet.
+      if (p.remote && !live.has(id) && now - (p.seenAt || 0) > mirrorQuietMs) {
+        room.players.delete(id);
+        tombstone(room, id);
+        fanOut(code, "playerLeft", { id, name: p.name });
+      }
+    }
+    for (const e of live.values()) addMirror(code, room, e);
+  }
+
+  /**
+   * Keep this instance's roster entries fresh (entries that stop being
+   * refreshed are treated as gone, which cleans up after a killed instance)
+   * and resync every room's mirrors.
+   */
+  function heartbeat() {
+    for (const [code, room] of rooms) {
+      const locals = [];
+      for (const p of room.players.values()) if (!p.remote) locals.push(rosterEntry(p));
+      sync.touchPlayers(code, locals);
+      reconcile(code).catch((e) => console.warn("[museum] roster resync failed", e?.message));
+    }
+  }
+  if (sync.enabled) {
+    const hb = setInterval(heartbeat, syncOptions.heartbeatMs ?? ROSTER_HEARTBEAT_MS);
+    hb.unref?.();
+    server.on("close", () => clearInterval(hb));
+  }
+
+  /** Remove a local player from its room and tell everybody. */
+  function dropPlayer(code, player) {
+    clearTimeout(player.graceTimer);
+    const room = rooms.get(code);
+    if (!room || room.players.get(player.id) !== player) return;
+    room.players.delete(player.id);
+    tombstone(room, player.id);
+    pushEvent(code, "playerLeft", { id: player.id, name: player.name });
+    sync.removePlayer(code, player.id);
+    maybeDeleteRoom(code);
+  }
+
+  /**
+   * Remove the socket's player from its current room (if any). With
+   * `holdForResume` a player that has a resume key stays (frozen) for
+   * RESUME_GRACE_MS, so a quick reconnect takes it over silently instead of
+   * everyone seeing "left" + "joined" and the colour/score resetting.
+   */
+  function leaveRoom(socket, { holdForResume = false } = {}) {
     const code = socket.data.room;
     if (!code) return;
     socket.data.room = null;
     socket.leave(code);
     const room = rooms.get(code);
     if (!room) return;
-    if (room.players.delete(socket.id)) {
-      pushEvent(code, "playerLeft", { id: socket.id, name: socket.data.name });
-      sync.removePlayer(code, socket.id);
+    const player = room.players.get(socket.id);
+    if (!player) {
+      maybeDeleteRoom(code);
+      return;
     }
-    maybeDeleteRoom(code);
+    if (holdForResume && player.k) {
+      player.away = true;
+      player.graceTimer = setTimeout(() => dropPlayer(code, player), RESUME_GRACE_MS);
+      player.graceTimer.unref?.();
+      return;
+    }
+    dropPlayer(code, player);
   }
 
   async function doJoin(socket, opts, ack) {
@@ -296,13 +624,20 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
       .replace(/[^A-Z0-9]/g, "")
       .slice(0, 8);
     if (code.length < 3) code = newRoomCode();
+    const k = typeof opts.resume === "string" && RESUME_RE.test(opts.resume) ? hashToken(opts.resume) : null;
 
     // Re-join on the same socket: leave the previous room first.
     leaveRoom(socket);
 
-    const watchRoom = () => sync.watch(code, (ev) => onRemoteEvent(code, ev));
+    const watchRoom = () =>
+      sync.watch(code, (ev) => onRemoteEvent(code, ev), {
+        shared: () => hasRemote(rooms.get(code)),
+        onGap: () => reconcile(code).catch(() => {}),
+      });
     let remoteRoster = null;
     if (sync.enabled) {
+      // Every Redis call is time-limited (see sync.js), so a slow or
+      // unreachable Redis degrades this join to local-only instead of hanging.
       await watchRoom();
       remoteRoster = await sync.getRoster(code);
       if (!socket.connected) {
@@ -317,10 +652,21 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
     const room = getRoom(code);
     if (sync.enabled) {
       watchRoom(); // no-op when already polling
-      for (const r of remoteRoster || []) {
-        if (r && r.id && r.id !== socket.id && !room.players.has(r.id)) {
-          room.players.set(r.id, { ...r, remote: true });
-        }
+      // Our sockets in the room are told about any mirror added here; the
+      // joiner gets them in its roster below.
+      for (const r of remoteRoster || []) if (r && r.id !== socket.id) addMirror(code, room, r);
+    }
+
+    // Reconnect: take over the player this client left behind (possibly a
+    // ghost whose dead socket the server has not noticed yet).
+    const prev = k ? findResumable(room, k, opts.prevId) : null;
+    if (prev) {
+      if (prev.remote) {
+        room.players.delete(prev.id);
+        tombstone(room, prev.id);
+        sync.removePlayer(code, prev.id);
+      } else {
+        evictLocal(code, room, prev);
       }
     }
 
@@ -328,24 +674,28 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
     const player = {
       id: socket.id,
       name,
-      color: pickColor(room),
-      score: 0,
-      iceCream: null,
-      look: sanitizeLook(opts.look),
-      x: spawn?.x ?? 0,
-      y: spawn?.y ?? 0,
-      z: spawn?.z ?? 0,
-      ry: spawn?.ry ?? 0,
+      color: prev?.color ?? pickColor(room),
+      score: prev?.score || 0,
+      iceCream: prev?.iceCream ?? null,
+      look: sanitizeLook(opts.look) ?? prev?.look ?? null,
+      x: spawn?.x ?? prev?.x ?? 0,
+      y: spawn?.y ?? prev?.y ?? 0,
+      z: spawn?.z ?? prev?.z ?? 0,
+      ry: spawn?.ry ?? prev?.ry ?? 0,
       anim: spawn?.anim ?? "idle",
+      k,
     };
     room.players.set(socket.id, player);
     socket.join(code);
     socket.data.room = code;
     socket.data.name = name;
 
-    // Tell everybody (including other instances) that this player arrived.
-    pushEvent(code, "playerJoined", publicPlayer(player), socket.id);
-    sync.addPlayer(code, publicPlayer(player));
+    // Tell everybody (including other instances) that this player arrived,
+    // or, on a resume, that it is the same player under a new id.
+    const meta = k ? { k } : null;
+    if (prev) pushEvent(code, "playerRejoined", { ...publicPlayer(player), oldId: prev.id }, socket.id, meta);
+    else pushEvent(code, "playerJoined", publicPlayer(player), socket.id, meta);
+    sync.addPlayer(code, rosterEntry(player));
 
     // Roster = local players + mirrors of players on other instances.
     const roster = publicPlayers(room);
@@ -356,6 +706,8 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
       color: player.color,
       players: roster,
       crossInstance: sync.enabled,
+      resumed: Boolean(prev),
+      score: player.score,
     });
   }
 
@@ -391,13 +743,15 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
       const s = sanitizeState(p);
       if (!s) return;
       Object.assign(cur.player, s);
-      pushEvent(cur.code, "state", { id: socket.id, ...s }, socket.id);
-      // Keep the shared roster's last position roughly fresh for players
-      // joining through another instance (throttled: one write per 2 s).
-      const now = Date.now();
-      if (sync.enabled && now - (cur.player.rosterAt || 0) > 2000) {
-        cur.player.rosterAt = now;
-        sync.addPlayer(cur.code, publicPlayer(cur.player));
+      fanOut(cur.code, "state", { id: socket.id, ...s }, socket.id);
+      // Other instances only need the stream while one of their players is
+      // in the room, and an idle player's identical states only as a slow
+      // keepalive: every publish is a paid Redis command.
+      if (sync.enabled && hasRemote(cur.room)) {
+        const key = `${s.x},${s.y},${s.z},${s.ry},${s.anim}`;
+        if (key !== cur.player.pubKey || Date.now() - (cur.player.pubAt || 0) >= STATE_KEEPALIVE_MS) {
+          publishState(cur.code, cur.player);
+        }
       }
     });
 
@@ -407,7 +761,7 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
       if (limited("look")) return;
       cur.player.look = sanitizeLook(look);
       pushEvent(cur.code, "look", { id: socket.id, look: cur.player.look }, socket.id);
-      sync.addPlayer(cur.code, publicPlayer(cur.player));
+      sync.addPlayer(cur.code, rosterEntry(cur.player));
     });
 
     socket.on("chat", (text) => {
@@ -434,17 +788,30 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
       const type = msg.type;
       if (typeof type !== "string" || !ACTION_TYPES.has(type)) return;
       if (payloadSize(msg.payload) > ACTION_PAYLOAD_MAX) return;
+      // Receivers build meshes / start the cinema from these: relay only
+      // whitelisted, clamped payloads.
+      const payload = sanitizeActionPayload(type, msg.payload ?? null);
+      if (payload === undefined) return;
       if (limited("action")) return;
-      const { player } = cur;
+      const { player, room } = cur;
 
-      let payload = msg.payload ?? null;
-      if (type === "score") {
-        const n = Number(payload);
-        payload = Number.isFinite(n) ? clamp(Math.round(n), 1, SCORE_MAX_STEP) : 1;
-        player.score = (player.score || 0) + payload;
+      if (type === "battle") {
+        const now = Date.now();
+        if (now - room.battleAt < BATTLE_COOLDOWN_MS) {
+          socket.emit("rateLimited", { type: "battle" });
+          return;
+        }
+        room.battleAt = now;
       }
+      if (type === "photo") {
+        const now = Date.now();
+        if (now - (player.photoAt || 0) < PHOTO_COOLDOWN_MS) return;
+        player.photoAt = now;
+      }
+      if (type === "score") player.score = (player.score || 0) + payload;
       if (type === "iceCream") {
-        player.iceCream = payload && typeof payload === "object" ? payload : null;
+        player.iceCream = payload;
+        sync.addPlayer(cur.code, rosterEntry(player));
       }
       // The sender already applied the action locally: don't echo it back.
       pushEvent(
@@ -455,8 +822,8 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
       );
     });
 
-    socket.on("disconnect", () => {
-      leaveRoom(socket);
+    socket.on("disconnect", (reason) => {
+      leaveRoom(socket, { holdForResume: RESUMABLE_REASONS.has(reason) });
     });
   });
 
@@ -475,7 +842,11 @@ export function createMuseumServer({ staticDir = null, mountPath = null } = {}) 
   app.get("/health", health);
   if (staticDir) {
     app.use(express.static(staticDir));
-    app.get(/^\/(?!api\/|socket\.io\/|health$).*/, (_req, res) => {
+    // SPA fallback for page routes only: a missing asset (/js/x.js,
+    // /models/x.glb) must be a real 404, not index.html with status 200.
+    app.get(/^\/(?!api\/|socket\.io\/|health$).*/, (req, res, next) => {
+      const last = req.path.slice(req.path.lastIndexOf("/") + 1);
+      if (/\.[A-Za-z0-9]+$/.test(last) || !req.accepts("html")) return next();
       res.sendFile("index.html", { root: staticDir });
     });
   }

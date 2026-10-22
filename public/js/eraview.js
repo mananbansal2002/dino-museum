@@ -12,6 +12,11 @@
  *
  * Input while open: drag (mouse / touch) to look around, wheel or pinch to zoom, arrow keys to
  * pan, Esc or the close button to leave. It gently auto-rotates when left alone.
+ *
+ * The viewer is modal: while open it swallows every keydown (capture phase on window), so game
+ * hotkeys, chat and jump never fire underneath it. render() draws nothing until the panorama has
+ * decoded, so the last museum frame stays on the canvas while a dark curtain fades in over it;
+ * the curtain then fades out to reveal the era (a dip-to-black instead of a hard cut).
  */
 
 import * as THREE from "three";
@@ -84,7 +89,10 @@ const CSS = `
 .eraview{position:fixed;inset:0;z-index:2147483000;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#f3f1ea;opacity:0;transition:opacity .45s ease}
 .eraview.ev-show{opacity:1}
+.eraview:focus{outline:none}
 .eraview.ev-drag{cursor:grabbing}
+.eraview .ev-curtain{position:absolute;inset:0;pointer-events:none;background:#07080a;transition:opacity .8s ease}
+.eraview.ev-ready .ev-curtain{opacity:0}
 .eraview .ev-vignette{position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.45) 100%)}
 .eraview .ev-glass{background:rgba(14,16,20,.52);border:1px solid rgba(255,255,255,.14);border-radius:14px;
@@ -112,7 +120,37 @@ const CSS = `
   .eraview .ev-facts{font-size:13px}
   .eraview .ev-close{right:12px;top:12px}
   .eraview .ev-hint{bottom:14px;font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){
+  .eraview,.eraview .ev-curtain{transition:none}
 }`;
+
+/* must match the .eraview opacity transition: the panorama is revealed only once the curtain is opaque */
+const FADE_IN_MS = 450;
+/* zero the drag fling if the pointer was held still this long before release */
+const FLING_STALE_MS = 80;
+
+/* keydown e.key -> look/zoom action. Matched on e.key so it follows the keyboard layout, but held
+ * keys are tracked by e.code: Shift+'=' is '+' on keydown yet '=' on keyup if Shift is let go first. */
+const KEY_ACTIONS = {
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+  ArrowDown: "down",
+  "+": "in",
+  "=": "in",
+  "-": "out",
+  _: "out",
+};
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "AltGraph"]);
+
+function prefersReducedMotion() {
+  try {
+    return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
 
 function injectStyle() {
   if (document.getElementById(STYLE_ID)) return;
@@ -202,12 +240,17 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
   let targetFov = 72;
   let idle = 0;
   let time = 0;
-  const keys = new Set();
+  const held = new Map(); // e.code -> KEY_ACTIONS value
   const pointers = new Map();
   let pinchDist = 0;
+  let lastMoveAt = 0;
+  let ready = false; // panorama decoded and revealed: render() draws the era scene
+  let openedAt = 0;
+  let lockEl = null; // element that held pointer lock when the viewer opened
 
   /* DOM */
   let root = null;
+  let closeBtn = null;
   let hintEl = null;
   let loadingEl = null;
   let lastFocus = null;
@@ -218,6 +261,9 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", info.title || "Era view");
+    // the dialog itself takes focus (not the × button, where Space/Enter would close it)
+    root.tabIndex = -1;
+    root.appendChild(el("div", "ev-curtain"));
     root.appendChild(el("div", "ev-vignette"));
 
     const panel = el("div", "ev-panel ev-glass");
@@ -242,6 +288,7 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
       api.close();
     });
     root.appendChild(close);
+    closeBtn = close;
 
     hintEl = el("div", "ev-hint ev-glass", "Drag to look around · Scroll to zoom · Esc to close");
     root.appendChild(hintEl);
@@ -258,13 +305,14 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
     document.body.appendChild(root);
     requestAnimationFrame(() => root && root.classList.add("ev-show"));
     lastFocus = document.activeElement;
-    close.focus({ preventScroll: true });
+    root.focus({ preventScroll: true });
   }
 
   function removeOverlay() {
     if (!root) return;
     const r = root;
     root = null;
+    closeBtn = null;
     hintEl = null;
     loadingEl = null;
     r.remove();
@@ -314,12 +362,17 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
     pitch += dy * s;
     velYaw = dx * s * 60;
     velPitch = dy * s * 60;
+    lastMoveAt = performance.now();
     clampPitch();
   }
   function onPointerUp(e) {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinchDist = 0;
-    if (!pointers.size && root) root.classList.remove("ev-drag");
+    if (!pointers.size) {
+      if (root) root.classList.remove("ev-drag");
+      // held still before letting go: stay where the user stopped instead of flinging
+      if (performance.now() - lastMoveAt > FLING_STALE_MS) velYaw = velPitch = 0;
+    }
   }
   function pinchDistance() {
     const pts = [...pointers.values()];
@@ -334,21 +387,47 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
   }
   function onKeyDown(e) {
     if (!open_) return;
+    // modifier-only presses can't trigger anything; let them through so held-modifier state stays in sync
+    if (MODIFIER_KEYS.has(e.key)) return;
+    // modal: nothing reaches the game underneath (E would reopen the viewer, T would open an
+    // unfocusable chat, G would photograph the panorama, V/B would broadcast to other players...)
+    e.stopImmediatePropagation();
     if (e.key === "Escape") {
       e.preventDefault();
-      e.stopImmediatePropagation();
       api.close();
       return;
     }
-    if (e.key.startsWith("Arrow") || e.key === "+" || e.key === "-" || e.key === "=") {
+    if (e.key === "Tab") {
+      // keep focus inside the dialog: the × button is its only control
       e.preventDefault();
-      e.stopImmediatePropagation();
-      keys.add(e.key);
-      idle = 0;
+      if (closeBtn) closeBtn.focus({ preventScroll: true });
+      return;
     }
+    // leave browser shortcuts (Ctrl/Cmd +/- page zoom, reload...) alone
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const action = KEY_ACTIONS[e.key];
+    if (action) {
+      e.preventDefault();
+      held.set(e.code || e.key, action);
+      idle = 0;
+      return;
+    }
+    // Space/Enter only activate × once the user has deliberately tabbed to it
+    if ((e.key === " " || e.key === "Enter") && e.target !== closeBtn) e.preventDefault();
   }
   function onKeyUp(e) {
-    keys.delete(e.key);
+    held.delete(e.code || e.key);
+  }
+  function holding(action) {
+    for (const a of held.values()) if (a === action) return true;
+    return false;
+  }
+  /* keyups are lost when the window loses focus mid-press: drop held keys so nothing sticks */
+  function releaseKeys() {
+    held.clear();
+  }
+  function onVisibility() {
+    if (document.hidden) releaseKeys();
   }
   function onResize() {
     renderer.getSize(size);
@@ -368,6 +447,46 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
       hintTimer = setTimeout(() => {
         hintEl && hintEl.classList.add("ev-fade");
       }, 2500);
+    }
+  }
+  /* timers tied to one opening (cleared by open/close, so they can't act on a later overlay) */
+  let revealTimer = 0;
+  let hintDelayTimer = 0;
+  function clearTimers() {
+    clearTimeout(hintTimer);
+    clearTimeout(revealTimer);
+    clearTimeout(hintDelayTimer);
+    hintTimer = revealTimer = hintDelayTimer = 0;
+  }
+  /* panorama decoded (or failed): once the curtain has fully faded in, start drawing the era and
+   * fade the curtain out. Until then the canvas keeps the last museum frame. */
+  function scheduleReveal(token) {
+    const fadeIn = prefersReducedMotion() ? 0 : FADE_IN_MS;
+    const wait = Math.max(0, fadeIn - (performance.now() - openedAt));
+    revealTimer = setTimeout(() => {
+      revealTimer = 0;
+      if (token !== loadToken || !root) return;
+      ready = true;
+      root.classList.add("ev-ready");
+      hintDelayTimer = setTimeout(() => {
+        hintDelayTimer = 0;
+        if (token === loadToken) fadeHint();
+      }, 1500);
+    }, wait);
+  }
+
+  /* pointer lock was dropped on open; take it back on close. requestPointerLock needs transient
+   * user activation, which the × click / Enter give but Esc never does (browsers exclude it), so
+   * after Esc the game's usual click-to-lock applies. */
+  function restoreLock(target) {
+    if (!target || !target.isConnected || !target.requestPointerLock || document.pointerLockElement) return;
+    const ua = navigator.userActivation;
+    if (ua && !ua.isActive) return;
+    try {
+      const p = target.requestPointerLock();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch {
+      /* ignore: drag-to-look / click-to-lock still work */
     }
   }
 
@@ -406,6 +525,8 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
       if (open_) {
         removeOverlay();
         disposeTexture();
+      } else {
+        lockEl = document.pointerLockElement || null;
       }
       open_ = true;
       eraId = id;
@@ -423,10 +544,11 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
       velYaw = velPitch = 0;
       fov = targetFov = 72;
       idle = 0;
-      keys.clear();
+      held.clear();
       pointers.clear();
-      clearTimeout(hintTimer);
-      hintTimer = 0;
+      clearTimers();
+      ready = false;
+      openedAt = performance.now();
       applyMote(base.mote);
       onResize();
       buildOverlay(merged);
@@ -441,12 +563,13 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
             return;
           }
           if (loadingEl) loadingEl.hidden = true;
-          setTimeout(fadeHint, 1500);
+          scheduleReveal(token);
         },
         undefined,
         () => {
           if (token !== loadToken) return;
           if (loadingEl) loadingEl.textContent = "Could not load this era's panorama.";
+          scheduleReveal(token); // still lift the curtain: motes over the dark backdrop
         }
       );
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -461,26 +584,35 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
       window.addEventListener("keydown", onKeyDown, true);
       window.addEventListener("keyup", onKeyUp, true);
       window.addEventListener("resize", onResize);
+      window.addEventListener("blur", releaseKeys);
+      document.addEventListener("visibilitychange", onVisibility);
       if (onOpen) onOpen(id);
     },
 
     close() {
       if (!open_) return;
       open_ = false;
+      ready = false;
       loadToken++;
       const id = eraId;
       eraId = null;
+      const relockEl = lockEl;
+      lockEl = null;
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("keyup", onKeyUp, true);
       window.removeEventListener("resize", onResize);
-      clearTimeout(hintTimer);
-      hintTimer = 0;
-      keys.clear();
+      window.removeEventListener("blur", releaseKeys);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearTimers();
+      held.clear();
       pointers.clear();
       removeOverlay();
       disposeTexture();
       if (onClose) onClose(id);
-      window.dispatchEvent(new CustomEvent("eraview:close", { detail: { era: id } }));
+      // hadPointerLock: the player was in mouse-look when the viewer opened (re-locked here when the
+      // close came from a user gesture that allows it; listeners can prompt "click to look" otherwise)
+      window.dispatchEvent(new CustomEvent("eraview:close", { detail: { era: id, hadPointerLock: !!relockEl } }));
+      restoreLock(relockEl);
     },
 
     isOpen() {
@@ -500,12 +632,14 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
 
       // keyboard look / zoom
       const ks = 1.4 * dt * (fov / 72);
-      if (keys.has("ArrowLeft")) yaw += ks;
-      if (keys.has("ArrowRight")) yaw -= ks;
-      if (keys.has("ArrowUp")) pitch += ks;
-      if (keys.has("ArrowDown")) pitch -= ks;
-      if (keys.has("+") || keys.has("=")) targetFov = clampFov(targetFov * (1 - dt));
-      if (keys.has("-")) targetFov = clampFov(targetFov * (1 + dt));
+      if (held.size) {
+        if (holding("left")) yaw += ks;
+        if (holding("right")) yaw -= ks;
+        if (holding("up")) pitch += ks;
+        if (holding("down")) pitch -= ks;
+        if (holding("in")) targetFov = clampFov(targetFov * (1 - dt));
+        if (holding("out")) targetFov = clampFov(targetFov * (1 + dt));
+      }
 
       // inertia after a drag
       if (!pointers.size) {
@@ -554,7 +688,9 @@ export function createEraView({ renderer, basePath = "/images/eras/", onOpen, on
     },
 
     render() {
-      if (!open_) return;
+      // nothing until the panorama is revealed: the canvas keeps its last (museum) frame under the
+      // curtain instead of cutting to an empty black cube map
+      if (!open_ || !ready) return;
       // show the photographic panorama as-is (the museum uses ACES, which would wash it out)
       const tm = renderer.toneMapping;
       const scissor = renderer.getScissorTest();

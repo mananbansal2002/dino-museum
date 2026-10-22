@@ -311,6 +311,13 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
         // with a huge (slow frame) step: the visitor must stay on its side
         const R = 0.52;
         for (const dir of [-1, 1]) {
+          // furniture pushed up against this wall (e.g. the info desk): no
+          // visitor can stand there, so there is nothing to walk in from
+          const [sx, sz] = [bx - dc * dir * (R + 0.3), bz - dr * dir * (R + 0.3)];
+          const blockedByProp = (world.PROP_OBSTACLES || []).some(
+            (o) => sx > o.minX - R && sx < o.maxX + R && sz > o.minZ - R && sz < o.maxZ + R
+          );
+          if (blockedByProp) continue;
           for (const [step, withPrev] of [
             [0.4, false],
             [0.4, true],
@@ -525,11 +532,105 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
   console.log(`✓ ${Object.keys(eras).length} era windows`);
 }
 
+/* panel sizes follow the animal's length, also for "~9.5 m" / "up to 7 m" */
+{
+  const { panelWidth } = world;
+  for (const [text, len] of [
+    ["8.5–9.7 m", 8.5],
+    ["~9.5 m", 9.5],
+    ["up to 7 m wingspan", 7],
+    ["~2–3 m", 2],
+  ]) {
+    const want = Math.max(1.8, Math.min(4.5, 1.5 + len * 0.15));
+    const got = panelWidth({ info: { length: text } });
+    if (Math.abs(got - want) > 1e-9) fail(`panelWidth("${text}") is ${got}, expected ${want}`);
+  }
+  for (const s of SPECIES_LIST) {
+    if (!/\d/.test(String(s.info?.length ?? ""))) warn(`${s.id} has no length: its panel gets the default size`);
+  }
+}
+
+/* exhibit placards stand beside their panel and face whoever reads it */
+{
+  let n = 0;
+  for (const p of world.EXHIBIT_PANELS) {
+    const spot = world.placardSpot({ x: p.x, z: p.z, ry: p.face, pedestal: p.w });
+    const nx = Math.sin(spot.rot);
+    const nz = Math.cos(spot.rot);
+    // the side of the panel it stands on, and a visitor 5 m out on that side
+    const side = spot.back ? -1 : 1;
+    const fx = Math.sin(p.face) * side;
+    const fz = Math.cos(p.face) * side;
+    if (nx * fx + nz * fz < 0.5) fail(`the placard of ${p.id} does not face the way its panel does`);
+    const vx = p.x + fx * 5 - spot.px;
+    const vz = p.z + fz * 5 - spot.pz;
+    if ((nx * vx + nz * vz) / Math.hypot(vx, vz) < 0.3) fail(`the placard of ${p.id} is not readable from in front of its panel`);
+    if (roomAt(spot.px, spot.pz)?.id !== p.room) fail(`the placard of ${p.id} is outside its hall`);
+    n++;
+  }
+  console.log(`✓ ${n} exhibit placards face their visitors`);
+}
+
+/* standing in front of a panel, the prompt names that panel (main.js picks
+   the nearest interactable whose radius you are inside) */
+{
+  const nearest = (x, z) => {
+    let best = null;
+    let bestD = Infinity;
+    for (const it of interactables) {
+      const d = Math.hypot(it.x - x, it.z - z);
+      if (d < it.radius && d < bestD) {
+        bestD = d;
+        best = it;
+      }
+    }
+    return best;
+  };
+  let spots = 0;
+  for (const p of world.EXHIBIT_PANELS) {
+    const fx = Math.sin(p.face);
+    const fz = Math.cos(p.face);
+    for (const d of [1.5, 2.5, 3.5, 4.5]) {
+      for (const l of [-p.w / 2, 0, p.w / 2]) {
+        const x = p.x + fx * d + fz * l;
+        const z = p.z + fz * d - fx * l;
+        if (roomAt(x, z)?.id !== p.room) continue;
+        const [rx, rz] = world.resolveCollision(x, z, 0.52);
+        if (Math.hypot(rx - x, rz - z) > 1e-6) continue; // nobody can stand there
+        spots++;
+        const it = nearest(x, z);
+        if (it?.id !== `exhibit:${p.id}`) {
+          fail(`${d} m in front of the ${p.id} panel the prompt offers ${it ? it.id : "nothing"}`);
+        }
+      }
+    }
+  }
+  console.log(`✓ the prompt names the right exhibit from ${spots} spots in front of the panels`);
+}
+
+/* furniture is solid: every collider stands on the floor of one room, clear
+   of the exhibit panels, and pushes a visitor out */
+{
+  const props = world.PROP_OBSTACLES || [];
+  if (!props.length) fail("world.js exports no PROP_OBSTACLES: furniture has no collision");
+  for (const o of props) {
+    const cx = Number.isFinite(o.r) ? o.x : (o.minX + o.maxX) / 2;
+    const cz = Number.isFinite(o.r) ? o.z : (o.minZ + o.maxZ) / 2;
+    if (!roomAt(cx, cz)) fail(`the collider ${o.id} stands in a wall`);
+    const [rx, rz] = world.resolveCollision(cx, cz, 0.52);
+    if (Math.hypot(rx - cx, rz - cz) < 0.5) fail(`the collider ${o.id} does not push a visitor out`);
+    for (const f of footprints) {
+      if (o.minX < f.maxX && o.maxX > f.minX && o.minZ < f.maxZ && o.maxZ > f.minZ) fail(`the collider ${o.id} overlaps the panel ${f.id}`);
+    }
+  }
+  console.log(`✓ ${props.length} pieces of furniture are solid`);
+}
+
 /* fine-grained walk test with the real collision code: every point of
    interest must be reachable on foot from the spawn point */
 {
   const R = 0.52;
-  const STEP = 0.5;
+  const STEP = 0.25;
   const x0 = -(GRID_W * CELL) / 2;
   const z0 = -(GRID_H * CELL) / 2;
   const nx = Math.round((GRID_W * CELL) / STEP);
@@ -574,15 +675,18 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
         q.push(kk);
       }
     }
+    // is there a reached sample point (a cell centre, where the walk test
+    // actually stood the visitor) within radius of (x, z)?
     const reachableNear = (x, z, radius) => {
-      const n = Math.ceil(radius / STEP);
-      for (let dj = -n; dj <= n; dj++) {
-        for (let di = -n; di <= n; di++) {
-          const px = x + di * STEP;
-          const pz = z + dj * STEP;
-          if (Math.hypot(px - x, pz - z) > radius - 0.05) continue;
-          const k = idx(px, pz);
-          if (k >= 0 && reached[k]) return true;
+      const n = Math.ceil(radius / STEP) + 1;
+      const ci = Math.floor((x - x0) / STEP);
+      const cj = Math.floor((z - z0) / STEP);
+      for (let j = cj - n; j <= cj + n; j++) {
+        for (let i = ci - n; i <= ci + n; i++) {
+          if (i < 0 || j < 0 || i >= nx || j >= nz || !reached[j * nx + i]) continue;
+          const px = x0 + (i + 0.5) * STEP;
+          const pz = z0 + (j + 0.5) * STEP;
+          if (Math.hypot(px - x, pz - z) <= radius - 0.05) return true;
         }
       }
       return false;

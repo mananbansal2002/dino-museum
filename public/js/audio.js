@@ -4,20 +4,29 @@
  *
  * Signal graph
  *
- *   sfx ──────────────┐
- *   ambBus → ambDuck ─┼→ master → compressor → destination
+ *   spot[zone] (gated) ┐
+ *   sfx ───────────────┤
+ *   ambBus → ambDuck ──┼→ master → compressor → destination
  *   revIn → convolver → revOut ┘
  *
  * Every gain change is ramped (no clicks), noise comes from a few looped
  * buffers generated once, and ambience beds are only alive while audible.
+ * One-shot SFX are only scheduled while the context clock is running, so a
+ * locked / suspended context never builds up a backlog of stale sounds.
  *
  * Public API (backwards compatible):
  *   ensure(), ambient(on), roar(intensity), chime(freq?), slurp(), step(vol),
  *   click(freq), setMuted(bool), muted
  * New:
- *   setZone(name)          zone key or a hall name ("Jurassic Hall" etc.)
+ *   setZone(name)          zone key or a hall name ("Jurassic Hall" etc.);
+ *                          debounced, so doorway jitter never rebuilds a bed
  *   setMasterVolume(0..1)  persisted
  *   duck(on)               lowers ambience (e.g. while a video plays)
+ *   roar(p, { zone })      only audible while the listener is in that zone
+ *                          (e.g. "theatre" for screening SFX)
+ *   roar(p, { distance })  another player's roar, attenuated by distance (m)
+ *   chime(f, { zone })     zone-gated like roar
+ *   land(impact)           heavier footstep for landing after a jump/fall
  *   zone, volume, ducked   getters
  * Also exported: zoneForHall(hallName), ZONES.
  */
@@ -85,10 +94,34 @@ const ROOM_LEVEL = {
   plaza: 0.25,
 };
 
+/** A zone change must persist this long before the ambience crossfades. */
+const ZONE_DWELL = 0.6;
+const ZONE_FADE = 2.5;
+/** Another player's roar is inaudible beyond this distance (metres). */
+const REMOTE_RANGE = 28;
+/** Noise loops are rendered at a fixed rate (sources resample), so their
+ *  generation cost does not scale with 96k / 192k output devices. */
+const NOISE_RATE = 32000;
+/** Activation-triggering events (HTML spec): any of them may unlock audio. */
+const UNLOCK_EVENTS = ["pointerdown", "pointerup", "touchend", "keydown", "click"];
+
+/** Run fn when the main thread is idle (Safari has no requestIdleCallback). */
+const later = (fn) =>
+  typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 16);
+
 export function createAudio() {
   let ctx = null;
+  let ctxBorn = 0;
   let master, comp, sfx, ambBus, ambDuck, ambRevSend, revIn, revOut;
   let noiseWhite, noisePink, noiseBrown, shaperCurve;
+  /** dry bus → its reverb send; anything not listed sends to ambRevSend. */
+  const sends = new WeakMap();
+  /** zone → { dry, wet } gated SFX buses, open only while in that zone. */
+  const spots = new Map();
+  /** Killed beds still fading out, by name, so a quick return revives them. */
+  const fading = new Map();
+  let pendingZone = null;
+  let zoneTimer = 0;
   let muted = load(STORE_MUTED, "0") === "1";
   let volume = clamp(parseFloat(load(STORE_VOLUME, "0.8")) || 0, 0, 1);
   if (!Number.isFinite(volume)) volume = 0.8;
@@ -116,7 +149,13 @@ export function createAudio() {
       } catch {
         return null;
       }
+      ctxBorn = performance.now();
       build();
+      // Whenever the clock (re)starts — unlock, unmute, tab shown — fill in
+      // any ambience bed that was skipped while it was frozen.
+      ctx.addEventListener("statechange", () => {
+        if (ctx.state === "running" && ambientOn) startAmbience();
+      });
       if (typeof document !== "undefined") {
         document.addEventListener("visibilitychange", () => {
           if (!ctx) return;
@@ -125,10 +164,21 @@ export function createAudio() {
         });
       }
     }
-    if (ctx.state === "suspended" && !muted && !(typeof document !== "undefined" && document.hidden)) {
+    if (ctx.state !== "running" && ctx.state !== "closed" && !muted && !(typeof document !== "undefined" && document.hidden)) {
       ctx.resume().catch(() => {});
     }
     return ctx;
+  }
+
+  // WebKit only lets a context start inside a user gesture, and callers may
+  // first reach ensure() after an await (e.g. the multiplayer join). So any
+  // gesture creates / resumes the context; once it runs this is a no-op.
+  function unlock() {
+    if (muted || (ctx && ctx.state === "running")) return;
+    if (!ensure()) UNLOCK_EVENTS.forEach((e) => document.removeEventListener(e, unlock, true));
+  }
+  if (typeof document !== "undefined") {
+    UNLOCK_EVENTS.forEach((e) => document.addEventListener(e, unlock, { capture: true, passive: true }));
   }
 
   function build() {
@@ -157,7 +207,7 @@ export function createAudio() {
 
     revIn = c.createGain();
     const conv = c.createConvolver();
-    conv.buffer = impulse(2.8);
+    impulse(conv, 2.8); // filled in idle slices; the reverb is silent until then
     revOut = c.createGain();
     revOut.gain.value = 0.55;
     revIn.connect(conv);
@@ -167,6 +217,7 @@ export function createAudio() {
     ambRevSend = c.createGain();
     ambRevSend.gain.value = ducked ? 0.22 : 1;
     ambRevSend.connect(revIn);
+    sends.set(sfx, revIn);
 
     noiseWhite = makeNoise(2, "white");
     noisePink = makeNoise(4, "pink");
@@ -181,28 +232,44 @@ export function createAudio() {
     if (muted) ctx.suspend().catch(() => {});
   }
 
-  /** Stone-hall impulse response: stereo decaying noise, darker over time. */
-  function impulse(seconds) {
-    const rate = ctx.sampleRate;
+  /**
+   * Stone-hall impulse response: stereo decaying noise, darker over time.
+   * A convolver needs it at the context rate (up to 192k), so it is rendered
+   * in short idle slices instead of one long task while the player joins.
+   */
+  function impulse(conv, seconds) {
+    const c = ctx;
+    const rate = c.sampleRate;
     const len = Math.floor(rate * seconds);
-    const buf = ctx.createBuffer(2, len, rate);
-    for (let ch = 0; ch < 2; ch++) {
-      const d = buf.getChannelData(ch);
-      let lp = 0;
-      for (let i = 0; i < len; i++) {
-        const p = i / len;
-        const k = 0.75 - 0.65 * p; // one-pole coefficient: brighter early, darker tail
-        lp += k * (Math.random() * 2 - 1 - lp);
-        const early = i < rate * 0.08 && Math.random() < 0.004 ? 1.5 : 0;
-        d[i] = (lp + early * (Math.random() - 0.5)) * Math.pow(1 - p, 3.2);
+    const buf = c.createBuffer(2, len, rate);
+    const data = [buf.getChannelData(0), buf.getChannelData(1)];
+    const lp = [0, 0];
+    const earlyEnd = rate * 0.08;
+    let i = 0;
+    const work = () => {
+      if (c.state === "closed") return;
+      const until = performance.now() + 6;
+      while (i < len && performance.now() < until) {
+        for (const end = Math.min(len, i + 4096); i < end; i++) {
+          const p = i / len;
+          const k = 0.75 - 0.65 * p; // one-pole coefficient: brighter early, darker tail
+          const env = Math.pow(1 - p, 3.2);
+          for (let ch = 0; ch < 2; ch++) {
+            lp[ch] += k * (Math.random() * 2 - 1 - lp[ch]);
+            const early = i < earlyEnd && Math.random() < 0.004 ? 1.5 : 0;
+            data[ch][i] = (lp[ch] + early * (Math.random() - 0.5)) * env;
+          }
+        }
       }
-    }
-    return buf;
+      if (i < len) later(work);
+      else conv.buffer = buf;
+    };
+    later(work);
   }
 
-  /** Seamlessly loopable noise buffer. */
+  /** Seamlessly loopable noise buffer (fixed rate; sources resample it). */
   function makeNoise(seconds, color) {
-    const rate = ctx.sampleRate;
+    const rate = NOISE_RATE;
     const len = Math.floor(rate * seconds);
     const fade = 2048;
     const raw = new Float32Array(len + fade);
@@ -240,7 +307,47 @@ export function createAudio() {
   /* helpers                                                           */
   /* ---------------------------------------------------------------- */
   const ready = () => ctx && ctx.state !== "closed";
-  const playable = () => ready() && !muted;
+  const inGesture = () => {
+    try {
+      return !!navigator.userActivation?.isActive;
+    } catch {
+      return false;
+    }
+  };
+  // One-shots need a running clock: on a frozen one they would queue up and
+  // all fire at once when it finally starts. The only exceptions are the
+  // moment the context is starting — created in the last second, or resumed
+  // from inside the gesture that is playing this sound.
+  const playable = () =>
+    ready() &&
+    !muted &&
+    (ctx.state === "running" ||
+      (ctx.state === "suspended" && (performance.now() - ctxBorn < 1000 || inGesture())));
+
+  /** Dry bus of zone-gated SFX: open (1) while the listener is in `name`. */
+  function spot(name) {
+    let s = spots.get(name);
+    if (!s) {
+      const open = name === zone ? 1 : 0;
+      s = { dry: gainNode(open), wet: gainNode(open) };
+      s.dry.connect(sfx);
+      s.wet.connect(revIn);
+      sends.set(s.dry, s.wet);
+      spots.set(name, s);
+    }
+    return s.dry;
+  }
+
+  function gateSpots(seconds) {
+    spots.forEach((s, name) => {
+      const v = name === zone ? 1 : 0;
+      rampTo(s.dry.gain, v, seconds);
+      rampTo(s.wet.gain, v, seconds);
+    });
+  }
+
+  /** Reverb send matching a dry destination (sfx, a spot bus or a bed). */
+  const revFor = (dest) => sends.get(dest) || ambRevSend;
 
   function rampTo(param, v, seconds) {
     const t = ctx.currentTime;
@@ -286,7 +393,7 @@ export function createAudio() {
     if (wet > 0) {
       const s = gainNode(wet);
       g.connect(s);
-      s.connect(dest === sfx ? revIn : ambRevSend);
+      s.connect(revFor(dest));
     }
     return g;
   }
@@ -336,12 +443,12 @@ export function createAudio() {
       const dry = gainNode(0.25);
       lp.connect(dry);
       dry.connect(dest);
-      lp.connect(dest === sfx ? revIn : ambRevSend);
+      lp.connect(revFor(dest));
     } else {
       env.connect(dest);
       const send = gainNode(0.35);
       env.connect(send);
-      send.connect(revIn);
+      send.connect(revFor(dest));
     }
 
     // growl source: detuned saws, pitch contour + wobble
@@ -462,7 +569,8 @@ export function createAudio() {
     const send = gainNode(wet);
     out.connect(send);
     send.connect(ambRevSend);
-    const bed = { name, out, level, sources: [], timers: new Set(), alive: true };
+    // starters: (re)start the bed's timer chains — run again on revive
+    const bed = { name, out, level, sources: [], timers: new Set(), starters: [], alive: true, reaper: 0 };
     return bed;
   }
 
@@ -517,6 +625,7 @@ export function createAudio() {
       }, delay * 1000);
       bed.timers.add(id);
     };
+    bed.starters.push(() => schedule(rand(minS, maxS)));
     schedule(firstDelay ?? rand(minS, maxS));
   }
 
@@ -524,17 +633,48 @@ export function createAudio() {
     rampTo(bed.out.gain, bed.level, seconds);
   }
 
-  function killBed(bed, seconds = 2.5) {
+  /**
+   * Fade a bed out. Its sources are stopped on a wall-clock timer rather than
+   * at a context time, so the stop can be cancelled if the player turns back
+   * (reviveBed), and still happens while the clock is frozen (muted).
+   */
+  function killBed(bed, seconds = ZONE_FADE) {
     if (!bed || !bed.alive) return;
     bed.alive = false;
     bed.timers.forEach((id) => clearTimeout(id));
     bed.timers.clear();
+    if (ctx.state !== "running") {
+      // frozen clock: a fade would never progress, so drop it right away
+      stopBed(bed);
+      return;
+    }
     rampTo(bed.out.gain, 0, seconds);
-    const stopAt = ctx.currentTime + seconds + 0.1;
-    bed.sources.forEach((s) => { try { s.stop(stopAt); } catch { /* already stopped */ } });
-    setTimeout(() => {
-      try { bed.out.disconnect(); } catch { /* ignore */ }
-    }, (seconds + 0.5) * 1000);
+    const prev = fading.get(bed.name);
+    if (prev && prev !== bed) stopBed(prev);
+    fading.set(bed.name, bed);
+    bed.reaper = setTimeout(() => stopBed(bed), (seconds + 0.15) * 1000);
+  }
+
+  function stopBed(bed) {
+    clearTimeout(bed.reaper);
+    bed.reaper = 0;
+    if (fading.get(bed.name) === bed) fading.delete(bed.name);
+    bed.sources.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } });
+    bed.sources.length = 0;
+    try { bed.out.disconnect(); } catch { /* ignore */ }
+  }
+
+  /** Bring back a bed of this name that is still fading out, or return null. */
+  function reviveBed(name, seconds) {
+    const bed = fading.get(name);
+    if (!bed) return null;
+    fading.delete(name);
+    clearTimeout(bed.reaper);
+    bed.reaper = 0;
+    bed.alive = true;
+    bed.starters.forEach((start) => start());
+    fadeIn(bed, seconds);
+    return bed;
   }
 
   /* ---- one-shot ambient events ---------------------------------- */
@@ -674,6 +814,7 @@ export function createAudio() {
       const id = setTimeout(() => { bed.timers.delete(id); tick(); }, 150);
       bed.timers.add(id);
     };
+    bed.starters.push(tick); // a revived bed carries on with the melody
     tick();
   }
 
@@ -792,13 +933,37 @@ export function createAudio() {
 
   function startAmbience() {
     if (!roomBed) {
-      roomBed = buildRoom();
+      roomBed = reviveBed("room", 3) || buildRoom();
+      roomBed.level = ROOM_LEVEL[zone] ?? 1;
       fadeIn(roomBed, 3);
     }
     if (!zoneBed) {
-      zoneBed = buildZone(zone);
+      zoneBed = reviveBed(zone, 3) || buildZone(zone);
       fadeIn(zoneBed, 3);
     }
+  }
+
+  /** Make `z` the listener's zone: crossfade beds and open its SFX gate. */
+  function commitZone(z) {
+    clearTimeout(zoneTimer);
+    zoneTimer = 0;
+    pendingZone = null;
+    if (z === zone) return;
+    zone = z;
+    if (!ready()) return;
+    gateSpots(0.5);
+    if (!ambientOn) return;
+    if (roomBed) {
+      roomBed.level = ROOM_LEVEL[zone] ?? 1;
+      rampTo(roomBed.out.gain, roomBed.level, ZONE_FADE);
+    }
+    killBed(zoneBed, ZONE_FADE);
+    zoneBed = null;
+    // While the clock is frozen (muted / not yet unlocked) only the zone is
+    // recorded; the statechange handler builds its bed once sound runs.
+    if (ctx.state !== "running") return;
+    zoneBed = reviveBed(zone, ZONE_FADE) || buildZone(zone);
+    fadeIn(zoneBed, ZONE_FADE);
   }
 
   function stopAmbience(seconds = 1.2) {
@@ -838,7 +1003,7 @@ export function createAudio() {
         }, 400);
       } else {
         const go = () => rampTo(master.gain, masterTarget(), 0.35);
-        if (ctx.state === "suspended") ctx.resume().then(go, go);
+        if (ctx.state !== "running") ctx.resume().then(go, go);
         else go();
       }
     },
@@ -858,19 +1023,30 @@ export function createAudio() {
       rampTo(ambRevSend.gain, v, ducked ? 0.6 : 1.5);
     },
 
-    /** Crossfade to the ambience bed of a hall ("Jurassic Hall") or zone ("jurassic"). */
+    /**
+     * Crossfade to the ambience bed of a hall ("Jurassic Hall") or zone
+     * ("jurassic"). Safe to call every frame: a new zone only takes over once
+     * it has persisted for ZONE_DWELL seconds, so hovering on a doorway line
+     * never tears beds down, and a bed still fading out is revived on return.
+     */
     setZone(name) {
       const z = zoneForHall(name);
-      if (z === zone && (zoneBed || !ambientOn)) return;
-      zone = z;
-      if (!ready() || !ambientOn) return;
-      killBed(zoneBed, 2.5);
-      zoneBed = buildZone(zone);
-      fadeIn(zoneBed, 2.5);
-      if (roomBed) {
-        roomBed.level = ROOM_LEVEL[zone] ?? 1;
-        rampTo(roomBed.out.gain, roomBed.level, 2.5);
+      if (z === zone) {
+        // back where we were before the dwell elapsed: forget the candidate
+        if (pendingZone !== null) {
+          clearTimeout(zoneTimer);
+          zoneTimer = 0;
+          pendingZone = null;
+        }
+        if (!zoneBed && ambientOn && ready() && ctx.state === "running") startAmbience();
+        return;
       }
+      // nothing audible to crossfade: switch at once
+      if (!ready() || !ambientOn) return commitZone(z);
+      if (z === pendingZone) return;
+      pendingZone = z;
+      clearTimeout(zoneTimer);
+      zoneTimer = setTimeout(() => commitZone(z), ZONE_DWELL * 1000);
     },
 
     /** Museum ambience on/off (room tone + the current zone bed). */
@@ -882,10 +1058,30 @@ export function createAudio() {
       else stopAmbience();
     },
 
-    /** Layered dinosaur roar: growl + formant sweep + breath, different every time. */
-    roar(power = 1) {
+    /**
+     * Layered dinosaur roar: growl + formant sweep + breath, different every time.
+     * opts.zone: only heard while the listener is in that zone (a screening's
+     *   roars stay in the theatre; leaving fades the ones still sounding).
+     * opts.distance: metres to a remote roarer; quieter and muffled with
+     *   distance, silent beyond REMOTE_RANGE.
+     */
+    roar(power = 1, opts = {}) {
       const c = ensure();
       if (!c || !playable() || activeRoars >= 3) return;
+      const { zone: only, distance } = opts || {};
+      if (only !== undefined) {
+        const z = zoneForHall(only);
+        if (z !== zone) return;
+        roarVoice(power, { dest: spot(z) });
+        return;
+      }
+      if (distance !== undefined) {
+        const d = Math.max(0, Number(distance) || 0);
+        const level = Math.pow(clamp(1 - d / REMOTE_RANGE, 0, 1), 1.5);
+        if (level < 0.03) return;
+        roarVoice(power, { distant: d > 10, level });
+        return;
+      }
       roarVoice(power);
     },
 
@@ -897,6 +1093,25 @@ export function createAudio() {
       if (now - lastStep < 0.06) return;
       lastStep = now;
       stepVoice(vol);
+    },
+
+    /** Landing after a jump / fall: a heavier, duller footfall plus body thump. */
+    land(impact = 1) {
+      const c = ensure();
+      if (!c || !playable()) return;
+      const k = clamp(Number(impact) || 1, 0.2, 2);
+      lastStep = c.currentTime;
+      stepVoice(1.2 * k, sfx, 0.16, 0.7);
+      const out = voiceOut(sfx, 0.12);
+      const o = tone(out, {
+        freq: rand(85, 100),
+        glideTo: rand(42, 50),
+        t: c.currentTime + 0.008,
+        peak: 0.14 * k,
+        attack: 0.004,
+        decay: rand(0.12, 0.16),
+      });
+      o.onended = () => out.disconnect();
     },
 
     /** Soft UI tick. */
@@ -911,12 +1126,14 @@ export function createAudio() {
       o.onended = () => setTimeout(() => out.disconnect(), 100);
     },
 
-    /** Bell-like arpeggio for discoveries / rewards. */
-    chime(base = 523.25) {
+    /** Bell-like arpeggio for discoveries / rewards. opts.zone gates it like roar(). */
+    chime(base = 523.25, opts = {}) {
       const c = ensure();
       if (!c || !playable()) return;
+      const only = opts?.zone;
+      if (only !== undefined && zoneForHall(only) !== zone) return;
       const f0 = clamp(Number(base) || 523.25, 80, 4000);
-      const out = voiceOut(sfx, 0.45);
+      const out = voiceOut(only !== undefined ? spot(zoneForHall(only)) : sfx, 0.45);
       const t0 = c.currentTime + 0.01;
       [1, 1.25, 1.5, 2].forEach((mul, i) => {
         const t = t0 + i * 0.075;
