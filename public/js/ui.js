@@ -12,6 +12,8 @@ import {
   randomLook,
   normalizeLook,
 } from "./character.js";
+import { makeGelato } from "./gelato.js";
+import { createAvatarPreview } from "./avatarpreview.js";
 
 export const FLAVOURS = [
   { id: "strawberry", name: "Strawberry", color: 0xff9aa2 },
@@ -437,11 +439,14 @@ function roundRect(ctx, x, y, w, h, r) {
 export function createUI(callbacks = {}) {
   const look = normalizeLook({ ...DEFAULT_LOOK });
   const preview = $("lookPreview");
+  // the rigged 3D avatar when WebGL is available, the 2D paper doll otherwise
+  let preview3d = createAvatarPreview(preview);
   // until the visitor picks a hair style, switching body swaps the default hair
   let hairPicked = false;
 
   function renderLook() {
-    drawDoll(preview, look);
+    if (preview3d) preview3d.setLook(look);
+    else drawDoll(preview, look);
   }
 
   /**
@@ -553,6 +558,9 @@ export function createUI(callbacks = {}) {
   const chatInput = $("chatInput");
 
   function enterGame() {
+    // the join screen is gone: free the preview's WebGL context
+    preview3d?.dispose();
+    preview3d = null;
     $("join").classList.add("hidden");
     hud.classList.remove("hidden");
     $("loading").classList.add("hidden");
@@ -1040,6 +1048,12 @@ function escapeHtml(s) {
 /* ice cream prop shown in the player's hand                            */
 /* ------------------------------------------------------------------ */
 export function makeIceCream(order) {
+  // the realistic gelato (gelato.js); the primitive version below is the fallback
+  try {
+    return makeGelato(order);
+  } catch (err) {
+    console.warn("gelato: falling back to the simple ice cream", err);
+  }
   const g = new THREE.Group();
   const flavour = order.flavour;
   const color = flavour?.color ?? 0xff9aa2;

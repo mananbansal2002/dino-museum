@@ -362,7 +362,8 @@ try {
   check(await freshLeft, "an explicit disconnect still leaves at once", "playerLeft was not sent on disconnect");
 
   /* ---- re-join on the same socket moves rooms ---- */
-  const leftOld = waitFor(bob, "playerLeft");
+  // filter by id: the imposter's leave above can still be in flight
+  const leftOld = waitFor(bob, "playerLeft", undefined, (p) => p.id === aliceJoin.id);
   const aliceAgain = await join(alice, { name: "Alice", room: "OTHER" });
   const leftMsg = await leftOld;
   check(

@@ -18,6 +18,8 @@ import { applyLookdev } from "./lookdev.js";
 import { placeLiveModels } from "./livemodels.js";
 import { createBattlePicker, fetchVideoCatalogue } from "./battlepicker.js";
 import { createScreenEmbed } from "./screen-embed.js";
+import { createCrowd } from "./crowd.js";
+import { buildGelateria } from "./gelato.js";
 
 preloadModels(["male", "female"]);
 
@@ -71,6 +73,32 @@ const propsReady = import("./props.js")
   })
   .catch((err) => console.warn("props: could not dress the halls", err));
 const live = placeLiveModels({ scene, world, camera, quality: QUALITY });
+// the gelato bar replaces the primitive kiosk once the halls are dressed
+let gelateria = null;
+propsReady
+  .then(() => {
+    gelateria = buildGelateria({ scene, world, COURT, renderer, quality: QUALITY });
+    window.__museum.gelateria = gelateria;
+  })
+  .catch((err) => console.warn("gelato: could not build the bar", err));
+// background visitors (local only, never networked, no name tags)
+const crowd = createCrowd({ scene, world, camera, count: QUALITY === "low" ? 5 : 12, quality: QUALITY });
+
+/** Floor finish under a point, for footstep sounds (matches lookdev's floors). */
+const FLOOR_SURFACE = {
+  lobby: "marble",
+  rotunda: "marble",
+  porch: "stone",
+  theater: "carpet",
+  triassic: "parquet",
+  jurassic: "parquet",
+  cretaceous: "parquet",
+  marine: "parquet",
+  predator: "parquet",
+};
+function surfaceAt(x, z) {
+  return FLOOR_SURFACE[roomAt(x, z)?.id] || "stone";
+}
 
 const fx = createFX(scene);
 const audio = createAudio();
@@ -242,6 +270,7 @@ const ui = createUI({
     fx.burst("confetti", S.player.state.x, S.player.state.y + 1.6, S.player.state.z, 26);
   },
   onStopBattle: () => stopBattle(),
+  hasExhibitVideos: (ex) => (catalogue.species?.[ex.id] || []).length > 0,
   onExhibitVideos: (ex) => {
     // verified clips from /data/videos.json, played in the site
     const list = catalogue.species?.[ex.id] || [];
@@ -844,7 +873,7 @@ function dig() {
 function roar() {
   const p = S.player.state;
   S.player.playAction("roar", 1.4);
-  audio.roar(1);
+  audio.roar(1, { kind: "visitor" });
   bubble(S.player, "🦖", "#ffc857");
   S.net?.emit("action", { type: "roar", payload: {} });
   fx.burst("dust", p.x, 0.4, p.z, 14);
@@ -1112,7 +1141,7 @@ function animate() {
         Promise.resolve(upgradeCharacter(r.character)).then((ok) => ok && reattachHeld(id));
       }
     }
-    remote.update(dt);
+    remote.update(dt, camera);
     S.digCooldown = Math.max(0, S.digCooldown - dt);
     if (S.eating) updateEating(dt);
 
@@ -1126,11 +1155,11 @@ function animate() {
       stepTimer += moved;
       if (stepTimer > 1.6) {
         stepTimer = 0;
-        audio.step(0.6);
+        audio.step(0.6, surfaceAt(st.x, st.z));
       }
     }
     if (st.onGround && !S.wasOnGround && vyBefore < -1.5) {
-      audio.land(Math.min(1.6, Math.max(0.3, -vyBefore / 9)));
+      audio.land(Math.min(1.6, Math.max(0.3, -vyBefore / 9)), surfaceAt(st.x, st.z));
       stepTimer = 0;
     }
     S.wasOnGround = st.onGround;
@@ -1169,6 +1198,7 @@ function animate() {
 
   vendor.update(dt, S.player?.state);
   live.update(dt, S.player?.state);
+  crowd.update(dt, S.player?.state, remote.list);
 
   // animated exhibits
   for (const a of world.animated) {
@@ -1244,6 +1274,7 @@ animate();
 
 // expose a tiny debug handle (used by the console and by the browser tests)
 window.__museum = {
+  crowd,
   scene,
   renderer,
   camera,
