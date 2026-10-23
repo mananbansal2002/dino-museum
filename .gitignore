@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 npm-cache/
 .vercel/
 .DS_Store

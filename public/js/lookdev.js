@@ -242,7 +242,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
   const requested = override && TIERS.includes(override) ? override : quality;
   // adaptive: trade pixel ratio and tier for frame time. On for "auto", and
   // for a tier main.js picked itself (not for ?lookdev= or a chosen tier).
-  const auto = override && TIERS.includes(override) ? false : adaptive ?? requested === "auto";
+  let auto = override && TIERS.includes(override) ? false : adaptive ?? requested === "auto";
   let tier = requested === "auto" ? (gpu.software ? "low" : "high") : TIERS.includes(requested) ? requested : "high";
   const tierAtLeast = (t) => TIERS.indexOf(tier) >= TIERS.indexOf(t);
   const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
@@ -1444,9 +1444,9 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
             composer.setSize(s.x, s.y);
           }
         } else if (tier === "high" && frameEMA > 33) {
-          setQuality("medium");
+          setTier("medium");
         } else if (tier === "medium" && frameEMA > 45) {
-          setQuality("low");
+          setTier("low");
         }
         frameEMA = 16;
       }
@@ -1461,7 +1461,16 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     }
   }
 
-  function setQuality(q) {
+  /**
+   * A tier picked by the visitor (or "auto"): a manual pick stops the
+   * adaptation. { manual: false } is a governor's step that keeps auto on.
+   */
+  function setQuality(q, { manual = true } = {}) {
+    if (manual && (q === "auto" || TIERS.includes(q))) auto = q === "auto";
+    setTier(q);
+  }
+
+  function setTier(q) {
     const next = q === "auto" ? (gpu.software ? "low" : "high") : q;
     if (!TIERS.includes(next) || next === tier) return;
     tier = next;
@@ -1496,6 +1505,9 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     },
     get quality() {
       return tier;
+    },
+    get auto() {
+      return auto;
     },
     render,
     resize,

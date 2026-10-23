@@ -48,6 +48,36 @@ const SERVER_EVENTS = [
 const JOIN_TIMEOUT_MS = 15000;
 const REJOIN_TIMEOUT_MS = 12000;
 const PATH_KEY = "dm:socketPath";
+const ACTIVE_STEP_MS = 250;
+
+/**
+ * setTimeout that only counts time the page was actually running. A main
+ * thread blocked for seconds (a slow device building the halls) is not the
+ * server failing to answer, so a long stall counts as one short step.
+ * Returns a handle for clearActive().
+ */
+function activeTimeout(fn, ms) {
+  const h = { id: 0, left: ms, last: Date.now() };
+  const step = () => {
+    const now = Date.now();
+    h.left -= Math.min(now - h.last, ACTIVE_STEP_MS * 2);
+    h.last = now;
+    if (h.left <= 0) {
+      h.id = 0;
+      fn();
+    } else {
+      h.id = setTimeout(step, Math.min(ACTIVE_STEP_MS, h.left));
+    }
+  };
+  h.id = setTimeout(step, Math.min(ACTIVE_STEP_MS, ms));
+  return h;
+}
+
+function clearActive(h) {
+  if (!h) return;
+  clearTimeout(h.id);
+  h.id = 0;
+}
 
 function storage() {
   try {
@@ -87,6 +117,7 @@ export function createNet(handlers = {}) {
   const io = globalThis.io;
   let socket = null;
   let index = initialPathIndex();
+  let pathTimeouts = 0; // handshake timeouts in a row on the current path
   /** Index of the path that connected in this page (null until one has). */
   let workingIndex = null;
   let attempts = 0;
@@ -144,7 +175,7 @@ export function createNet(handlers = {}) {
       sendJoin(s, p.opts, (res) => {
         if (pending !== p) return;
         pending = null;
-        clearTimeout(p.timer);
+        clearActive(p.timer);
         if (res && !res.error && res.id) {
           session = { ...p.opts, room: res.room };
           status("online", s.io?.opts?.path);
@@ -156,8 +187,8 @@ export function createNet(handlers = {}) {
     } else if (session) {
       // Re-join where the player last stood, not at the original spawn.
       const opts = lastState ? { ...session, state: lastState } : session;
-      clearTimeout(rejoinTimer);
-      rejoinTimer = setTimeout(() => {
+      clearActive(rejoinTimer);
+      rejoinTimer = activeTimeout(() => {
         // No answer (e.g. the server is stuck on a slow backend): start over
         // on a fresh socket rather than staying "reconnecting" forever.
         if (s !== socket) return;
@@ -167,7 +198,7 @@ export function createNet(handlers = {}) {
         scheduleConnect(false);
       }, REJOIN_TIMEOUT_MS);
       sendJoin(s, opts, (res) => {
-        clearTimeout(rejoinTimer);
+        clearActive(rejoinTimer);
         if (res && !res.error && res.id) {
           session = { ...session, room: res.room };
           status("online", s.io?.opts?.path);
@@ -205,6 +236,7 @@ export function createNet(handlers = {}) {
     s.on("connect", () => {
       if (s !== socket) return;
       attempts = 0;
+      pathTimeouts = 0;
       workingIndex = index % CANDIDATES.length;
       rememberPath(path);
       flushJoin(s);
@@ -215,6 +247,12 @@ export function createNet(handlers = {}) {
       status(session ? "reconnecting" : "error", err?.message || "connection failed");
       dispose(s);
       socket = null;
+      // a handshake timeout on a busy device is not a wrong path: retry the
+      // same one once before moving on to the next candidate
+      const timedOut = err?.message === "timeout";
+      pathTimeouts = timedOut ? pathTimeouts + 1 : 0;
+      if (timedOut && pathTimeouts < 2) return scheduleConnect(false);
+      pathTimeouts = 0;
       scheduleConnect(true);
     });
 
@@ -286,11 +324,11 @@ export function createNet(handlers = {}) {
       return new Promise((resolve, reject) => {
         if (destroyed) return reject(new Error("connection closed"));
         if (pending) {
-          clearTimeout(pending.timer);
+          clearActive(pending.timer);
           pending.reject(new Error("superseded by a newer join"));
         }
         const p = { opts: { ...opts }, resolve, reject, timer: null };
-        p.timer = setTimeout(() => {
+        p.timer = activeTimeout(() => {
           if (pending !== p) return;
           pending = null;
           reject(new Error("join timed out"));
@@ -303,9 +341,9 @@ export function createNet(handlers = {}) {
     close() {
       destroyed = true;
       clearTimeout(timer);
-      clearTimeout(rejoinTimer);
+      clearActive(rejoinTimer);
       if (pending) {
-        clearTimeout(pending.timer);
+        clearActive(pending.timer);
         pending.reject(new Error("connection closed"));
         pending = null;
       }

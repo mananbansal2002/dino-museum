@@ -190,6 +190,12 @@ export function createPlayer({ scene, camera, look, name, color, onTouchAction =
   let lastX = state.x;
   let lastZ = state.z;
   const touch = { mx: 0, mz: 0, active: false };
+  // settings.js: look sensitivity / invert, and reduced motion (no head bob)
+  let lookSens = 1;
+  let lookInvert = false;
+  let reducedMotion = false;
+  let bobPhase = 0;
+  let bobAmp = 0;
 
   const camTarget = new THREE.Vector3();
   const camPos = new THREE.Vector3();
@@ -236,8 +242,8 @@ export function createPlayer({ scene, camera, look, name, color, onTouchAction =
     if (touchUi) touchUi.reset();
   }
   function applyLook(dx, dy) {
-    state.camYaw -= dx * MOUSE_SENS;
-    state.pitch = clamp(state.pitch - dy * MOUSE_SENS * 0.875, PITCH_MIN, PITCH_MAX);
+    state.camYaw -= dx * MOUSE_SENS * lookSens;
+    state.pitch = clamp(state.pitch - dy * MOUSE_SENS * 0.875 * lookSens * (lookInvert ? -1 : 1), PITCH_MIN, PITCH_MAX);
   }
   function onMouseMove(e) {
     if (!inputEnabled) return;
@@ -769,7 +775,12 @@ export function createPlayer({ scene, camera, look, name, color, onTouchAction =
 
     if (state.cameraMode === 1) {
       character.group.visible = false;
-      const eyeY = state.sitting ? state.y + EYE * 0.72 : state.y + EYE;
+      // a gentle head bob while walking on the ground (off with reduced motion)
+      const walking = !reducedMotion && !state.sitting && state.onGround && state.speed > 0.4;
+      bobAmp = damp(bobAmp, walking ? Math.min(1, state.speed / RUN) : 0, 8, dt);
+      if (bobAmp > 0.001) bobPhase += dt * (6 + state.speed * 0.9);
+      const bob = reducedMotion ? 0 : Math.sin(bobPhase * 2) * 0.035 * bobAmp;
+      const eyeY = (state.sitting ? state.y + EYE * 0.72 : state.y + EYE) + bob;
       camPos.set(state.x, eyeY, state.z);
       // nudge forward a little, but only as far as keeps the near plane off
       // the wall face (the body radius alone leaves just ~0.3 m to the face)
@@ -921,6 +932,16 @@ export function createPlayer({ scene, camera, look, name, color, onTouchAction =
       return state.cameraMode;
     },
     setInputEnabled,
+    /** Settings: look sensitivity multiplier (1 = default) and inverted vertical look. */
+    setLookSettings({ sensitivity = 1, invertY = false } = {}) {
+      lookSens = Number.isFinite(+sensitivity) && +sensitivity > 0 ? +sensitivity : 1;
+      lookInvert = !!invertY;
+    },
+    /** Settings: reduced motion turns the first-person head bob off. */
+    setReducedMotion(on) {
+      reducedMotion = !!on;
+      if (reducedMotion) bobAmp = 0;
+    },
     /** Touch devices: show the interact button for `label` (null hides it). */
     setTouchAction: (label) => touchUi?.setAction(label),
     sit,

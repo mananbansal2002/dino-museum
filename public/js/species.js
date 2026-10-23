@@ -4,6 +4,15 @@
  *
  * plan: biped | quad | marine | flyer
  * headType: theropod | raptor | duckbill | ceratopsian | dome | beak | fish
+ *
+ * Specimen-label fields in info (all optional, rendered by labels.js):
+ *   latin + author   binomial and naming authority ("Tyrannosaurus rex", "Osborn, 1905")
+ *   say              pronunciation, stressed syllable in capitals
+ *   meaning          what the genus name means
+ *   discovered       { year, by, where } of the first find
+ *   specimen         a famous or name-bearing real specimen
+ *   note             a caveat worth a line (debated identity, famous blunder)
+ *   notDinosaur      true for the non-dinosaurs, with notDinoNote saying what it is
  */
 
 const T = (o) => ({
@@ -25,6 +34,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "triassic",
     info: {
+      latin: "Eoraptor lunensis", author: "Sereno et al., 1993", say: "EE-oh-RAP-tor",
+      meaning: "dawn plunderer",
+      discovered: { year: 1991, by: "Ricardo Martínez", where: "Ischigualasto, San Juan, Argentina" },
+      specimen: "Holotype PVSJ 512, an almost complete skeleton (National University of San Juan, Argentina)",
       era: "Late Triassic", period: "c. 231 million years ago",
       habitat: "Ischigualasto Formation, Argentina",
       length: "1–1.2 m", weight: "~10 kg", diet: "Omnivore", speed: "~30 km/h (est.)",
@@ -45,6 +58,9 @@ export const SPECIES = {
     features: { arms: true },
     hall: "triassic",
     info: {
+      latin: "Herrerasaurus ischigualastensis", author: "Reig, 1963", say: "her-RARE-uh-SORE-us",
+      meaning: "Herrera's lizard",
+      discovered: { year: 1959, by: "Victorino Herrera, a goatherd", where: "Ischigualasto, San Juan, Argentina" },
       era: "Late Triassic", period: "c. 231 million years ago",
       habitat: "Ischigualasto Formation, Argentina",
       length: "3–6 m", weight: "200–350 kg", diet: "Carnivore", speed: "~35 km/h (est.)",
@@ -65,6 +81,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "triassic",
     info: {
+      latin: "Riojasaurus incertus", author: "Bonaparte, 1969", say: "ree-OH-hah-SORE-us",
+      meaning: "lizard from La Rioja",
+      discovered: { year: 1966, where: "La Rioja Province, Argentina" },
+      specimen: "Holotype PVL 3808, a skeleton without its skull (Miguel Lillo Institute, Tucumán)",
       era: "Late Triassic", period: "c. 227–209 million years ago",
       habitat: "Los Colorados Formation, Argentina",
       length: "5–6.6 m", weight: "~800 kg", diet: "Herbivore", speed: "~15 km/h (est.)",
@@ -85,6 +105,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "triassic",
     info: {
+      latin: "Coelophysis bauri", author: "(Cope, 1887)", say: "SEE-loh-FY-sis",
+      meaning: "hollow form, after its hollow bones",
+      discovered: { year: 1881, by: "David Baldwin", where: "Rio Arriba County, New Mexico, USA" },
+      specimen: "Hundreds of skeletons came from the Ghost Ranch quarry, New Mexico, dug by the American Museum of Natural History from 1947",
       era: "Late Triassic", period: "c. 215–208 million years ago",
       habitat: "Chinle Formation, New Mexico, USA",
       length: "3 m", weight: "15–20 kg", diet: "Carnivore", speed: "~40 km/h (est.)",
@@ -105,6 +129,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "triassic",
     info: {
+      latin: "Plateosaurus trossingensis", author: "Fraas, 1913", say: "PLAT-ee-oh-SORE-us",
+      meaning: "broad lizard",
+      discovered: { year: 1834, by: "Johann Friedrich Engelhardt", where: "Heroldsberg, near Nuremberg, Germany" },
+      specimen: "Dozens of skeletons from the Trossingen bonebeds; many were lost when the Stuttgart natural history collection burned in 1944",
       era: "Late Triassic", period: "c. 214–204 million years ago",
       habitat: "Trossingen Formation, Germany",
       length: "5–10 m", weight: "0.6–4 tonnes", diet: "Herbivore", speed: "~20 km/h (est.)",
@@ -125,6 +153,9 @@ export const SPECIES = {
     features: { arms: true, crest: true },
     hall: "triassic",
     info: {
+      latin: "Massospondylus carinatus", author: "Owen, 1854", say: "MASS-oh-SPON-dih-lus",
+      meaning: "longer vertebra",
+      discovered: { year: "c. 1853", by: "Joseph Millard Orpen", where: "near Harrismith, South Africa" },
       era: "Early Jurassic", period: "c. 200–183 million years ago",
       habitat: "Elliot & Clarens Formations, South Africa",
       length: "4–6 m", weight: "~0.5–1 tonne", diet: "Herbivore", speed: "~20 km/h (est.)",
@@ -147,6 +178,10 @@ export const SPECIES = {
     features: {},
     hall: "jurassic",
     info: {
+      latin: "Brachiosaurus altithorax", author: "Riggs, 1903", say: "BRACK-ee-oh-SORE-us",
+      meaning: "arm lizard",
+      discovered: { year: 1900, by: "Harold Menke of Elmer Riggs's Field Museum crew", where: "near Fruita, Colorado, USA" },
+      specimen: "Holotype FMNH P 25107, Field Museum, Chicago",
       era: "Late Jurassic", period: "154–150 million years ago",
       habitat: "Morrison Formation, North America",
       length: "18–22 m", weight: "~28–50 tonnes", diet: "Herbivore", speed: "~15 km/h (est.)",
@@ -167,6 +202,10 @@ export const SPECIES = {
     features: { tailVane: false },
     hall: "jurassic",
     info: {
+      latin: "Diplodocus carnegii", author: "Hatcher, 1901", say: "dih-PLOD-oh-kus",
+      meaning: "double beam, after the paired bones under its tail",
+      discovered: { year: 1899, by: "a Carnegie Museum crew under Jacob Wortman", where: "Sheep Creek, Wyoming, USA" },
+      specimen: "'Dippy' (CM 84), Carnegie Museum of Natural History, Pittsburgh; casts stand in museums around the world",
       era: "Late Jurassic", period: "154–150 million years ago",
       habitat: "Morrison Formation, North America",
       length: "24–26 m", weight: "12–16 tonnes", diet: "Herbivore", speed: "~15 km/h (est.)",
@@ -187,6 +226,10 @@ export const SPECIES = {
     features: {},
     hall: "jurassic",
     info: {
+      latin: "Apatosaurus ajax", author: "Marsh, 1877", say: "uh-PAT-oh-SORE-us",
+      meaning: "deceptive lizard",
+      discovered: { year: 1877, by: "Arthur Lakes", where: "Morrison, Colorado, USA" },
+      specimen: "Holotype YPM 1860, Yale Peabody Museum",
       era: "Late Jurassic", period: "152–150 million years ago",
       habitat: "Morrison Formation, North America",
       length: "21–23 m", weight: "16–23 tonnes", diet: "Herbivore", speed: "~15 km/h (est.)",
@@ -207,6 +250,9 @@ export const SPECIES = {
     features: {},
     hall: "jurassic",
     info: {
+      latin: "Camarasaurus supremus", author: "Cope, 1877", say: "KAM-uh-ruh-SORE-us",
+      meaning: "chambered lizard, after the hollows in its backbone",
+      discovered: { year: 1877, by: "Oramel Lucas", where: "Garden Park, Colorado, USA" },
       era: "Late Jurassic", period: "155–145 million years ago",
       habitat: "Morrison Formation, North America",
       length: "15–18 m", weight: "~15–20 tonnes", diet: "Herbivore", speed: "~15 km/h (est.)",
@@ -227,6 +273,10 @@ export const SPECIES = {
     features: {},
     hall: "jurassic",
     info: {
+      latin: "Barosaurus lentus", author: "Marsh, 1890", say: "BARR-oh-SORE-us",
+      meaning: "heavy lizard",
+      discovered: { year: 1889, by: "Ms Ellerman, postmistress of Postville", where: "South Dakota, USA" },
+      specimen: "A cast rears up over an Allosaurus in the American Museum of Natural History's Roosevelt Rotunda",
       era: "Late Jurassic", period: "154–150 million years ago",
       habitat: "Morrison Formation, North America",
       length: "24–27 m", weight: "12–20 tonnes", diet: "Herbivore", speed: "~15 km/h (est.)",
@@ -247,6 +297,10 @@ export const SPECIES = {
     features: { plates: true, spikes: true },
     hall: "jurassic",
     info: {
+      latin: "Stegosaurus stenops", author: "Marsh, 1887", say: "STEG-oh-SORE-us",
+      meaning: "roof lizard",
+      discovered: { year: 1877, by: "Arthur Lakes", where: "north of Morrison, Colorado, USA" },
+      specimen: "'Sophie' (NHMUK PV R36730), the most complete Stegosaurus known, Natural History Museum, London",
       era: "Late Jurassic", period: "155–150 million years ago",
       habitat: "Morrison Formation, North America",
       length: "7–9 m", weight: "~3.5–5 tonnes", diet: "Herbivore", speed: "~7 km/h (est.)",
@@ -268,6 +322,10 @@ export const SPECIES = {
     features: { plates: true, spikes: true, shoulderSpikes: true },
     hall: "jurassic",
     info: {
+      latin: "Kentrosaurus aethiopicus", author: "Hennig, 1915", say: "KEN-troh-SORE-us",
+      meaning: "sharp-point lizard",
+      discovered: { year: 1909, by: "the German Tendaguru Expedition", where: "Tendaguru, Tanzania" },
+      specimen: "Mounted skeleton, Museum für Naturkunde, Berlin",
       era: "Late Jurassic", period: "c. 155–150 million years ago",
       habitat: "Tendaguru Formation, Tanzania",
       length: "4–4.5 m", weight: "~0.7–1.6 tonnes", diet: "Herbivore", speed: "~8 km/h (est.)",
@@ -288,6 +346,9 @@ export const SPECIES = {
     features: { plates: true, spikes: true },
     hall: "cretaceous",
     info: {
+      latin: "Wuerhosaurus homheni", author: "Dong, 1973", say: "WER-hoh-SORE-us",
+      meaning: "lizard from Wuerho (Urho), Xinjiang",
+      discovered: { where: "Junggar Basin, Xinjiang, China" },
       era: "Early Cretaceous", period: "c. 130–112 million years ago",
       habitat: "Tugulu Group, Xinjiang, China",
       length: "~7 m", weight: "~3.5–4 tonnes", diet: "Herbivore", speed: "~7 km/h (est.)",
@@ -308,6 +369,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "jurassic",
     info: {
+      latin: "Allosaurus fragilis", author: "Marsh, 1877", say: "AL-oh-SORE-us",
+      meaning: "different lizard",
+      discovered: { year: 1877, where: "Garden Park, Colorado, USA" },
+      specimen: "'Big Al' (MOR 693), 95% complete, found in Wyoming in 1991; Museum of the Rockies, Montana",
       era: "Late Jurassic", period: "155–145 million years ago",
       habitat: "Morrison Formation, North America",
       length: "8.5–9.7 m", weight: "1.7–2.3 tonnes", diet: "Carnivore", speed: "~30 km/h (est.)",
@@ -329,6 +394,9 @@ export const SPECIES = {
     features: { arms: true },
     hall: "jurassic",
     info: {
+      latin: "Torvosaurus tanneri", author: "Galton & Jensen, 1979", say: "TOR-voh-SORE-us",
+      meaning: "savage lizard",
+      discovered: { year: 1971, by: "Vivian Jones", where: "western Colorado, USA" },
       era: "Late Jurassic", period: "155–145 million years ago",
       habitat: "Morrison Formation, North America",
       length: "9–10 m", weight: "~2–2.5 tonnes", diet: "Carnivore", speed: "~28 km/h (est.)",
@@ -349,6 +417,10 @@ export const SPECIES = {
     features: { arms: true, crest: true },
     hall: "jurassic",
     info: {
+      latin: "Dilophosaurus wetherilli", author: "(Welles, 1954)", say: "dy-LOAF-oh-SORE-us",
+      meaning: "two-crested lizard",
+      discovered: { year: 1940, by: "Jesse Williams, a Navajo man", where: "Navajo Nation, northern Arizona, USA" },
+      specimen: "Holotype UCMP 37302, University of California Museum of Paleontology, Berkeley",
       era: "Early Jurassic", period: "c. 193–183 million years ago",
       habitat: "Kayenta Formation, Arizona, USA",
       length: "~7 m", weight: "~400 kg", diet: "Carnivore", speed: "~35 km/h (est.)",
@@ -369,6 +441,10 @@ export const SPECIES = {
     features: { arms: true, sickle: true },
     hall: "cretaceous",
     info: {
+      latin: "Baryonyx walkeri", author: "Charig & Milner, 1986", say: "BARR-ee-ON-iks",
+      meaning: "heavy claw",
+      discovered: { year: 1983, by: "William Walker, an amateur collector", where: "Smokejacks clay pit, Surrey, England" },
+      specimen: "Holotype NHMUK PV R 9951, Natural History Museum, London",
       era: "Early Cretaceous", period: "c. 130–125 million years ago",
       habitat: "Weald Clay Formation, England",
       length: "7.5–10 m", weight: "1.2–1.7 tonnes", diet: "Piscivore/Carnivore", speed: "~28 km/h (est.)",
@@ -390,6 +466,10 @@ export const SPECIES = {
     features: { arms: true, wings: true, feathers: true, tailVane: true, wingLen: 1.7 },
     hall: "jurassic",
     info: {
+      latin: "Archaeopteryx lithographica", author: "von Meyer, 1861", say: "AR-kee-OP-ter-iks",
+      meaning: "ancient wing",
+      discovered: { year: 1861, where: "Langenaltheim, Bavaria, Germany" },
+      specimen: "The London Specimen (NHMUK 37001), found 1861; the Berlin Specimen followed in the 1870s",
       era: "Late Jurassic", period: "150–148 million years ago",
       habitat: "Solnhofen Limestone, Germany",
       length: "0.5 m", weight: "0.5–1 kg", diet: "Carnivore (insects, small animals)", speed: "~20 km/h (est.)",
@@ -410,6 +490,11 @@ export const SPECIES = {
     features: { wings: true, tailVane: true, teeth: true, wingLen: 1.9 },
     hall: "jurassic",
     info: {
+      latin: "Rhamphorhynchus muensteri", author: "(Goldfuss, 1831)", say: "RAM-foh-RINK-us",
+      meaning: "beak snout",
+      discovered: { year: 1825, by: "collector Georg Graf zu Münster", where: "Solnhofen limestone, Bavaria, Germany" },
+      notDinosaur: true,
+      notDinoNote: "A pterosaur: a flying reptile and a cousin of the dinosaurs, not one of them.",
       era: "Late Jurassic", period: "c. 151–149 million years ago",
       habitat: "Solnhofen Limestone, Germany",
       length: "up to 1.8 m wingspan", weight: "~1 kg", diet: "Piscivore", speed: "~30 km/h (est.)",
@@ -432,6 +517,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "cretaceous",
     info: {
+      latin: "Tyrannosaurus rex", author: "Osborn, 1905", say: "tie-RAN-oh-SORE-us REX",
+      meaning: "tyrant lizard king",
+      discovered: { year: 1902, by: "Barnum Brown", where: "Hell Creek, Montana, USA" },
+      specimen: "'Sue' (FMNH PR 2081), about 85% complete, found by Sue Hendrickson in 1990; Field Museum, Chicago",
       era: "Late Cretaceous", period: "68–66 million years ago",
       habitat: "Hell Creek Formation, North America",
       length: "12–13 m", weight: "7–9 tonnes", diet: "Carnivore", speed: "~20–30 km/h (est.)",
@@ -454,6 +543,10 @@ export const SPECIES = {
     features: { frill: true, horns: true, noseHorn: true, frillSpikes: 7 },
     hall: "cretaceous",
     info: {
+      latin: "Triceratops horridus", author: "(Marsh, 1889)", say: "try-SERR-uh-tops",
+      meaning: "three-horned face",
+      discovered: { year: 1887, by: "George Lyman Cannon", where: "near Denver, Colorado, USA" },
+      specimen: "Holotype YPM 1820, collected in Wyoming in 1888 by John Bell Hatcher; Yale Peabody Museum",
       era: "Late Cretaceous", period: "68–66 million years ago",
       habitat: "Hell Creek Formation, North America",
       length: "8–9 m", weight: "6–12 tonnes", diet: "Herbivore", speed: "~25 km/h (est.)",
@@ -475,6 +568,9 @@ export const SPECIES = {
     features: { frill: true, horns: true, noseHorn: true, frillSpikes: 7, longFrillSpikes: true },
     hall: "cretaceous",
     info: {
+      latin: "Styracosaurus albertensis", author: "Lambe, 1913", say: "sty-RAK-oh-SORE-us",
+      meaning: "spiked lizard",
+      discovered: { year: 1913, by: "Charles H. Sternberg", where: "Dinosaur Park Formation, Alberta, Canada" },
       era: "Late Cretaceous", period: "c. 75.5–75 million years ago",
       habitat: "Dinosaur Park Formation, Alberta, Canada",
       length: "5–5.5 m", weight: "~1.8–2.7 tonnes", diet: "Herbivore", speed: "~25 km/h (est.)",
@@ -495,6 +591,10 @@ export const SPECIES = {
     features: { frill: true, horns: true, noseHorn: true, frillSpikes: 5 },
     hall: "cretaceous",
     info: {
+      latin: "Centrosaurus apertus", author: "Lambe, 1904", say: "SEN-troh-SORE-us",
+      meaning: "pointed lizard, after the hornlets on its frill",
+      discovered: { year: 1901, by: "Lawrence Lambe", where: "Red Deer River, Alberta, Canada" },
+      specimen: "Bonebeds in Dinosaur Provincial Park hold the remains of hundreds of individuals",
       era: "Late Cretaceous", period: "c. 76.5–75.5 million years ago",
       habitat: "Dinosaur Park Formation, Alberta, Canada",
       length: "5.5–6 m", weight: "~2–2.5 tonnes", diet: "Herbivore", speed: "~25 km/h (est.)",
@@ -515,6 +615,10 @@ export const SPECIES = {
     features: { frill: true, frillSpikes: 5 },
     hall: "cretaceous",
     info: {
+      latin: "Protoceratops andrewsi", author: "Granger & Gregory, 1923", say: "PROH-toh-SERR-uh-tops",
+      meaning: "first horned face",
+      discovered: { year: 1922, by: "Roy Chapman Andrews's Central Asiatic Expedition", where: "Flaming Cliffs, Gobi Desert, Mongolia" },
+      specimen: "The 'Fighting Dinosaurs', found in 1971: a Protoceratops locked in combat with a Velociraptor",
       era: "Late Cretaceous", period: "75–71 million years ago",
       habitat: "Djadochta Formation, Mongolia",
       length: "1.8–2.5 m", weight: "~60–100 kg", diet: "Herbivore", speed: "~25 km/h (est.)",
@@ -536,6 +640,10 @@ export const SPECIES = {
     features: {},
     hall: "cretaceous",
     info: {
+      latin: "Edmontosaurus annectens", author: "(Marsh, 1892)", say: "ed-MON-toh-SORE-us",
+      meaning: "lizard from Edmonton",
+      discovered: { year: 1891, by: "John Bell Hatcher", where: "Niobrara County, Wyoming, USA" },
+      specimen: "The 'mummy' (AMNH 5060) with skin impressions, found in 1908 by Charles H. Sternberg and his sons; American Museum of Natural History",
       era: "Late Cretaceous", period: "68–66 million years ago",
       habitat: "Hell Creek Formation, North America",
       length: "9–12 m", weight: "~4–6 tonnes", diet: "Herbivore", speed: "~35 km/h (est.)",
@@ -556,6 +664,10 @@ export const SPECIES = {
     features: { headCrest: true },
     hall: "cretaceous",
     info: {
+      latin: "Parasaurolophus walkeri", author: "Parks, 1922", say: "PAIR-uh-sore-OL-oh-fus",
+      meaning: "near crested lizard",
+      discovered: { year: 1920, by: "a University of Toronto field party", where: "Red Deer River, Alberta, Canada" },
+      specimen: "Holotype ROM 768, Royal Ontario Museum, Toronto",
       era: "Late Cretaceous", period: "c. 76.5–73 million years ago",
       habitat: "Dinosaur Park Formation, Alberta, Canada",
       length: "~9.5 m", weight: "~2.5–3 tonnes", diet: "Herbivore", speed: "~35 km/h (est.)",
@@ -576,6 +688,10 @@ export const SPECIES = {
     features: { club: true, armor: true },
     hall: "cretaceous",
     info: {
+      latin: "Ankylosaurus magniventris", author: "Brown, 1908", say: "ANG-kih-loh-SORE-us",
+      meaning: "fused lizard",
+      discovered: { year: 1906, by: "Barnum Brown", where: "Gilbert Creek, Montana, USA" },
+      specimen: "Holotype AMNH 5895, American Museum of Natural History",
       era: "Late Cretaceous", period: "68–66 million years ago",
       habitat: "Hell Creek & Lance Formations, North America",
       length: "6–8 m", weight: "~5–8 tonnes", diet: "Herbivore", speed: "~8 km/h (est.)",
@@ -597,6 +713,11 @@ export const SPECIES = {
     features: { club: true, clubSpikes: true, armor: true },
     hall: "rotunda",
     info: {
+      latin: "Doedicurus clavicaudatus", author: "(Owen, 1847)", say: "dee-dih-KYOOR-us",
+      meaning: "pestle tail",
+      discovered: { where: "the Pampas of South America" },
+      notDinosaur: true,
+      notDinoNote: "A glyptodont: a giant armoured mammal related to armadillos, alive in the Ice Age, some 65 million years after the last non-bird dinosaurs.",
       era: "Pleistocene (Ice Age)", period: "c. 0.8 million – 11,000 years ago",
       habitat: "Pampas of Argentina & Uruguay",
       length: "~3.6 m", weight: "~1.5–2.4 tonnes", diet: "Herbivore", speed: "~6 km/h (est.)",
@@ -617,6 +738,10 @@ export const SPECIES = {
     features: { armor: true, spikes: true },
     hall: "cretaceous",
     info: {
+      latin: "Nodosaurus textilis", author: "Marsh, 1889", say: "NOH-doh-SORE-us",
+      meaning: "knobbed lizard",
+      discovered: { year: 1881, by: "William Harlow Reed", where: "Albany County, Wyoming, USA" },
+      specimen: "Holotype YPM VP 1815, Yale Peabody Museum",
       era: "Late Cretaceous", period: "c. 100–94 million years ago",
       habitat: "Frontier Formation, Wyoming, USA",
       length: "4–6 m", weight: "~3–3.5 tonnes", diet: "Herbivore", speed: "~8 km/h (est.)",
@@ -637,6 +762,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "cretaceous",
     info: {
+      latin: "Pachycephalosaurus wyomingensis", author: "(Gilmore, 1931)", say: "PACK-ee-SEF-uh-loh-SORE-us",
+      meaning: "thick-headed lizard",
+      discovered: { year: 1930, by: "George F. Sternberg", where: "Niobrara County, Wyoming, USA" },
+      specimen: "Holotype USNM 12031, a partial skull, Smithsonian Institution",
       era: "Late Cretaceous", period: "70–66 million years ago",
       habitat: "Hell Creek & Lance Formations, North America",
       length: "~4.5 m", weight: "~370–450 kg", diet: "Herbivore (perhaps omnivore)", speed: "~30 km/h (est.)",
@@ -657,6 +786,10 @@ export const SPECIES = {
     features: { arms: true, spineRow: true },
     hall: "cretaceous",
     info: {
+      latin: "Stygimoloch spinifer", author: "Galton & Sues, 1983", say: "STIJ-ih-MOH-lok",
+      meaning: "demon from the river Styx, a nod to Hell Creek",
+      discovered: { where: "Hell Creek Formation, Montana, USA" },
+      note: "Many palaeontologists now think it is a young Pachycephalosaurus.",
       era: "Late Cretaceous", period: "c. 68–66 million years ago",
       habitat: "Hell Creek Formation, North America",
       length: "~2–3 m", weight: "~80 kg (est.)", diet: "Herbivore", speed: "~30 km/h (est.)",
@@ -677,6 +810,10 @@ export const SPECIES = {
     features: { arms: true, sail: true },
     hall: "cretaceous",
     info: {
+      latin: "Spinosaurus aegyptiacus", author: "Stromer, 1915", say: "SPY-noh-SORE-us",
+      meaning: "spine lizard",
+      discovered: { year: 1912, by: "Richard Markgraf", where: "Bahariya Oasis, Egypt" },
+      specimen: "The original bones were destroyed in a 1944 bombing raid on Munich; a neotype (FSAC-KK 11888) was named from Morocco in 2014",
       era: "Late Cretaceous", period: "99–93 million years ago",
       habitat: "Bahariya Formation, Egypt & Kem Kem Beds, Morocco",
       length: "14–15 m", weight: "~7–7.5 tonnes", diet: "Piscivore/Carnivore", speed: "~24 km/h (est.)",
@@ -698,6 +835,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "cretaceous",
     info: {
+      latin: "Carcharodontosaurus saharicus", author: "(Depéret & Savornin, 1925)", say: "kar-KAR-oh-DON-toh-SORE-us",
+      meaning: "jagged-toothed lizard",
+      discovered: { year: 1924, where: "near Timimoun, Algeria" },
+      specimen: "First known from two teeth; a skull found in Morocco's Kem Kem beds by Paul Sereno's team in 1995 now defines the species",
       era: "Late Cretaceous", period: "100–94 million years ago",
       habitat: "Kem Kem Beds, Morocco & Bahariya Formation, Egypt",
       length: "12–12.5 m", weight: "~6–7 tonnes", diet: "Carnivore", speed: "~28 km/h (est.)",
@@ -719,6 +860,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "cretaceous",
     info: {
+      latin: "Giganotosaurus carolinii", author: "Coria & Salgado, 1995", say: "JIG-uh-NOH-toh-SORE-us",
+      meaning: "giant southern lizard",
+      discovered: { year: 1993, by: "Rubén Carolini", where: "near Villa El Chocón, Neuquén, Argentina" },
+      specimen: "Holotype MUCPv-Ch 1, about 70% complete, Ernesto Bachmann Museum, Villa El Chocón",
       era: "Late Cretaceous", period: "99–95 million years ago",
       habitat: "Candeleros Formation, Argentina",
       length: "12–13 m", weight: "~6–8 tonnes", diet: "Carnivore", speed: "~30 km/h (est.)",
@@ -739,6 +884,10 @@ export const SPECIES = {
     features: { arms: true },
     hall: "cretaceous",
     info: {
+      latin: "Mapusaurus roseae", author: "Coria & Currie, 2006", say: "MAH-poo-SORE-us",
+      meaning: "earth lizard (mapu, Mapuche)",
+      discovered: { year: 1997, by: "the Argentinian-Canadian Dinosaur Project", where: "Cañadón del Gato, Neuquén, Argentina" },
+      specimen: "One bonebed held seven to nine individuals, hinting that it lived in groups",
       era: "Late Cretaceous", period: "c. 97–94 million years ago",
       habitat: "Huincul Formation, Argentina",
       length: "10–12.5 m", weight: "~5–7 tonnes", diet: "Carnivore", speed: "~30 km/h (est.)",
@@ -759,6 +908,10 @@ export const SPECIES = {
     features: { arms: true, spineRow: true },
     hall: "cretaceous",
     info: {
+      latin: "Acrocanthosaurus atokensis", author: "Stovall & Langston, 1950", say: "AK-roh-KAN-thoh-SORE-us",
+      meaning: "high-spined lizard",
+      discovered: { year: "early 1940s", where: "Atoka County, Oklahoma, USA" },
+      specimen: "'Fran' (NCSM 14345), the most complete skeleton, North Carolina Museum of Natural Sciences",
       era: "Early Cretaceous", period: "c. 113–110 million years ago",
       habitat: "Antlers & Twin Mountains Formations, Oklahoma & Texas, USA",
       length: "11–11.5 m", weight: "~4.5–6 tonnes", diet: "Carnivore", speed: "~28 km/h (est.)",
@@ -779,6 +932,10 @@ export const SPECIES = {
     features: { arms: true, sickle: true, feathers: true },
     hall: "cretaceous",
     info: {
+      latin: "Velociraptor mongoliensis", author: "Osborn, 1924", say: "veh-LOSS-ih-RAP-tor",
+      meaning: "swift thief",
+      discovered: { year: 1923, by: "Peter Kaisen", where: "Flaming Cliffs, Gobi Desert, Mongolia" },
+      specimen: "The 'Fighting Dinosaurs', found in 1971: a Velociraptor locked in combat with a Protoceratops",
       era: "Late Cretaceous", period: "75–71 million years ago",
       habitat: "Djadochta Formation, Mongolia",
       length: "1.5–2 m", weight: "15–20 kg", diet: "Carnivore", speed: "~40 km/h (est.)",
@@ -800,6 +957,9 @@ export const SPECIES = {
     features: { arms: true, sickle: true, feathers: true },
     hall: "cretaceous",
     info: {
+      latin: "Utahraptor ostrommaysi", author: "Kirkland, Gaston & Burge, 1993", say: "YOO-tah-RAP-tor",
+      meaning: "Utah's thief",
+      discovered: { year: 1975, by: "Jim Jensen", where: "Dalton Wells Quarry, near Moab, Utah, USA" },
       era: "Early Cretaceous", period: "c. 139–135 million years ago",
       habitat: "Cedar Mountain Formation, Utah, USA",
       length: "5–6 m", weight: "~300–500 kg", diet: "Carnivore", speed: "~35 km/h (est.)",
@@ -820,6 +980,10 @@ export const SPECIES = {
     features: { arms: true, sickle: true, feathers: true },
     hall: "cretaceous",
     info: {
+      latin: "Deinonychus antirrhopus", author: "Ostrom, 1969", say: "dy-NON-ih-kus",
+      meaning: "terrible claw",
+      discovered: { year: 1964, by: "John Ostrom's Yale expedition", where: "near Bridger, Montana, USA" },
+      specimen: "Holotype YPM 5205, a foot with its sickle claw, Yale Peabody Museum",
       era: "Early Cretaceous", period: "115–108 million years ago",
       habitat: "Cloverly Formation, Montana & Wyoming, USA",
       length: "3–3.4 m", weight: "60–100 kg", diet: "Carnivore", speed: "~40 km/h (est.)",
@@ -840,6 +1004,10 @@ export const SPECIES = {
     features: { arms: true, feathers: true, crest: true },
     hall: "cretaceous",
     info: {
+      latin: "Oviraptor philoceratops", author: "Osborn, 1924", say: "OH-vih-RAP-tor",
+      meaning: "egg thief",
+      discovered: { year: 1923, by: "Roy Chapman Andrews's Central Asiatic Expedition", where: "Flaming Cliffs, Gobi Desert, Mongolia" },
+      specimen: "Holotype AMNH 6517 lay on a nest of eggs; it was blamed for stealing them, but they were probably its own kind's",
       era: "Late Cretaceous", period: "75–71 million years ago",
       habitat: "Djadochta Formation, Mongolia",
       length: "1.6–2 m", weight: "~35 kg", diet: "Omnivore", speed: "~40 km/h (est.)",
@@ -860,6 +1028,10 @@ export const SPECIES = {
     features: { arms: true, thumbSpike: true },
     hall: "cretaceous",
     info: {
+      latin: "Iguanodon bernissartensis", author: "Boulenger, 1881", say: "ih-GWAH-noh-don",
+      meaning: "iguana tooth",
+      discovered: { year: 1878, by: "coal miners", where: "Bernissart, Belgium" },
+      specimen: "Dozens of skeletons from a Belgian coal mine, Royal Belgian Institute of Natural Sciences, Brussels",
       era: "Early Cretaceous", period: "c. 126–122 million years ago",
       habitat: "Bernissart, Belgium & Wealden, England",
       length: "9–11 m", weight: "~3–4.5 tonnes", diet: "Herbivore", speed: "~25 km/h (est.)",
@@ -881,6 +1053,11 @@ export const SPECIES = {
     features: { wings: true, wingLen: 6.2, crest: true },
     hall: "cretaceous",
     info: {
+      latin: "Quetzalcoatlus northropi", author: "Lawson, 1975", say: "KET-sul-koh-AT-lus",
+      meaning: "named after Quetzalcoatl, the Aztec feathered-serpent god",
+      discovered: { year: 1971, by: "Douglas A. Lawson", where: "Big Bend National Park, Texas, USA" },
+      notDinosaur: true,
+      notDinoNote: "A pterosaur: a flying reptile and a cousin of the dinosaurs, not one of them.",
       era: "Late Cretaceous", period: "68–66 million years ago",
       habitat: "Javelina Formation, Texas, USA",
       length: "10–11 m wingspan", weight: "200–250 kg", diet: "Carnivore (small animals)", speed: "~80 km/h flying (est.)",
@@ -901,6 +1078,12 @@ export const SPECIES = {
     features: { wings: true, wingLen: 4.6, crest: true },
     hall: "cretaceous",
     info: {
+      latin: "Pteranodon longiceps", author: "Marsh, 1876", say: "teh-RAN-oh-don",
+      meaning: "wing without tooth",
+      discovered: { year: 1870, by: "Othniel C. Marsh", where: "Smoky Hill Chalk, western Kansas, USA" },
+      specimen: "The first skull was found on 2 May 1876 by Samuel Williston",
+      notDinosaur: true,
+      notDinoNote: "A pterosaur: a flying reptile and a cousin of the dinosaurs, not one of them.",
       era: "Late Cretaceous", period: "c. 86–84.5 million years ago",
       habitat: "Niobrara Chalk, Kansas, USA",
       length: "up to 7 m wingspan", weight: "~20–35 kg", diet: "Piscivore", speed: "~50 km/h flying (est.)",
@@ -923,6 +1106,12 @@ export const SPECIES = {
     features: { tailFin: true, dorsalFin: true },
     hall: "marine",
     info: {
+      latin: "Mosasaurus hoffmannii", author: "Mantell, 1829", say: "MOH-zuh-SORE-us",
+      meaning: "lizard of the Meuse river",
+      discovered: { year: 1764, where: "a chalk quarry near Maastricht, Netherlands" },
+      specimen: "The 'great animal of Maastricht' skull (found 1778), seized by French troops in 1795; National Museum of Natural History, Paris",
+      notDinosaur: true,
+      notDinoNote: "A mosasaur: a giant sea-going lizard, related to monitor lizards and snakes.",
       era: "Late Cretaceous", period: "82–66 million years ago",
       habitat: "Maastricht Formation, Netherlands",
       length: "12–17 m", weight: "~10–15 tonnes (est.)", diet: "Marine predator", speed: "~35 km/h (est.)",
@@ -944,6 +1133,11 @@ export const SPECIES = {
     features: { tailFin: true },
     hall: "marine",
     info: {
+      latin: "Plesiosaurus dolichodeirus", author: "Conybeare, 1824", say: "PLEE-zee-oh-SORE-us",
+      meaning: "near to lizard",
+      discovered: { year: 1823, by: "Mary Anning", where: "Lyme Regis, Dorset, England" },
+      notDinosaur: true,
+      notDinoNote: "A plesiosaur: a marine reptile that swam the seas while dinosaurs walked the land.",
       era: "Early Jurassic", period: "c. 199–190 million years ago",
       habitat: "Blue Lias, Lyme Regis, England",
       length: "~3–3.5 m", weight: "~200–450 kg (est.)", diet: "Marine predator", speed: "~15 km/h (est.)",
@@ -965,6 +1159,12 @@ export const SPECIES = {
     features: { tailFin: true },
     hall: "marine",
     info: {
+      latin: "Elasmosaurus platyurus", author: "Cope, 1868", say: "eh-LAZ-moh-SORE-us",
+      meaning: "thin-plate lizard",
+      discovered: { year: 1867, by: "army surgeon Theophilus Turner", where: "near Fort Wallace, Kansas, USA" },
+      note: "Edward Drinker Cope's first reconstruction put its head on the end of its tail.",
+      notDinosaur: true,
+      notDinoNote: "A plesiosaur: a marine reptile that swam the seas while dinosaurs walked the land.",
       era: "Late Cretaceous", period: "c. 80.5 million years ago",
       habitat: "Pierre Shale, Kansas, USA",
       length: "~10 m", weight: "~2 tonnes", diet: "Marine predator", speed: "~15 km/h (est.)",
@@ -985,6 +1185,11 @@ export const SPECIES = {
     features: { dorsalFin: true, tailFin: true, bigEyes: true },
     hall: "marine",
     info: {
+      latin: "Ichthyosaurus communis", author: "De la Beche & Conybeare, 1821", say: "IK-thee-oh-SORE-us",
+      meaning: "fish lizard",
+      discovered: { where: "Lyme Regis, Dorset, England" },
+      notDinosaur: true,
+      notDinoNote: "An ichthyosaur: a dolphin-shaped marine reptile, not a dinosaur.",
       era: "Early Jurassic", period: "c. 200–190 million years ago",
       habitat: "Blue Lias, Lyme Regis, England",
       length: "~2–3.3 m", weight: "~90–160 kg (est.)", diet: "Marine predator", speed: "~35 km/h (est.)",
@@ -1005,6 +1210,12 @@ export const SPECIES = {
     features: { tailFin: true },
     hall: "marine",
     info: {
+      latin: "Kronosaurus queenslandicus", author: "Longman, 1924", say: "KROH-noh-SORE-us",
+      meaning: "Kronos's lizard, after the Titan of Greek myth",
+      discovered: { year: 1899, by: "Andrew Crombie", where: "Hughenden, Queensland, Australia" },
+      specimen: "Harvard's mounted skeleton (MCZ 1285), dug up in 1932, was so heavily rebuilt in plaster it was nicknamed 'Plasterosaurus'",
+      notDinosaur: true,
+      notDinoNote: "A pliosaur: a short-necked marine reptile, not a dinosaur.",
       era: "Early Cretaceous", period: "c. 112–100 million years ago",
       habitat: "Toolebuc Formation, Queensland, Australia",
       length: "~9–10.5 m", weight: "~10–12 tonnes (est.)", diet: "Marine predator", speed: "~30 km/h (est.)",
@@ -1025,6 +1236,12 @@ export const SPECIES = {
     features: { tailFin: true },
     hall: "marine",
     info: {
+      latin: "Liopleurodon ferox", author: "Sauvage, 1873", say: "LY-oh-PLOOR-oh-don",
+      meaning: "smooth-sided tooth",
+      discovered: { where: "Le Wast, near Boulogne-sur-Mer, France" },
+      specimen: "Named from a single tooth (BHN 3R 197), Lille Natural History Museum",
+      notDinosaur: true,
+      notDinoNote: "A pliosaur: a short-necked marine reptile, not a dinosaur.",
       era: "Middle Jurassic", period: "c. 166–163 million years ago",
       habitat: "Oxford Clay (Peterborough Member), England & France",
       length: "~5–8 m", weight: "~1–3 tonnes (est.)", diet: "Marine predator", speed: "~30 km/h (est.)",
@@ -1045,6 +1262,12 @@ export const SPECIES = {
     features: { armor: true },
     hall: "marine",
     info: {
+      latin: "Archelon ischyros", author: "Wieland, 1896", say: "AR-keh-lon",
+      meaning: "ruler turtle",
+      discovered: { year: 1895, by: "George Reber Wieland", where: "Cheyenne River, South Dakota, USA" },
+      specimen: "Holotype YPM 3000, Yale Peabody Museum; the largest, 'Brigitta', is in the Natural History Museum Vienna",
+      notDinosaur: true,
+      notDinoNote: "A giant sea turtle, not a dinosaur.",
       era: "Late Cretaceous", period: "c. 80–74 million years ago",
       habitat: "Pierre Shale, South Dakota, USA",
       length: "~4–4.6 m", weight: "~2.2 tonnes", diet: "Omnivore (jellyfish, shellfish)", speed: "~15 km/h (est.)",
@@ -1065,6 +1288,11 @@ export const SPECIES = {
     features: { tailFin: true, armor: true },
     hall: "marine",
     info: {
+      latin: "Deinosuchus riograndensis", author: "(Colbert & Bird, 1954)", say: "DY-noh-SOO-kus",
+      meaning: "terrible crocodile",
+      discovered: { year: 1940, by: "an American Museum of Natural History expedition", where: "Big Bend, Texas, USA" },
+      notDinosaur: true,
+      notDinoNote: "A crocodylian: a giant relative of today's alligators.",
       era: "Late Cretaceous", period: "c. 82–73 million years ago",
       habitat: "Coastal swamps & estuaries, USA & Mexico",
       length: "8–12 m", weight: "~2.5–5 tonnes", diet: "Carnivore (ambush predator)", speed: "~30 km/h swimming (est.)",
@@ -1087,6 +1315,12 @@ export const SPECIES = {
     features: { sail: true, teeth: true },
     hall: "rotunda",
     info: {
+      latin: "Dimetrodon limbatus", author: "(Cope, 1877)", say: "dy-MET-roh-don",
+      meaning: "two measures of teeth",
+      discovered: { year: 1845, by: "Donald McLeod", where: "Prince Edward Island, Canada" },
+      note: "That first find, a jaw from Prince Edward Island, was named Bathygnathus in 1854 and only recognised as Dimetrodon in 2015; the species shown here was named from Texas fossils.",
+      notDinosaur: true,
+      notDinoNote: "A Permian synapsid: closer to mammals, including you, than to any dinosaur.",
       era: "Early Permian", period: "c. 295–272 million years ago",
       habitat: "Texas & Oklahoma, USA",
       length: "1.7–4.6 m", weight: "up to ~250 kg", diet: "Carnivore", speed: "~15 km/h (est.)",

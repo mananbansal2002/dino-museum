@@ -1,0 +1,256 @@
+/* ------------------------------------------------------------------ */
+/* Audio guide subtitles (narrator.js)                                  */
+/* Bottom-centre, under the interaction prompt, above every panel so a */
+/* talk started from an exhibit card stays readable over the card.     */
+/* --gc-lift is set by narrator.js when a long subtitle would run into */
+/* the prompt: the box then rises just above it.                       */
+/* ------------------------------------------------------------------ */
+.guideCaption {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--hud-gap, 16px) + 42px + var(--safe-b, 0px) + var(--gc-lift, 0px));
+  z-index: 45;
+  width: max-content;
+  max-width: min(660px, calc(100vw - 2 * var(--hud-gap, 16px)));
+  padding: 9px 18px 12px;
+  border-radius: 12px;
+  background: rgba(8, 11, 16, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
+  color: #f6f1e7;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    bottom 0.22s ease;
+}
+
+.guideCaption.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.gcHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent, #ffc857);
+}
+
+/* small headphones glyph, drawn so it needs no icon font */
+.gcIcon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 18v-6a9 9 0 0 1 18 0v6'/%3E%3Cpath d='M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 18v-6a9 9 0 0 1 18 0v6'/%3E%3Cpath d='M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.gcLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46ch;
+}
+
+.gcHint {
+  flex: none;
+  margin: 0 0 0 6px;
+  padding: 0 0 0 9px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  white-space: nowrap;
+  color: rgba(246, 241, 231, 0.6);
+  letter-spacing: 0.04em;
+  text-transform: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.gcHint:hover,
+.gcHint:focus-visible {
+  color: #f6f1e7;
+}
+
+.gcHint kbd {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-bottom-width: 2px;
+  font: 700 10px/14px var(--mono, ui-monospace, Menlo, monospace);
+  color: #f6f1e7;
+  text-align: center;
+}
+
+.gcText {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.42;
+  text-wrap: balance;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* when the voice reports word boundaries, words still to come are dimmed */
+.gcText.tracking span {
+  color: rgba(246, 241, 231, 0.55);
+  transition: color 0.12s linear;
+}
+
+.gcText.tracking span.said {
+  color: #fff;
+}
+
+/* small screens: the prompt sits lower, so the subtitles go above it */
+@media (max-width: 760px) {
+  .guideCaption {
+    bottom: calc(132px + var(--safe-b, 0px) + var(--gc-lift, 0px));
+    padding: 7px 14px 9px;
+  }
+  .gcText {
+    font-size: 15px;
+  }
+}
+
+/* touch: clear the joystick / action buttons strip */
+@media (pointer: coarse) {
+  .guideCaption {
+    bottom: calc(var(--touch-safe-bottom, 170px) + 120px + var(--safe-b, 0px) + var(--gc-lift, 0px));
+  }
+
+  /* no N key on a touch screen: the hint becomes a tappable Stop pill */
+  .gcHint {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 26px;
+    margin-left: 8px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #f6f1e7;
+  }
+
+  .gcHint kbd {
+    display: none;
+  }
+
+  .gcHint::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 1.5px;
+    background: currentColor;
+  }
+
+  /* a bigger invisible hit area than the pill itself */
+  .gcHint::after {
+    content: "";
+    position: absolute;
+    inset: -9px -6px;
+  }
+}
+
+/* phones: "Audio guide · Triceratops" becomes "Triceratops" (the icon says the rest) */
+@media (max-width: 640px), (max-height: 500px) {
+  .guideCaption .gcPre {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guideCaption,
+  .gcText.tracking span {
+    transition: none;
+  }
+}
+
+html[data-reduced-motion] .guideCaption,
+html[data-reduced-motion] .gcText.tracking span {
+  transition: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* A talk playing over an open exhibit card (main.js sets .guide-card): */
+/* the card shrinks to make room and the caption sits in the gap below  */
+/* it, so the subtitles never cover what the visitor is reading.        */
+/* ------------------------------------------------------------------ */
+body.guide-card #exhibitCard,
+body.guide-card #modal {
+  padding-bottom: calc(112px + var(--safe-b, 0px));
+}
+
+body.guide-card #modal .card,
+body.guide-card #exhibitCard .card.wide {
+  max-height: calc(100vh - 132px - var(--safe-b, 0px));
+  max-height: calc(100dvh - 132px - var(--safe-b, 0px));
+}
+
+body.guide-card .guideCaption {
+  bottom: calc(14px + var(--safe-b, 0px)) !important;
+}
+
+/* phones: the card is a bottom sheet, so the caption goes to the top */
+@media (max-width: 640px) {
+  body.guide-card #exhibitCard {
+    padding-bottom: 0;
+    padding-top: calc(104px + var(--safe-t, 0px));
+  }
+
+  body.guide-card #exhibitCard .card.wide {
+    max-height: calc(100dvh - 104px - var(--safe-t, 0px));
+  }
+
+  body.guide-card .guideCaption {
+    top: calc(10px + var(--safe-t, 0px));
+    bottom: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Touch dock (touchdock.css): the subtitles keep clear of its buttons. */
+/* Portrait phones mirror the prompt (left aligned, short of the strip); */
+/* landscape phones stop short of the 3 x 2 block in the Jump row.       */
+/* ------------------------------------------------------------------ */
+@media (pointer: coarse) and (max-width: 640px) and (min-height: 501px) {
+  body.has-touch-dock:not(.guide-card) .guideCaption {
+    left: calc(var(--hud-gap, 16px) + var(--safe-l, 0px));
+    max-width: calc(100vw - 2 * var(--hud-gap, 16px) - 126px - var(--safe-l, 0px) - var(--safe-r, 0px));
+    transform: translate(0, 6px);
+  }
+}
+
+@media (pointer: coarse) and (max-height: 500px) {
+  body.has-touch-dock:not(.guide-card) .guideCaption {
+    left: calc(var(--hud-gap, 16px) + var(--safe-l, 0px));
+    max-width: calc(100vw - 2 * var(--hud-gap, 16px) - 360px - var(--safe-l, 0px) - var(--safe-r, 0px));
+    transform: translate(0, 6px);
+  }
+}
+
+@media (pointer: coarse) and (max-width: 640px) and (min-height: 501px), (pointer: coarse) and (max-height: 500px) {
+  body.has-touch-dock:not(.guide-card) .guideCaption.show {
+    transform: translate(0, 0);
+  }
+}

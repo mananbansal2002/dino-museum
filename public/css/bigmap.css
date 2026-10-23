@@ -1,0 +1,415 @@
+/* ================================================================= bigmap */
+/* Full-screen museum map with fast travel (bigmap.js). Uses the in-game
+   glass tokens from style.css; every selector is prefixed .bmap- so nothing
+   leaks out. */
+
+.bmap-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, var(--safe-t, 0px)) max(16px, var(--safe-r, 0px)) max(16px, var(--safe-b, 0px))
+    max(16px, var(--safe-l, 0px));
+  background: radial-gradient(circle at 50% 35%, rgba(22, 32, 43, 0.6), rgba(5, 8, 12, 0.88));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: bmapFade 0.2s ease-out;
+  color: var(--text, #f3ecdf);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.bmap-overlay[hidden] {
+  display: none !important;
+}
+
+.bmap-card {
+  width: min(1180px, 100%);
+  height: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-strong, rgba(12, 17, 24, 0.9));
+  border: 1px solid var(--glass-edge, rgba(255, 255, 255, 0.1));
+  border-radius: 20px;
+  backdrop-filter: var(--glass-blur, blur(14px));
+  -webkit-backdrop-filter: var(--glass-blur, blur(14px));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), var(--glass-hi, inset 0 1px 0 rgba(255, 255, 255, 0.07));
+  overflow: hidden;
+  animation: bmapCardIn 0.3s var(--ease-out, ease-out) both;
+}
+
+@keyframes bmapFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes bmapCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+}
+
+/* ---- header ---- */
+.bmap-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bmap-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.bmap-sub {
+  margin: 2px 0 0;
+  color: var(--muted, #9fb0bf);
+}
+
+.bmap-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, #f3ecdf);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.bmap-close:hover,
+.bmap-close:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  outline: none;
+}
+
+/* ---- body: plan + hall list ---- */
+.bmap-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 0;
+}
+
+.bmap-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(20, 30, 40, 0.75), rgba(6, 10, 14, 0.92));
+}
+
+.bmap-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: manipulation;
+}
+
+.bmap-tip {
+  position: absolute;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(8, 12, 17, 0.94);
+  border: 1px solid rgba(255, 200, 87, 0.35);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.bmap-tip[hidden] {
+  display: none;
+}
+
+.bmap-tip b {
+  font-weight: 700;
+}
+
+.bmap-tip span {
+  font-size: 11.5px;
+  color: var(--accent, #ffc857);
+}
+
+.bmap-tip.is-locked {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.bmap-tip.is-locked span {
+  color: var(--muted, #9fb0bf);
+}
+
+.bmap-side {
+  flex: none;
+  width: 290px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 0;
+}
+
+.bmap-progress-text {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.bmap-bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.bmap-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent, #ffc857), var(--accent2, #ff8fab));
+  transition: width 0.4s var(--ease-out, ease-out);
+}
+
+.bmap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bmap-hall {
+  --hall: #ffc857;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text, #f3ecdf);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.bmap-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--hall) 55%, transparent);
+  background: color-mix(in srgb, var(--hall) 18%, transparent);
+  color: var(--hall);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bmap-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bmap-status {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent, #ffc857);
+}
+
+.bmap-hall:not(:disabled):hover,
+.bmap-hall:not(:disabled).is-hover,
+.bmap-hall:focus-visible {
+  background: color-mix(in srgb, var(--hall) 14%, transparent);
+  border-color: color-mix(in srgb, var(--hall) 45%, transparent);
+  outline: none;
+}
+
+.bmap-hall.is-here .bmap-status {
+  color: var(--ok, #7ee081);
+}
+
+.bmap-hall:disabled {
+  cursor: default;
+  color: rgba(243, 236, 223, 0.42);
+}
+
+.bmap-hall:disabled .bmap-num {
+  color: rgba(175, 185, 195, 0.5);
+  border-color: rgba(175, 185, 195, 0.18);
+  background: rgba(175, 185, 195, 0.06);
+}
+
+.bmap-hall:disabled .bmap-status {
+  color: rgba(159, 176, 191, 0.55);
+  font-weight: 600;
+}
+
+.bmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11.5px;
+  color: var(--muted, #9fb0bf);
+}
+
+.bmap-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bmap-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.bmap-key-you {
+  background: #ffc857;
+  clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%);
+  border-radius: 0 !important;
+}
+
+.bmap-key-friend {
+  background: #8ecae6;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.bmap-key-exhibit {
+  width: 6px !important;
+  height: 6px !important;
+  background: rgba(255, 200, 87, 0.9);
+}
+
+.bmap-key-locked {
+  border-radius: 2px !important;
+  background: repeating-linear-gradient(45deg, rgba(160, 170, 180, 0.35) 0 2px, rgba(120, 130, 140, 0.12) 2px 4px);
+}
+
+/* ---- footer ---- */
+.bmap-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 9px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--muted, #9fb0bf);
+  font-size: 11.5px;
+}
+
+.bmap-foot kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom-width: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: var(--mono, monospace);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text, #f3ecdf);
+}
+
+/* ---- narrow screens: the list goes under the plan ---- */
+@media (max-width: 760px) {
+  .bmap-overlay {
+    padding: max(10px, var(--safe-t, 0px)) max(10px, var(--safe-r, 0px)) max(10px, var(--safe-b, 0px))
+      max(10px, var(--safe-l, 0px));
+  }
+
+  .bmap-card {
+    height: 100%;
+    border-radius: 16px;
+  }
+
+  .bmap-head {
+    padding: 12px 12px 10px 16px;
+  }
+
+  .bmap-title {
+    font-size: 17px;
+  }
+
+  .bmap-body {
+    flex-direction: column;
+  }
+
+  .bmap-stage {
+    flex: 1 1 55%;
+  }
+
+  .bmap-side {
+    width: auto;
+    flex: 0 1 45%;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .bmap-legend {
+    display: none;
+  }
+
+  .bmap-hall {
+    padding: 7px 8px;
+  }
+}
+
+@media (pointer: coarse) {
+  .bmap-foot {
+    display: none;
+  }
+
+  .bmap-hall {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bmap-overlay,
+  .bmap-card {
+    animation: none;
+  }
+}
+
+.bmap-card:focus {
+  outline: none;
+}
