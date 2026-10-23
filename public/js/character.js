@@ -94,25 +94,25 @@ export const ACCESSORIES = [
 export const SPECIAL_PRESETS = [
   {
     id: "him-hills",
-    name: "Him · Hills",
+    name: "Special 1",
     swatch: ["#38446c", "#e9e8e2"],
     look: { body: "male", skin: "#8c5e42", shirt: "#38446c", pants: "#e9e8e2", hair: "curly", hairColor: "#16110d", accessory: "glasses" },
   },
   {
     id: "him-rooftop",
-    name: "Him · Rooftop",
+    name: "Special 2",
     swatch: ["#17171b", "#45454b"],
     look: { body: "male", skin: "#8c5e42", shirt: "#17171b", pants: "#151518", hair: "curly", hairColor: "#16110d", accessory: "glasses" },
   },
   {
     id: "her-hills",
-    name: "Her · Hills",
+    name: "Special 3",
     swatch: ["#6476cc", "#ecedeb"],
     look: { body: "female", skin: "#9a684d", shirt: "#6476cc", pants: "#ecedeb", hair: "long", hairColor: "#1d1611", accessory: "none" },
   },
   {
     id: "her-rooftop",
-    name: "Her · Rooftop",
+    name: "Special 4",
     swatch: ["#1f264c", "#1f1b1d"],
     look: { body: "female", skin: "#9a684d", shirt: "#1f264c", pants: "#1f1b1d", hair: "long", hairColor: "#1d1611", accessory: "none" },
   },
