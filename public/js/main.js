@@ -144,6 +144,7 @@ let live = null;
 let crowd = null;
 let gelateria = null;
 let vendor = null;
+let dioramas = null; // living diorama windows in the era halls (diorama.js)
 let resolveProps;
 const propsReady = new Promise((r) => (resolveProps = r));
 
@@ -219,6 +220,14 @@ async function bootAmbient() {
   })
     .catch((err) => console.warn("crowd: could not create it", err))
     .finally(endCrowd);
+  // diorama cases in the era halls; each scene behind the glass loads on approach
+  await whenIdle(() => import("./diorama.js"))
+    .then((m) => {
+      dioramas = m.createDioramas({ scene, renderer, camera, quality: () => lookdev.quality });
+      window.__museum.dioramas = dioramas;
+      return stageIn(dioramas.root);
+    })
+    .catch((err) => console.warn("dioramas: could not build them", err));
 }
 
 // the Jurassic Hall's exit doorway: the court is built when a visitor nears it
@@ -1506,6 +1515,7 @@ const AMBIENT = [
   ["live exhibits", () => live],
   ["crowd", () => crowd],
   ["atmosphere", () => atmosphere],
+  ["dioramas", () => dioramas],
 ];
 const MAP = { local: { x: 0, z: 0, ry: 0 }, remotes: [] };
 let mapTick = false;
