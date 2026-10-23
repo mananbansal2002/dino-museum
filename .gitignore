@@ -8,3 +8,5 @@ npm-cache/
 .claude/
 public/models/staging/
 prof-*/
+.vercel
+.env*

@@ -245,8 +245,10 @@ export function createMuseumServer({ staticDir = null, mountPath = null, sync: s
     cors: { origin: "*" },
     // Vercel strips the function mount path, so the default path works there
     // and locally. Long-polling is disabled client-side (see public/js/net.js).
-    pingInterval: 20000,
-    pingTimeout: 25000,
+    // A dead serverless instance only shows up as a missed heartbeat. Keep the
+    // interval short so a cut is noticed in ~10-18 s instead of ~45 s.
+    pingInterval: 10000,
+    pingTimeout: 8000,
     maxHttpBufferSize: 1e5,
   });
 
