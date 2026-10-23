@@ -26,8 +26,9 @@
  *   walks up to them, leave a spot a player lingers at, never pick a spot a
  *   player is standing at, and repath / quietly relocate out of view when
  *   stuck for more than 4 s.
- * - Cost: mixers tick every frame within 20 m of the camera, at 15 Hz up to
- *   45 m and not at all beyond; NPCs beyond 70 m are hidden. Geometry and
+ * - Cost: 3 / 6 / 12 visitors on low / medium / high. Mixers tick every
+ *   frame within 12 m of the camera, at 15 Hz up to 25 m and not at all
+ *   beyond (6 Hz for walkers in view on high); NPCs beyond 70 m are hidden. Geometry and
  *   textures are shared between clones; only the clothes / hair materials
  *   are cloned (one shader program for all of them). Shadows on high/ultra.
  */
@@ -46,8 +47,8 @@ const NAV_R = 0.42; // clearance a nav cell keeps from walls / plinths
 const BODY_R = 0.3; // collision radius when steering
 const PERSONAL = 0.8; // minimum distance to anyone else
 const WALL_HALF = 0.2; // world.js wall slabs are 0.4 m thick
-const ANIM_NEAR = 20; // full-rate mixers
-const ANIM_FAR = 45; // 15 Hz mixers up to here, frozen beyond
+const ANIM_NEAR = 12; // full-rate mixers
+const ANIM_FAR = 25; // 15 Hz mixers up to here, frozen beyond (a walker in view still steps at 6 Hz on high)
 const HIDE_DIST = 70;
 const STUCK_TIME = 4;
 const PATHS_PER_FRAME = 2;
@@ -95,7 +96,8 @@ const BOTTOMS = {
 };
 const HAIR = [0xffffff, 0xd9c8b8, 0x8a6a52, 0x5a4636, 0x3a302a, 0x26211e, 0xa86b4c, 0xc9c3bd];
 
-const QUALITY_COUNT = { low: 5, medium: 9, med: 9, high: null, ultra: null };
+// visitors per tier (main.js asks for the same); high / ultra: as many as asked
+const QUALITY_COUNT = { low: 3, medium: 6, med: 6, high: null, ultra: null };
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                              */
@@ -618,6 +620,7 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
   const taken = new Map(); // slot / seat key -> npc
   const pathQueue = [];
   const players = []; // [{x, z}] this frame
+  const playerRecs = [];
   let clock = 0;
   let disposed = false;
   let navCheckT = 0;
@@ -1251,15 +1254,32 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
 
   /* ---------------- per-frame ---------------- */
 
+  // others() hands out pooled records: steer() reads them straight away and
+  // the next call reuses them, so local avoidance makes no garbage per frame
+  const othersList = [];
+  const othersPool = [];
+  function otherRec(i, x, z, moving, dx, dz, npc, player) {
+    let r = othersPool[i];
+    if (!r) r = othersPool[i] = { x: 0, z: 0, moving: false, dx: 0, dz: 0, npc: null, player: false };
+    r.x = x;
+    r.z = z;
+    r.moving = moving;
+    r.dx = dx;
+    r.dz = dz;
+    r.npc = npc;
+    r.player = player;
+    return r;
+  }
   function others(n) {
     // other NPCs + players, as { x, z, moving, dx, dz }
-    const list = [];
+    const list = othersList;
+    list.length = 0;
     for (const o of npcs) {
       if (o === n || (o.x - n.x) ** 2 + (o.z - n.z) ** 2 > 6.25) continue;
       if (o.state === "sit" || o.state === "sitDown" || o.state === "standUp") continue;
-      list.push({ x: o.x, z: o.z, moving: o.speed > 0.2, dx: Math.sin(o.ry), dz: Math.cos(o.ry), npc: o });
+      list.push(otherRec(list.length, o.x, o.z, o.speed > 0.2, Math.sin(o.ry), Math.cos(o.ry), o, false));
     }
-    for (const p of players) if ((p.x - n.x) ** 2 + (p.z - n.z) ** 2 <= 6.25) list.push({ x: p.x, z: p.z, moving: false, player: true });
+    for (const p of players) if ((p.x - n.x) ** 2 + (p.z - n.z) ** 2 <= 6.25) list.push(otherRec(list.length, p.x, p.z, false, 0, 0, null, true));
     return list;
   }
 
@@ -1539,7 +1559,7 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
         n.mixer.update(1.0);
         n.mixAcc = 0;
         stats.mixersTicked++;
-      } else if (n.state === "walk" && n.speed > 0.2 && n.mixAcc >= 1 / 6 && inView(n.x, n.z)) {
+      } else if (shadows && n.state === "walk" && n.speed > 0.2 && n.mixAcc >= 1 / 6 && inView(n.x, n.z)) {
         // a frozen walker gliding along would read as sliding: 6 Hz in view
         n.mixer.update(n.mixAcc);
         n.mixAcc = 0;
@@ -1563,9 +1583,17 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
     if (disposed) return;
     dt = Math.min(Math.max(dt || 0, 0), 0.1);
     clock += dt;
-    players.length = 0;
-    if (playerPos && Number.isFinite(playerPos.x) && Number.isFinite(playerPos.z)) players.push({ x: playerPos.x, z: playerPos.z });
-    for (const r of remotes || []) if (r && Number.isFinite(r.x) && Number.isFinite(r.z)) players.push({ x: r.x, z: r.z });
+    // players: reused { x, z } records (no allocation per frame)
+    let np = 0;
+    const addPlayer = (x, z) => {
+      const rec = playerRecs[np] || (playerRecs[np] = { x: 0, z: 0 });
+      rec.x = x;
+      rec.z = z;
+      players[np++] = rec;
+    };
+    if (playerPos && Number.isFinite(playerPos.x) && Number.isFinite(playerPos.z)) addPlayer(playerPos.x, playerPos.z);
+    for (const r of remotes || []) if (r && Number.isFinite(r.x) && Number.isFinite(r.z)) addPlayer(r.x, r.z);
+    players.length = np;
     if (!npcs.length) return;
 
     navCheckT -= dt;

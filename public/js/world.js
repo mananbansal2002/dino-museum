@@ -92,6 +92,26 @@ export function roomAt(x, z) {
   return roomGrid.get(`${w2g(x)},${w2gz(z)}`) || null;
 }
 
+/** Room id -> ids of the rooms a doorway in OPEN connects it to. */
+const ROOM_LINKS = (() => {
+  const links = new Map(ROOMS.map((r) => [r.id, new Set()]));
+  for (const key of OPEN) {
+    const [kind, rest] = key.split(":");
+    const [c, r] = rest.split(",").map(Number);
+    const a = roomGrid.get(`${c},${r}`);
+    const b = roomGrid.get(kind === "h" ? `${c + 1},${r}` : `${c},${r + 1}`);
+    if (!a || !b || a === b) continue;
+    links.get(a.id).add(b.id);
+    links.get(b.id).add(a.id);
+  }
+  return links;
+})();
+
+/** The rooms you can walk into straight from room `id` (through one doorway). */
+export function roomNeighbours(id) {
+  return ROOM_LINKS.get(id) || new Set();
+}
+
 export function isSolid(c, r) {
   if (c < 0 || r < 0 || c >= GRID_W || r >= GRID_H) return true;
   return !roomGrid.has(`${c},${r}`);
@@ -971,6 +991,181 @@ function tag(obj, surface, extra = {}) {
   return obj;
 }
 
+/* ------------------------------------------------------------------ */
+/* exhibit photo streaming                                              */
+/* ------------------------------------------------------------------ */
+const PHOTO_NEAR = 26; // always load a photo this close (m)
+const PHOTO_HOP = 80; // photos in a hall seen down a corridor load within this
+const PHOTO_FAR = 90; // photos outside the wanted halls unload beyond this
+const PHOTO_PARALLEL = 3; // downloads in flight
+const PHOTO_TICK = 0.4; // seconds between wanted-set updates
+
+/**
+ * Keeps only the photos around the visitor in video memory: the hall they
+ * are in, the halls one doorway away, and halls behind a corridor if they
+ * are close. Far ones go back to the name card and their texture is freed.
+ * Decoding happens off the main thread (createImageBitmap) and at most one
+ * new photo is handed to the GPU per frame, so walking never hitches.
+ *
+ *   photos.update(dt, x, z)   // every frame, with the visitor (or camera) position
+ *   photos.stats()            // { loaded, loading, failed, wanted }
+ */
+function createPhotoStreamer(captions, fallbackLoader) {
+  const hasBitmap = typeof createImageBitmap === "function" && typeof THREE.ImageBitmapLoader === "function";
+  const bitmapLoader = hasBitmap
+    ? new THREE.ImageBitmapLoader().setOptions({ imageOrientation: "flipY", premultiplyAlpha: "none" })
+    : null;
+  const panelRooms = new Set(captions.map((c) => c.panel.room).filter(Boolean));
+  const ready = []; // [{ caption, tex, aspect }] waiting for their GPU upload
+  let inFlight = 0;
+  let timer = 0;
+  let wantedCount = 0;
+  let lastRoom = undefined;
+  const direct = new Set();
+  const hop = new Set();
+
+  function roomsAround(id) {
+    direct.clear();
+    hop.clear();
+    if (!id) return;
+    direct.add(id);
+    for (const n of roomNeighbours(id)) {
+      direct.add(n);
+      // corridors and links hold no photos: look through them to the next hall
+      if (!panelRooms.has(n)) for (const m of roomNeighbours(n)) hop.add(m);
+    }
+  }
+
+  function finish(caption, tex) {
+    inFlight--;
+    if (caption.state !== "loading") {
+      // no longer wanted while it was downloading
+      tex.dispose();
+      tex.image?.close?.();
+      return;
+    }
+    const img = tex.image;
+    const aspect = img && img.width && img.height ? img.width / img.height : 3 / 2;
+    ready.push({ caption, tex, aspect });
+  }
+
+  function load(caption) {
+    caption.state = "loading";
+    inFlight++;
+    const fail = () => {
+      inFlight--;
+      // keep the name card; never retried
+      if (caption.state === "loading") caption.state = "failed";
+    };
+    if (bitmapLoader) {
+      bitmapLoader.load(
+        caption.url,
+        (bitmap) => {
+          const tex = new THREE.Texture(bitmap);
+          tex.flipY = false; // flipped while decoding
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = 4;
+          tex.needsUpdate = true;
+          finish(caption, tex);
+        },
+        undefined,
+        fail
+      );
+    } else {
+      fallbackLoader.load(
+        caption.url,
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = 4;
+          finish(caption, tex);
+        },
+        undefined,
+        fail
+      );
+    }
+  }
+
+  function update(dt, x, z) {
+    // one GPU upload per frame
+    const next = ready.shift();
+    if (next) {
+      if (next.caption.state === "loading") {
+        next.caption.show(next.tex, next.aspect);
+        next.caption.state = "ready";
+      } else {
+        next.tex.dispose();
+        next.tex.image?.close?.();
+      }
+    }
+    timer -= dt;
+    if (timer > 0 || !Number.isFinite(x) || !Number.isFinite(z)) return;
+    timer = PHOTO_TICK;
+    const room = roomAt(x, z);
+    const id = room ? room.id : null;
+    if (id !== lastRoom) {
+      lastRoom = id;
+      roomsAround(id);
+    }
+    // nearest first, so the photo in front of you is the first to arrive
+    let wanted = 0;
+    let best = null;
+    let bestD = Infinity;
+    for (const c of captions) {
+      const d = Math.hypot(c.panel.x - x, c.panel.z - z);
+      const want = d < PHOTO_NEAR || direct.has(c.panel.room) || (hop.has(c.panel.room) && d < PHOTO_HOP);
+      if (want) wanted++;
+      if (!want) {
+        if (d > PHOTO_FAR && (c.state === "ready" || c.state === "loading")) {
+          if (c.state === "ready") c.unload();
+          else c.state = "none"; // finish() drops it on arrival
+        }
+        continue;
+      }
+      if (c.state === "none" && c.url && d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    wantedCount = wanted;
+    // start the nearest wanted photos (a few at a time)
+    while (best && inFlight < PHOTO_PARALLEL) {
+      load(best);
+      best = null;
+      bestD = Infinity;
+      for (const c of captions) {
+        if (c.state !== "none" || !c.url) continue;
+        const d = Math.hypot(c.panel.x - x, c.panel.z - z);
+        const want = d < PHOTO_NEAR || direct.has(c.panel.room) || (hop.has(c.panel.room) && d < PHOTO_HOP);
+        if (want && d < bestD) {
+          bestD = d;
+          best = c;
+        }
+      }
+    }
+  }
+
+  return {
+    update,
+    stats() {
+      let loaded = 0;
+      let loading = 0;
+      let failed = 0;
+      for (const c of captions) {
+        if (c.state === "ready") loaded++;
+        else if (c.state === "loading") loading++;
+        else if (c.state === "failed") failed++;
+      }
+      return { loaded, loading, failed, wanted: wantedCount, total: captions.length };
+    },
+    /** Per-panel state (tests / debugging). */
+    list: () => captions.map((c) => ({ id: c.spec.id, room: c.panel.room, state: c.state, url: c.url })),
+    /** Load every photo now (screenshots / tests). */
+    loadAll() {
+      for (const c of captions) if (c.state === "none" && c.url) load(c);
+    },
+  };
+}
+
 export function buildWorld(scene) {
   const group = new THREE.Group();
   scene.add(group);
@@ -1358,9 +1553,13 @@ export function buildWorld(scene) {
     mesh.boundingSphere = null; // recomputed (lazily) from the instances
   };
 
+  // Name card shown until (or instead of) the photo. Drawn at half the
+  // 768x512 design size: it is only up while the photo streams in (or far
+  // away), and 53 of them at full size were ~110 MB of video memory.
   function placeholderTexture(spec, accent) {
-    const c = makeCanvas(768, 512);
+    const c = makeCanvas(384, 256);
     const ctx = c.getContext("2d");
+    ctx.scale(0.5, 0.5);
     const g = ctx.createLinearGradient(0, 0, 0, 512);
     g.addColorStop(0, "#1b2228");
     g.addColorStop(1, "#11161a");
@@ -1490,25 +1689,32 @@ export function buildWorld(scene) {
     exhibits.push(entry);
     layout(3 / 2);
 
-    caption.load = (url) => {
+    // The photo streams: photos.update() loads it when the visitor is in or
+    // next to its hall and frees it again once they are far away (a name
+    // card stands in meanwhile). The frame keeps the photo's aspect after
+    // an unload, so nothing jumps when it comes back.
+    caption.panel = { x: panel.x, z: panel.z, room: room ? room.id : null };
+    caption.state = "none"; // none | loading | ready | failed
+    caption.url = null;
+    caption.setUrl = (url) => {
       entry.image = url;
-      loader.load(
-        url,
-        (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 4;
-          const img = tex.image;
-          const aspect = img && img.width && img.height ? img.width / img.height : 3 / 2;
-          imageMat.map.dispose();
-          imageMat.map = tex;
-          imageMat.needsUpdate = true;
-          layout(aspect);
-        },
-        undefined,
-        () => {
-          /* keep the name card */
-        }
-      );
+      caption.url = url;
+    };
+    caption.show = (tex, aspect) => {
+      if (imageMat.map) imageMat.map.dispose();
+      imageMat.map = tex;
+      imageMat.needsUpdate = true;
+      layout(aspect);
+    };
+    caption.unload = () => {
+      const tex = imageMat.map;
+      imageMat.map = placeholderTexture(spec, accent);
+      imageMat.needsUpdate = true;
+      if (tex) {
+        tex.dispose();
+        tex.image?.close?.(); // ImageBitmap
+      }
+      caption.state = "none";
     };
 
     // warm museum "spotlight": a pool of light on the floor, a soft beam and
@@ -1545,7 +1751,7 @@ export function buildWorld(scene) {
           const m = manifest[caption.spec.id];
           if (!m) continue;
           const file = typeof m.file === "string" && m.file ? m.file.split("/").pop() : `${caption.spec.id}.jpg`;
-          caption.load(`/images/species/${file}`);
+          caption.setUrl(`/images/species/${file}`);
           if (!m.credit) continue;
           caption.credit = `Image: ${m.credit}${m.license ? ` · ${m.license}` : ""}`;
           drawCaption(caption);
@@ -1555,6 +1761,7 @@ export function buildWorld(scene) {
         /* no credits available */
       });
   }
+  const photos = createPhotoStreamer(captions, loader);
 
   // ---------------- era windows ----------------
   // a glowing frame on the wall; the window "glass" is a soft sky gradient
@@ -2176,6 +2383,7 @@ export function buildWorld(scene) {
     screenMat,
     screenTex,
     sun,
+    photos,
   };
 }
 

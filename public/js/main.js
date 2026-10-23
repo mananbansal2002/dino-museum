@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { buildWorld, roomNameAt, roomAt, COURT, SCREEN } from "./world.js";
+import { buildWorld, roomNameAt, roomAt, COURT, SCREEN, WAYFINDING } from "./world.js";
 import { createPlayer } from "./player.js";
 import { createRemotePlayers } from "./remote.js";
 import { createMinimap } from "./minimap.js";
@@ -57,32 +57,204 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0, 6, 20);
 
 const world = buildWorld(scene);
-const lookdev = applyLookdev({ renderer, scene, camera });
 
-// phones and tablets get the light versions of the heavy dressing
-const QUALITY =
-  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia?.("(pointer: coarse)").matches
-    ? "low"
-    : "high";
-// best-effort: a prop that fails to load leaves the primitive in its place
-const propsReady = import("./props.js")
-  .then((m) => m.placeProps({ scene, world, renderer, quality: QUALITY }))
-  .then((props) => {
-    window.__museum.props = props;
-    return props;
-  })
-  .catch((err) => console.warn("props: could not dress the halls", err));
-const live = placeLiveModels({ scene, world, camera, quality: QUALITY });
-// the gelato bar replaces the primitive kiosk once the halls are dressed
+/* ------------------------------------------------------------------ */
+/* quality                                                              */
+/* ------------------------------------------------------------------ */
+const TIERS = ["low", "medium", "high", "ultra"];
+const MOBILE =
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || !!window.matchMedia?.("(pointer: coarse)").matches;
+
+/**
+ * The starting tier. ?quality=low|medium|high|ultra (or ?lookdev=) picks one
+ * and turns adaptation off; otherwise ("auto") it is guessed from the GPU,
+ * then checked by a 2 s frame-time probe and adapted while you play:
+ *   software rasteriser -> low; phone / tablet, integrated GPU, or a high-DPR
+ *   screen without a strong GPU -> medium; strong GPU -> high. Ultra (GTAO)
+ *   is never picked automatically.
+ */
+function pickQuality() {
+  let asked = null;
+  try {
+    const p = new URLSearchParams(location.search);
+    asked = (p.get("quality") || p.get("lookdev") || "").toLowerCase();
+  } catch {
+    /* ignore */
+  }
+  if (TIERS.includes(asked)) return { tier: asked, auto: false, gpu: "chosen" };
+  let gpu = "";
+  try {
+    const gl = renderer.getContext();
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    gpu = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+  } catch {
+    /* unknown */
+  }
+  if (/swiftshader|llvmpipe|software|softpipe/i.test(gpu)) return { tier: "low", auto: true, gpu };
+  const strong = /nvidia|geforce|quadro|rtx|radeon\s*(rx|pro|r9|vii)|apple m\d+\s*(pro|max|ultra)/i.test(gpu);
+  const integrated =
+    /intel|iris|uhd|hd graphics|mali|adreno|powervr|apple gpu|radeon(\(tm\))? graphics|vega \d+ graphics/i.test(gpu) ||
+    /apple m\d+(?!\s*(pro|max|ultra))/i.test(gpu);
+  const cores = navigator.hardwareConcurrency || 4;
+  const memory = navigator.deviceMemory || 8;
+  const highDpr = (window.devicePixelRatio || 1) >= 1.75;
+  const weak = MOBILE || integrated || cores <= 4 || memory <= 4 || (highDpr && !strong);
+  return { tier: weak ? "medium" : "high", auto: true, gpu };
+}
+const QPICK = pickQuality();
+/** Tier for props / live models / crowd ("ultra" only changes post-processing). */
+let QUALITY = MOBILE ? "low" : QPICK.tier === "ultra" ? "high" : QPICK.tier;
+const lookdev = applyLookdev({ renderer, scene, camera, quality: QPICK.tier, adaptive: QPICK.auto });
+/** Visitors in the background crowd per tier. */
+const CROWD_COUNT = { low: 3, medium: 6, high: 12 };
+
+/* ------------------------------------------------------------------ */
+/* staged boot: the heavy dressing loads after the first frames         */
+/* ------------------------------------------------------------------ */
+// Nothing below blocks the join screen: live exhibits, props and the crowd
+// are created one at a time in idle time once the first frames are drawn
+// (and the frame-time probe has settled the tier). The Ice Cream Court's bar
+// and vendor are only built when a visitor nears the Jurassic Hall exit.
+let live = null;
+let crowd = null;
 let gelateria = null;
-propsReady
-  .then(() => {
-    gelateria = buildGelateria({ scene, world, COURT, renderer, quality: QUALITY });
-    window.__museum.gelateria = gelateria;
-  })
-  .catch((err) => console.warn("gelato: could not build the bar", err));
-// background visitors (local only, never networked, no name tags)
-const crowd = createCrowd({ scene, world, camera, count: QUALITY === "low" ? 5 : 12, quality: QUALITY });
+let vendor = null;
+let resolveProps;
+const propsReady = new Promise((r) => (resolveProps = r));
+
+const whenIdle = (fn, timeout = 1200) =>
+  new Promise((resolve, reject) => {
+    const run = () => {
+      try {
+        resolve(fn());
+      } catch (err) {
+        reject(err);
+      }
+    };
+    if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(run, { timeout });
+    else setTimeout(run, 30);
+  });
+
+/**
+ * Keep a freshly added group out of the picture until its shaders are
+ * compiled (in parallel) and warmed, so it pops in on a later frame instead
+ * of freezing the one it first appears in. Layers, not .visible: the
+ * compiler skips invisible objects but not other layers.
+ */
+async function stageIn(root) {
+  if (!root) return;
+  const masks = [];
+  root.traverse((o) => {
+    masks.push(o, o.layers.mask);
+    o.layers.disableAll();
+  });
+  try {
+    await Promise.race([
+      Promise.resolve()
+        .then(() => lookdev.compileAsync?.())
+        .then(() => warmPrograms(root)),
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch {
+    /* draw it anyway */
+  } finally {
+    for (let i = 0; i < masks.length; i += 2) masks[i].layers.mask = masks[i + 1];
+  }
+}
+
+async function bootAmbient() {
+  // life-size and scale models: plinths now, the models stream in by distance
+  await whenIdle(() => {
+    live = placeLiveModels({ scene, world, camera, quality: QUALITY });
+    window.__museum.live = live;
+    return stageIn(scene.getObjectByName("live-models"));
+  }).catch((err) => console.warn("live exhibits: could not place them", err));
+  // best-effort: a prop that fails to load leaves the primitive in its place
+  await whenIdle(() => import("./props.js"))
+    .then((m) => m.placeProps({ scene, world, renderer, quality: QUALITY }))
+    .then((props) => {
+      window.__museum.props = props;
+      return stageIn(scene.getObjectByName("props"));
+    })
+    .catch((err) => console.warn("props: could not dress the halls", err));
+  resolveProps();
+  // background visitors (local only, never networked, no name tags)
+  await whenIdle(() => {
+    crowd = createCrowd({ scene, world, camera, count: CROWD_COUNT[QUALITY] ?? 6, quality: QUALITY });
+    window.__museum.crowd = crowd;
+    crowd.ready?.then(() => stageIn(crowd.root));
+  }).catch((err) => console.warn("crowd: could not create it", err));
+}
+
+// the Jurassic Hall's exit doorway: the court is built when a visitor nears it
+const EXIT_SIGN = WAYFINDING.find((w) => w.dest === "court") || { x: COURT.exitX, z: COURT.exitZ };
+const COURT_ROOMS = new Set(["xpassage", "court"]);
+const COURT_REACH = 16;
+let courtTimer = 0;
+function nearCourt(x, z) {
+  const id = roomAt(x, z)?.id;
+  return COURT_ROOMS.has(id) || (id === "jurassic" && Math.hypot(x - EXIT_SIGN.x, z - EXIT_SIGN.z) < COURT_REACH);
+}
+function updateCourt(dt) {
+  if (vendor) return;
+  courtTimer -= dt;
+  if (courtTimer > 0) return;
+  courtTimer = 0.5;
+  let near = S.player ? nearCourt(S.player.state.x, S.player.state.z) : false;
+  // a friend holding the door open counts too (their ice cream should not pop in)
+  for (let i = 0; !near && i < remote.list.length; i++) near = nearCourt(remote.list[i].x, remote.list[i].z);
+  if (near) openCourt();
+}
+/** Build the gelato bar and its vendor (once). */
+function openCourt() {
+  if (vendor) return;
+  vendor = createVendor();
+  propsReady
+    .then(() => {
+      // the gelato bar replaces the primitive kiosk once the halls are dressed
+      gelateria = buildGelateria({ scene, world, COURT, renderer, quality: QUALITY });
+      window.__museum.gelateria = gelateria;
+    })
+    .catch((err) => console.warn("gelato: could not build the bar", err));
+}
+
+/**
+ * The 2 s frame-time probe (auto only): if the first tier cannot hold its
+ * frame rate here, step down before the heavy dressing is even loaded.
+ */
+function probeFrames() {
+  return new Promise((resolve) => {
+    if (!QPICK.auto) return resolve();
+    const times = [];
+    let last = 0;
+    let skip = 15; // shader compiles and first uploads
+    const t0 = performance.now();
+    const tick = (now) => {
+      if (last && skip-- <= 0) times.push(now - last);
+      last = now;
+      if (now - t0 < 2600 && document.visibilityState === "visible") requestAnimationFrame(tick);
+      else done();
+    };
+    const done = () => {
+      if (times.length >= 10) {
+        times.sort((a, b) => a - b);
+        const median = times[times.length >> 1];
+        const tier = lookdev.quality;
+        let next = tier;
+        if (tier === "high" && median > 26) next = median > 45 ? "low" : "medium";
+        else if (tier === "medium" && median > 45) next = "low";
+        if (next !== tier) {
+          console.info(`[quality] ${tier} -> ${next} (median frame ${median.toFixed(1)} ms)`);
+          lookdev.setQuality(next);
+          if (!MOBILE) QUALITY = next;
+        }
+        S.probe = { median: +median.toFixed(1), from: tier, to: next };
+      }
+      resolve();
+    };
+    requestAnimationFrame(tick);
+  });
+}
 
 /** Floor finish under a point, for footstep sounds (matches lookdev's floors). */
 const FLOOR_SURFACE = {
@@ -148,7 +320,8 @@ function stopEmbed() {
 /* ------------------------------------------------------------------ */
 /* the ice cream vendor behind the counter                              */
 /* ------------------------------------------------------------------ */
-const vendor = (() => {
+// built by openCourt() when a visitor nears the court (it loads a rigged model)
+function createVendor() {
   const character = createCharacter(
     {
       body: "female",
@@ -184,7 +357,7 @@ const vendor = (() => {
       character.playAction("cheer", 1.4);
     },
   };
-})();
+}
 
 const cinema = createCinema({
   renderer,
@@ -265,7 +438,7 @@ const ui = createUI({
     S.scoops++;
     ui.setCounters({ scoops: S.scoops });
     audio.slurp();
-    vendor.celebrate();
+    vendor?.celebrate();
     ui.toast(`${flavourName(payload.flavour)} — enjoy! Press F to eat it 🍦`, "good");
     fx.burst("confetti", S.player.state.x, S.player.state.y + 1.6, S.player.state.z, 26);
   },
@@ -556,6 +729,8 @@ async function startGame(opts) {
       onTouchAction: () => useAction(),
     });
     upgradeCharacter(S.player.character);
+    // compile the avatar's shaders in parallel (the loading card is up)
+    stageIn(S.player.character.group);
     // your own name tag would just float in the middle of the view
     S.player.character.tag.visible = false;
     S.player.state.x = world.spawn.x;
@@ -1120,8 +1295,23 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", sendIdleNow);
 let rosterTimer = 0;
 
+/** Ambient systems updated every frame; getters, as most are created late. */
+const AMBIENT = [
+  ["vendors", () => vendor],
+  ["live exhibits", () => live],
+  ["crowd", () => crowd],
+];
+const MAP = { local: { x: 0, z: 0, ry: 0 }, remotes: [] };
+let mapTick = false;
+/** Behind the join screen (a blurred, nearly opaque card) a third of the frames is plenty. */
+let joinFrame = 0;
+let probing = true;
+
 function animate() {
   requestAnimationFrame(animate);
+  const throttled = !S.joined && !probing && !eraView.isOpen();
+  lookdev.hold = throttled;
+  if (throttled && ++joinFrame % 3 !== 0) return;
   const dt = Math.min(0.05, clock.getDelta());
 
   if (S.joined && S.player) {
@@ -1198,11 +1388,10 @@ function animate() {
 
   // Ambient life. Each system is isolated so one bad npc can never freeze the
   // whole museum (a throw here used to stop the frame before it was rendered).
-  for (const [name, system] of [
-    ["vendors", vendor],
-    ["live exhibits", live],
-    ["crowd", crowd],
-  ]) {
+  for (let i = 0; i < AMBIENT.length; i++) {
+    const [name, get] = AMBIENT[i];
+    const system = get();
+    if (!system) continue; // not created yet (staged boot)
     try {
       system.update(dt, S.player?.state, remote.list);
     } catch (err) {
@@ -1213,12 +1402,18 @@ function animate() {
       }
     }
   }
+  // exhibit photos stream in and out around the visitor (or the camera
+  // behind the join screen)
+  if (S.player) world.photos.update(dt, S.player.state.x, S.player.state.z);
+  else world.photos.update(dt, camera.position.x, camera.position.z);
+  if (S.joined) updateCourt(dt);
 
   // animated exhibits
-  for (const a of world.animated) {
+  const lavaNow = performance.now();
+  for (let i = 0; i < world.animated.length; i++) {
+    const a = world.animated[i];
     if (a.type === "lava") {
-      a.mesh.material.emissiveIntensity =
-        a.base + Math.sin(performance.now() / 260) * 0.5 + Math.random() * 0.3;
+      a.mesh.material.emissiveIntensity = a.base + Math.sin(lavaNow / 260) * 0.5 + Math.random() * 0.3;
     }
   }
 
@@ -1228,10 +1423,24 @@ function animate() {
 
   // minimap
   if (S.joined && S.player) {
-    minimap.draw({
-      local: { x: S.player.state.x, z: S.player.state.z, ry: S.player.state.ry },
-      remotes: remote.list.map((r) => ({ x: r.x, z: r.z, color: r.color })),
-    });
+    // 30 Hz is plenty for the minimap (a full 2D canvas redraw), and its
+    // arguments are reused instead of rebuilt every frame
+    mapTick = !mapTick;
+    if (mapTick) {
+      MAP.local.x = S.player.state.x;
+      MAP.local.z = S.player.state.z;
+      MAP.local.ry = S.player.state.ry;
+      const list = remote.list;
+      while (MAP.remotes.length < list.length) MAP.remotes.push({ x: 0, z: 0, color: "" });
+      MAP.remotes.length = list.length;
+      for (let i = 0; i < list.length; i++) {
+        const m = MAP.remotes[i];
+        m.x = list[i].x;
+        m.z = list[i].z;
+        m.color = list[i].color;
+      }
+      minimap.draw(MAP);
+    }
     rosterTimer -= dt;
     if (rosterTimer <= 0) {
       rosterTimer = 0.35;
@@ -1284,11 +1493,94 @@ window.addEventListener("eraview:close", (e) => {
   }
 });
 
-animate();
+// Shaders compile in parallel (KHR_parallel_shader_compile) before the first
+// frame, so the join screen stays responsive instead of freezing for a second
+// on the first draw (after the HDRI, which those shaders depend on). Never
+// waits more than 6 s.
+/**
+ * The first draw with a program also reads back its uniform / attribute
+ * tables, which waits for the driver (~300 ms for this scene). Do that now,
+ * a few programs per task, so no single task holds the page for long.
+ */
+const TEX_SLOTS = ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "emissiveMap", "alphaMap", "lightMap", "bumpMap"];
+const warmedTextures = new WeakSet();
+function warmPrograms(root = scene) {
+  const list = (renderer.info.programs || []).slice();
+  // ...and upload the textures the same way (the first frame used to upload
+  // every caption, name card and floor map in one go)
+  const textures = [];
+  root.traverse((o) => {
+    if (!o.material || !o.layers) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      for (const k of TEX_SLOTS) {
+        const t = m[k];
+        if (t && t.isTexture && !t.isRenderTargetTexture && !warmedTextures.has(t) && t.image) {
+          warmedTextures.add(t);
+          textures.push(t);
+        }
+      }
+    }
+  });
+  return new Promise((resolve) => {
+    const step = () => {
+      const t = performance.now();
+      while ((list.length || textures.length) && performance.now() - t < 24) {
+        try {
+          if (list.length) {
+            const p = list.pop();
+            p.getUniforms();
+            p.getAttributes();
+          } else {
+            renderer.initTexture(textures.pop());
+          }
+        } catch {
+          /* a broken program / image shows up on draw as before */
+        }
+      }
+      if (list.length || textures.length) setTimeout(step, 0);
+      else resolve();
+    };
+    step();
+  });
+}
+const compileStart = performance.now();
+Promise.race([
+  Promise.resolve(lookdev.envReady)
+    .then(() => (lookdev.compileAsync ? lookdev.compileAsync() : renderer.compileAsync?.(scene, camera)))
+    .then(() => warmPrograms())
+    .then(() => "compiled")
+    .catch(() => "failed"),
+  new Promise((r) => setTimeout(() => r("timeout"), 6000)),
+]).then((how) => {
+  S.compile = { how, ms: Math.round(performance.now() - compileStart) };
+  startLoop();
+});
+
+function startLoop() {
+  animate();
+  // after the first frames: check the tier, then dress the halls in idle time
+  requestAnimationFrame(() =>
+  probeFrames()
+    .catch(() => {})
+    .then(() => {
+      probing = false;
+      return bootAmbient();
+    })
+  );
+}
 
 // expose a tiny debug handle (used by the console and by the browser tests)
 window.__museum = {
-  crowd,
+  crowd: null,
+  live: null,
+  gelateria: null,
+  get vendor() {
+    return vendor;
+  },
+  openCourt,
+  get quality() {
+    return { tier: lookdev.quality, systems: QUALITY, auto: QPICK.auto, gpu: QPICK.gpu, probe: S.probe || null };
+  },
   scene,
   renderer,
   camera,
@@ -1301,7 +1593,6 @@ window.__museum = {
     return S.net;
   },
   lookdev,
-  live,
   picker,
   screenEmbed,
   videoPlayer,

@@ -207,6 +207,50 @@ async function loadProto(name, prepMaterial) {
   return { name, parts, box };
 }
 
+/**
+ * Downscale every texture of these prototypes to at most `max` px before it
+ * is ever uploaded. GLTFLoader hands out ImageBitmaps in Chrome / Firefox /
+ * Safari 17+, which createImageBitmap can resize off the main thread; any
+ * other image is left as it is.
+ */
+async function shrinkTextures(protos, max) {
+  if (typeof createImageBitmap !== "function" || typeof ImageBitmap === "undefined") return;
+  const byImage = new Map(); // one ImageBitmap may back several textures
+  for (const proto of protos) {
+    for (const part of proto?.parts || []) {
+      const m = part.material;
+      if (!m) continue;
+      for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "emissiveMap"]) {
+        const t = m[k];
+        const img = t?.image;
+        if (!t || !(img instanceof ImageBitmap) || !(max / Math.max(img.width, img.height) < 1)) continue;
+        if (!byImage.has(img)) byImage.set(img, new Set());
+        byImage.get(img).add(t);
+      }
+    }
+  }
+  await Promise.all(
+    [...byImage].map(([img, textures]) => {
+      const scale = max / Math.max(img.width, img.height);
+      return createImageBitmap(img, {
+        resizeWidth: Math.max(1, Math.round(img.width * scale)),
+        resizeHeight: Math.max(1, Math.round(img.height * scale)),
+        resizeQuality: "high",
+      })
+        .then((small) => {
+          for (const t of textures) {
+            t.image = small;
+            t.needsUpdate = true;
+          }
+          img.close?.();
+        })
+        .catch(() => {
+          /* keep the full-size one */
+        });
+    })
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* main entry                                                           */
 /* ------------------------------------------------------------------ */
@@ -278,6 +322,9 @@ async function build({ scene, world, renderer, quality }) {
       }
     })
   );
+  // medium / low: any prop texture over 512 px is downscaled before its
+  // first upload (resized off the main thread)
+  if (q < 2) await shrinkTextures(Object.values(protos), 512);
 
   /* ---------- procedural prototypes (always available) ---------- */
   const brass = tune(new THREE.MeshStandardMaterial({ color: 0xc8a050, metalness: 1, roughness: 0.28 }));

@@ -225,7 +225,7 @@ function patchWorldUV(mat, metersPerRepeat, { macro = 0.1, baseDarken = 0, gain 
 /* main entry                                                           */
 /* ------------------------------------------------------------------ */
 
-export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {}) {
+export function applyLookdev({ renderer, scene, camera, quality = "auto", adaptive } = {}) {
   const override = urlOverride();
   if (override === "off") {
     return {
@@ -240,8 +240,10 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
   }
   const gpu = detectSoftware(renderer);
   const requested = override && TIERS.includes(override) ? override : quality;
-  const auto = requested === "auto";
-  let tier = auto ? (gpu.software ? "low" : "high") : TIERS.includes(requested) ? requested : "high";
+  // adaptive: trade pixel ratio and tier for frame time. On for "auto", and
+  // for a tier main.js picked itself (not for ?lookdev= or a chosen tier).
+  const auto = override && TIERS.includes(override) ? false : adaptive ?? requested === "auto";
+  let tier = requested === "auto" ? (gpu.software ? "low" : "high") : TIERS.includes(requested) ? requested : "high";
   const tierAtLeast = (t) => TIERS.indexOf(tier) >= TIERS.indexOf(t);
   const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
   const isWebGL2 = renderer.capabilities.isWebGL2;
@@ -251,12 +253,35 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   /* ---------------- textures ---------------- */
+  // ImageBitmaps are decoded off the main thread (an <img> is decoded
+  // synchronously on its first upload: ~10-150 ms of jank per map)
+  const bitmaps =
+    typeof createImageBitmap === "function" && typeof THREE.ImageBitmapLoader === "function"
+      ? new THREE.ImageBitmapLoader().setOptions({ imageOrientation: "flipY", premultiplyAlpha: "none" })
+      : null;
   const loader = new THREE.TextureLoader();
   const texCache = new Map();
+  function load(url) {
+    if (!bitmaps) return loader.load(url);
+    const t = new THREE.Texture();
+    t.flipY = false; // flipped while decoding
+    bitmaps.load(
+      url,
+      (bmp) => {
+        t.image = bmp;
+        t.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        /* the material keeps its flat colour */
+      }
+    );
+    return t;
+  }
   function tex(name, kind) {
     const k = `${name}/${kind}`;
     if (texCache.has(k)) return texCache.get(k);
-    const t = loader.load(`${TEX}${name}/${kind}.jpg`);
+    const t = load(`${TEX}${name}/${kind}.jpg`);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = maxAniso;
     if (kind === "diff") t.colorSpace = THREE.SRGBColorSpace;
@@ -1130,22 +1155,52 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     renderer.shadowMap.needsUpdate = true;
   }
 
+  /**
+   * Shadows only on high and up, and only from the key light (the sun): on
+   * medium / low the shadow map is neither drawn nor sampled.
+   */
+  let shadowsOn = null;
+  function applyShadows() {
+    const on = tierAtLeast("high");
+    if (on === shadowsOn) return;
+    const first = shadowsOn === null;
+    shadowsOn = on;
+    renderer.shadowMap.enabled = on;
+    if (sun) sun.castShadow = on;
+    renderer.shadowMap.needsUpdate = true;
+    if (first) return; // nothing compiled yet
+    // the shadow defines are baked into the programs: rebuild them
+    scene.traverse((o) => {
+      if (!o.material) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.needsUpdate = true;
+    });
+  }
+
   let lightTimer = 0;
   const wanted = new Set();
+  const scored = [];
+  const free = [];
+  const byScore = (a, b) => a.s - b.s;
   function updateLights(dt) {
     if (!anchors.length) return;
     lightTimer -= dt;
     const camRoom = roomAt(camera.position.x, camera.position.z);
     if (lightTimer <= 0) {
       lightTimer = 0.25;
-      const scored = anchors.map((a, i) => ({
-        i,
-        s: a.pos.distanceTo(camera.position) + (camRoom && a.room !== camRoom.id ? 18 : 0),
-      }));
-      scored.sort((a, b) => a.s - b.s);
+      // reused records: no garbage four times a second
+      if (scored.length !== anchors.length) {
+        scored.length = 0;
+        for (let i = 0; i < anchors.length; i++) scored.push({ i, s: 0 });
+      }
+      for (const r of scored) {
+        const a = anchors[r.i];
+        r.s = a.pos.distanceTo(camera.position) + (camRoom && a.room !== camRoom.id ? 18 : 0);
+      }
+      scored.sort(byScore);
       wanted.clear();
       for (let k = 0; k < Math.min(LIGHT_POOL, scored.length); k++) wanted.add(scored[k].i);
-      const free = [...wanted].filter((i) => !pool.some((l) => l.userData.anchor === i));
+      free.length = 0;
+      for (const i of wanted) if (!pool.some((l) => l.userData.anchor === i)) free.push(i);
       for (const l of pool) {
         if (l.userData.anchor >= 0 && !wanted.has(l.userData.anchor)) l.userData.leaving = true;
         if (l.userData.anchor < 0 && free.length) assign(l, free.shift());
@@ -1180,18 +1235,35 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     return tierAtLeast("medium");
   }
   let envRequested = false;
+  let envSettled = null;
+  /**
+   * Resolves once the environment the first frame will use is in place:
+   * the HDRI, or the RoomEnvironment fallback if it fails or takes > 4 s.
+   * (The two PMREMs differ in size, and every standard material's shader
+   * depends on it: compiling before the HDRI arrived compiled them twice.)
+   */
+  const envReady = new Promise((r) => (envSettled = r));
   /** PMREM work only happens once a tier that uses reflections is active. */
   function setupEnvironment() {
     if (envRequested || !envOn()) {
       applyEnv();
+      if (!envOn()) envSettled();
       return;
     }
     envRequested = true;
-    envTex = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
-    applyEnv();
+    let fallbackTimer = 0;
+    const fallback = () => {
+      clearTimeout(fallbackTimer);
+      if (envTex) return;
+      envTex = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+      applyEnv();
+      envSettled();
+    };
+    fallbackTimer = setTimeout(fallback, 4000);
     new RGBELoader().load(
       HDRI,
       (hdr) => {
+        clearTimeout(fallbackTimer);
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         const rt = pmrem.fromEquirectangular(hdr);
         hdr.dispose();
@@ -1199,11 +1271,10 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
         envTex = rt.texture;
         applyEnv();
         if (prev) prev.dispose();
+        envSettled();
       },
       undefined,
-      () => {
-        /* keep the RoomEnvironment fallback */
-      }
+      fallback
     );
   }
   function applyEnv() {
@@ -1313,6 +1384,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
   buildArchitecture();
   setupEnvironment();
   applyFxVisibility();
+  applyShadows();
   renderer.setPixelRatio(tierAtLeast("high") ? pixelRatio : Math.min(window.devicePixelRatio || 1, 1.25));
   buildComposer();
   renderer.shadowMap.needsUpdate = true;
@@ -1353,7 +1425,11 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
 
     // adaptive quality (auto only): trade pixel ratio, then post, for frame time
     // (skipped while shaders compile and textures upload right after boot)
-    if (auto && dt > 0 && elapsed > 8) {
+    // (held while main.js renders only some frames, e.g. behind the join screen)
+    if (api.hold) {
+      frameEMA = 16;
+      slow = 0;
+    } else if (auto && dt > 0 && elapsed > 8) {
       frameEMA += (dt * 1000 - frameEMA) * 0.05;
       if (frameEMA > 18 && document.visibilityState === "visible") slow += dt;
       else slow = Math.max(0, slow - dt * 0.5);
@@ -1369,6 +1445,8 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
           }
         } else if (tier === "high" && frameEMA > 33) {
           setQuality("medium");
+        } else if (tier === "medium" && frameEMA > 45) {
+          setQuality("low");
         }
         frameEMA = 16;
       }
@@ -1389,6 +1467,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     tier = next;
     setupEnvironment();
     applyFxVisibility();
+    applyShadows();
     renderer.setPixelRatio(tierAtLeast("high") ? pixelRatio : Math.min(window.devicePixelRatio || 1, 1.25));
     buildComposer();
     api.composer = composer;
@@ -1396,6 +1475,25 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
 
   const api = {
     composer,
+    /** true: do not adapt the tier to the frame time for now */
+    hold: false,
+    envReady,
+    /**
+     * Compile the scene's shaders without blocking (KHR_parallel_shader_compile).
+     * With a composer the scene is drawn into a render target, and the
+     * programs differ from on-screen ones (no tone mapping, linear output),
+     * so compile them for that target.
+     */
+    compileAsync() {
+      if (typeof renderer.compileAsync !== "function") return Promise.resolve();
+      const prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(composer ? composer.renderTarget1 : null);
+      try {
+        return renderer.compileAsync(scene, camera);
+      } finally {
+        renderer.setRenderTarget(prev);
+      }
+    },
     get quality() {
       return tier;
     },

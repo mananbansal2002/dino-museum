@@ -38,6 +38,7 @@ import * as WORLD from "./world.js";
 
 const MANIFEST_URL = "/models/real/manifest.json";
 const LOAD_DIST = 40;
+const SIGHT_DIST = 70; // models in a hall seen down a corridor load within this
 const PAUSE_DIST = 60;
 const HIDE_DIST = 95;
 const KEY_RANGE = 35; // stands within this distance get a key light
@@ -1176,11 +1177,18 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
     l.userData.peak = k.lux * k.dist * k.dist; // candela for ~lux at the target (decay 2)
     l.userData.stand = p;
   }
+  const want = []; // the KEY_POOL nearest lit stands, reused every frame
   function updateKeys(dt) {
-    const want = placed
-      .filter((p) => p.ex.key && p.state === "ready" && p.dist < KEY_RANGE)
-      .sort((a, b) => a.dist - b.dist)
-      .slice(0, KEY_POOL);
+    // insertion into a short sorted list: no filter/sort/slice garbage per frame
+    want.length = 0;
+    for (const p of placed) {
+      if (!p.ex.key || p.state !== "ready" || !(p.dist < KEY_RANGE)) continue;
+      let i = want.length;
+      while (i > 0 && want[i - 1].dist > p.dist) i--;
+      if (i >= KEY_POOL) continue;
+      want.splice(i, 0, p);
+      if (want.length > KEY_POOL) want.length = KEY_POOL;
+    }
     if (!want.length && !keys) return;
     ensureKeys();
     const fade = Math.min(1, dt * 1.5);
@@ -1562,6 +1570,20 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
 
   /* ---------------- per frame ---------------- */
   const tmp = new THREE.Vector3();
+  // halls you can see down a corridor (e.g. the Grand Gallery from the
+  // atrium): their models load too, within SIGHT_DIST
+  const exhibitRooms = new Set(EXHIBITS.map((e) => e.room));
+  const sightCache = new Map();
+  function seenThrough(id) {
+    if (sightCache.has(id)) return sightCache.get(id);
+    const out = new Set();
+    for (const n of adjacency.get(id) || []) {
+      if (exhibitRooms.has(n)) continue;
+      for (const m of adjacency.get(n) || []) if (m !== id) out.add(m);
+    }
+    sightCache.set(id, out);
+    return out;
+  }
   function update(dt = 0, playerPos) {
     if (disposed) return;
     let px;
@@ -1576,10 +1598,14 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
     } else return;
     const here = WORLD.roomAt ? WORLD.roomAt(px, pz) : null;
     const near = here ? adjacency.get(here.id) : null;
+    const seen = here ? seenThrough(here.id) : null;
     for (const p of placed) {
       p.dist = pointBoxDist(px, pz, p.box);
       if (p.state === "idle") {
-        const inReach = p.dist < LOAD_DIST || (here && (here.id === p.ex.room || near?.has(p.ex.room)));
+        const inReach =
+          p.dist < LOAD_DIST ||
+          (here && (here.id === p.ex.room || near?.has(p.ex.room))) ||
+          (seen?.has(p.ex.room) && p.dist < SIGHT_DIST);
         if (inReach) spawnModels(p);
         continue;
       }
