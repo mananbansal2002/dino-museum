@@ -305,9 +305,9 @@ export function createAudio() {
 
     revIn = c.createGain();
     const conv = c.createConvolver();
-    impulse(conv, 2.8); // filled in idle slices; the reverb is silent until then
+    impulse(conv, 1.6); // filled in idle slices; the reverb is silent until then
     revOut = c.createGain();
-    revOut.gain.value = 0.55;
+    revOut.gain.value = 0.3;
     revIn.connect(conv);
     conv.connect(revOut);
     revOut.connect(master);
@@ -678,7 +678,7 @@ export function createAudio() {
     const p = clamp(Number(power) || 1, 0.15, 1.6);
     let gain = ROAR_LEVEL[kind] * p * level;
     let dry = 1;
-    let wet = kind === "sauropod" ? 0.4 : 0.3;
+    let wet = kind === "sauropod" ? 0.18 : 0.12;
     let lp = 0;
     if (distance !== undefined) {
       const d = Math.max(0, Number(distance) || 0);
@@ -686,8 +686,8 @@ export function createAudio() {
       const att = Math.pow(k, 1.5);
       if (att < 0.03) return true; // out of earshot: handled, but silent
       gain *= att;
-      dry = 0.3 + 0.7 * k;
-      wet = 0.3 + 0.55 * (1 - k);
+      dry = 0.45 + 0.55 * k;
+      wet = 0.12 + 0.3 * (1 - k);
       lp = d > 3 ? 700 + 9000 * k * k : 0;
     }
     activeRoars++;
