@@ -1,0 +1,111 @@
+{
+  "description": "Period murals hung in the era halls (public/js/halls.js). Charles R. Knight's Field Museum (Chicago) paintings of the 1920s-30s, downloaded from Wikimedia Commons as 1280 px thumbnails and re-encoded with sips at 1024 px wide, JPEG quality 80. No other edits.",
+  "license": "Public domain (as tagged on Wikimedia Commons; Knight's Field Museum murals, see each file page for the exact PD rationale)",
+  "murals": {
+    "triassic.jpg": {
+      "hall": "triassic",
+      "title": "Mammal like reptiles by Knight",
+      "artist": "Charles R. Knight",
+      "date": "1932",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Mammal_like_reptiles_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Mammal_like_reptiles_by_Knight.jpg",
+      "originalSize": [
+        2000,
+        1506
+      ],
+      "source": "https://mm.fieldmuseum.org/a49732a6-bea9-4e6f-8676-9c92fd5384dd",
+      "description": "Mammal like reptiles. Carnivorous Cynognathus hunting in a wolf like pack, as the animals prepare to attack the virtually defenseless Kannemeyeria. Karroo beds of South Africa's Triassic period; Mesozoic era; Charles R. Knight painting or mural"
+    },
+    "jurassic.jpg": {
+      "hall": "jurassic",
+      "title": "Brontosaurus by Knight",
+      "artist": "Charles R. Knight",
+      "date": "ca 1929",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Brontosaurus_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/4/42/Brontosaurus_by_Knight.jpg",
+      "originalSize": [
+        2000,
+        696
+      ],
+      "source": "https://mm.fieldmuseum.org/f2b2c7a2-a9b8-4ee0-91c0-dfabc04396ef",
+      "description": "Apatosaurus (Brontosaurus) end of Jurassic, Mesozoic Charles R. Knight painting or mural. Knight's classic portrait of the enormous brontosaur Apatosurus. At the time he painted this mural, the skull of Apatosaurus was not known and the head was restored based on the skull of the Camarasaurus, anoth"
+    },
+    "jurassic2.jpg": {
+      "hall": "jurassic",
+      "title": "Stegosaurus by Knight",
+      "artist": "Charles R. Knight",
+      "date": "ca 1927",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Stegosaurus_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/0/09/Stegosaurus_by_Knight.jpg",
+      "originalSize": [
+        1982,
+        1520
+      ],
+      "source": "https://mm.fieldmuseum.org/6a11edd6-b029-4bfb-9e44-d07b53bfe946",
+      "description": "Stegosaurus Jurassic dinosaur had dorsal plates that might have served as heat regulators and a spiked tail that was most likely used for defense against predators. Charles R. Knight painting or mural"
+    },
+    "cretaceous.jpg": {
+      "hall": "cretaceous",
+      "title": "Triceratops and Tyrannosaurus by Knight",
+      "artist": "Charles R. Knight",
+      "date": "ca 1928",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Triceratops_and_Tyrannosaurus_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Triceratops_and_Tyrannosaurus_by_Knight.jpg",
+      "originalSize": [
+        2000,
+        688
+      ],
+      "source": "https://mm.fieldmuseum.org/bd850db6-9190-4628-be33-b7a500dd7338",
+      "description": "Triceratops and T. rex (tyrannosaurus) Mesozoic. Charles Knight painting or mural. This is unequivocally Knight's most influential work, the classic confrontation between the horned dinosaur Triceratops and its deadly adversary Tyrannosaurus."
+    },
+    "cretaceous2.jpg": {
+      "hall": "cretaceous",
+      "title": "Late Cretaceous Dinosaurs by Knight",
+      "artist": "Charles R. Knight",
+      "date": "1931",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Late_Cretaceous_Dinosaurs_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/5/51/Late_Cretaceous_Dinosaurs_by_Knight.jpg",
+      "originalSize": [
+        1967,
+        658
+      ],
+      "source": "https://mm.fieldmuseum.org/1bcd2464-1816-4f14-b709-75cd0098888d",
+      "description": "Late Cretaceous Dinosaurs Mesozoic. Helmet-crested Corythosaurus, submerged in water, a herd of long-crested Parasaurolophus, heavily armored Palaeoscincus, based on a specimen of Panoplosaurus, ostrichlike Struthiomimus, and flat-headed hadrosaur Edmontosaurus. Charles R. Knight, the artist, gives "
+    },
+    "marine.jpg": {
+      "hall": "marine",
+      "title": "Late or Upper Cretaceous Seas by Knight",
+      "artist": "Charles R. Knight",
+      "date": "Ca 1929",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Late_or_Upper_Cretaceous_Seas_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/2/20/Late_or_Upper_Cretaceous_Seas_by_Knight.jpg",
+      "originalSize": [
+        2000,
+        682
+      ],
+      "source": "https://mm.fieldmuseum.org/dad9b1a1-73b1-4119-a4bf-15d3397d940d",
+      "description": "Late or Upper Cretaceous Seas Mesozoic; Charles Knight painting or mural. Marine reptiles monstrous lizard Tylosaurus; giant turtle Protostega, flying reptile Pteranodon."
+    },
+    "marine2.jpg": {
+      "hall": "marine",
+      "title": "Reptiles That Invaded The Seas by Knight",
+      "artist": "Charles R. Knight",
+      "date": "Ca 1929",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Reptiles_That_Invaded_The_Seas_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/a/ac/Reptiles_That_Invaded_The_Seas_by_Knight.jpg",
+      "originalSize": [
+        2000,
+        686
+      ],
+      "source": "https://mm.fieldmuseum.org/7e58c24f-bc8c-4c22-8e50-3ea1901046ba",
+      "description": "Reptiles That Invaded The Seas; Plesiosaurus and Stenopterygius, fish shaped ichthyosaur. Mesozoic, Jurassic. Charles Knight painting or mural."
+    }
+  }
+}
