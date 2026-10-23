@@ -63,7 +63,7 @@ const fmtM = (m) => (Math.abs(m - Math.round(m)) < 0.05 ? String(Math.round(m)) 
 /* floor tapes                                                          */
 /* ------------------------------------------------------------------ */
 
-const HW = 0.06; // half the strip width (12 cm strip)
+const HW = 0.035; // half the strip width (7 cm inlay)
 const LANE = 0.36; // half-width of floor the tape needs (ticks + numerals)
 const CLEAR = 0.3; // lane to plinths, cases, furniture
 const WALL_CLEAR = 0.7; // lane edge to a wall
@@ -677,14 +677,15 @@ export function buildScaleTapes(group, world, SPECIES = CATALOGUE, opts = {}) {
     t.end = { x: +end.x.toFixed(3), z: +end.z.toFixed(3) };
   });
 
-  // polished brass that still reads in a dim hall: half metal, a touch of glow
+  // aged brass inlaid in the parquet: catches the light up close, but from
+  // across the hall it reads as part of the floor, not as painted road lines
   const brassMat = new THREE.MeshStandardMaterial({
-    color: 0xd8b062,
-    metalness: 0.45,
-    roughness: 0.34,
-    emissive: 0x6a4c16,
-    emissiveIntensity: 0.45,
-    envMapIntensity: 1.2,
+    color: 0x9a7638,
+    metalness: 0.7,
+    roughness: 0.42,
+    emissive: 0x241806,
+    emissiveIntensity: 0.25,
+    envMapIntensity: 0.9,
   });
   const tickMat = new THREE.MeshStandardMaterial({ color: 0x2a1d0c, metalness: 0.4, roughness: 0.55 });
   const decal = (map) =>
