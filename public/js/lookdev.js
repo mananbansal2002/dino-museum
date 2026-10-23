@@ -240,7 +240,8 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
   }
   const gpu = detectSoftware(renderer);
   const requested = override && TIERS.includes(override) ? override : quality;
-  const auto = requested === "auto";
+  // frame-time adaptation only while the visitor leaves quality on auto
+  let auto = requested === "auto";
   let tier = auto ? (gpu.software ? "low" : "high") : TIERS.includes(requested) ? requested : "high";
   const tierAtLeast = (t) => TIERS.indexOf(tier) >= TIERS.indexOf(t);
   const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
@@ -1368,7 +1369,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
             composer.setSize(s.x, s.y);
           }
         } else if (tier === "high" && frameEMA > 33) {
-          setQuality("medium");
+          setTier("medium");
         }
         frameEMA = 16;
       }
@@ -1383,7 +1384,16 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     }
   }
 
-  function setQuality(q) {
+  /**
+   * A tier picked by the visitor (or "auto"): a manual pick stops the
+   * adaptation. { manual: false } is a governor's step that keeps auto on.
+   */
+  function setQuality(q, { manual = true } = {}) {
+    if (manual && (q === "auto" || TIERS.includes(q))) auto = q === "auto";
+    setTier(q);
+  }
+
+  function setTier(q) {
     const next = q === "auto" ? (gpu.software ? "low" : "high") : q;
     if (!TIERS.includes(next) || next === tier) return;
     tier = next;
@@ -1398,6 +1408,9 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto" } = {})
     composer,
     get quality() {
       return tier;
+    },
+    get auto() {
+      return auto;
     },
     render,
     resize,

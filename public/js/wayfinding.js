@@ -526,6 +526,7 @@ function drawTotemFace(W, H, here, rot) {
   // legend: the halls and how long ago their animals lived
   let y = mapBox.y + mapBox.h + Math.round(42 * sf);
   ctx.textBaseline = "middle";
+  ctx.textAlign = "left"; // drawPlan leaves it centred
   ctx.fillStyle = "#6b6257";
   ctx.font = `800 ${Math.round(17 * sf)}px ${FONT}`;
   setSpacing(ctx, 3 * sf);
@@ -1194,14 +1195,30 @@ export function buildWayfinding(group, world, { scene = null, renderer = null, q
 
   function washMat() {
     if (washMaterial) return washMaterial;
+    // a cone of light from the lamp above, fading out before every edge of
+    // the quad so the wash never shows as a lit rectangle on the wall
     const c = canvas(128, 128);
     const ctx = c.getContext("2d");
-    const g = ctx.createRadialGradient(64, -30, 10, 64, -30, 150);
-    g.addColorStop(0, "rgba(255,238,210,0.32)");
-    g.addColorStop(0.55, "rgba(255,238,210,0.08)");
-    g.addColorStop(1, "rgba(255,238,210,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 128, 128);
+    const img = ctx.createImageData(128, 128);
+    const smooth = (e0, e1, v) => {
+      const t = Math.min(1, Math.max(0, (v - e0) / (e1 - e0)));
+      return t * t * (3 - 2 * t);
+    };
+    for (let py = 0; py < 128; py++) {
+      for (let px = 0; px < 128; px++) {
+        const u = (px + 0.5) / 128;
+        const v = (py + 0.5) / 128;
+        const d = Math.hypot((u - 0.5) * 1.1, v + 0.25) / 1.15; // 0 at the lamp
+        const fall = Math.max(0, 1 - d) ** 1.6;
+        const edge = smooth(0, 0.22, u) * smooth(0, 0.22, 1 - u) * smooth(0, 0.08, v) * smooth(0, 0.3, 1 - v);
+        const i = (py * 128 + px) * 4;
+        img.data[i] = 255;
+        img.data[i + 1] = 238;
+        img.data[i + 2] = 210;
+        img.data[i + 3] = Math.round(255 * 0.42 * fall * edge);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     textures.push(t);
@@ -1243,17 +1260,23 @@ export function buildWayfinding(group, world, { scene = null, renderer = null, q
         html: `
           <h2>${h.name}</h2>
           <p class="lead">${h.era} · ${h.bandText}</p>
-          <p class="quote">${h.intro}<span class="who">In this hall: ${h.species.join(", ")}</span></p>
+          <p class="quote" style="border-left-color:${h.accent}">${h.intro}</p>
+          <p class="wayLabel">In this hall · ${h.species.length}</p>
+          <ul class="wayChips">${h.species.map((n) => `<li>${n}</li>`).join("")}</ul>
           <div class="row actions"><button class="primary" id="wayClose">Close</button></div>`,
       };
     }
     if (it?.type === "totem") {
-      const rows = LEGEND.map((h) => `<b>${h.name}</b> · ${h.bandText}`).join("<br>");
+      const rows = LEGEND.map(
+        (h) =>
+          `<li${h.id === it.room ? ' class="here"' : ""}><i style="background:${h.accent}"></i><b>${h.name}</b><span>${h.bandText}</span></li>`
+      ).join("");
       return {
         title: "Museum map",
         html: `
           <h2>🗺️ You are here: ${it.roomName || "the museum"}</h2>
-          <p class="quote">${rows}</p>
+          <p class="lead">The halls in tour order, oldest first.</p>
+          <ul class="wayLegend">${rows}</ul>
           <div class="row actions"><button class="primary" id="wayClose">Close</button></div>`,
       };
     }

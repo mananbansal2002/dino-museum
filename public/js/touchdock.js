@@ -7,8 +7,10 @@
  *   dock.setEatAvailable(true, "Eat");   // F button ("Eat" or "Dig"), false hides it
  *
  * `onAction` gets the keyboard letter of the action: "E" use, "V" roar,
- * "B" wave, "F" eat / dig, "G" photo, "T" chat, "M" map. No synthetic
- * KeyboardEvents are sent; the caller runs the action directly.
+ * "B" wave, "F" eat / dig, "G" photo, "T" chat, "M" map. The dock itself
+ * sends no keys; pass `pressKey` as `onAction` to replay the tap through the
+ * game's own keydown handler (same guards as the keyboard), or run the action
+ * directly.
  *
  * Layout (css/touchdock.css) keeps clear of player.js: the joystick takes any
  * canvas touch on the left half, Jump sits at right 22px in the row just above
@@ -110,6 +112,20 @@ const BUTTONS = [
   { key: "T", id: "chat", label: "Chat" },
   { key: "M", id: "map", label: "Map" },
 ];
+
+/**
+ * Replay a dock tap as a keyboard press ("E" -> KeyE down + up on window), so
+ * every keyboard guard (joined, chat open, panel open, era view) applies to it.
+ * Runs synchronously inside the tap, so Chat's focus() still counts as a user
+ * gesture on iOS.
+ */
+export function pressKey(key) {
+  const code = `Key${String(key).toUpperCase()}`;
+  const init = { code, key: String(key).toLowerCase(), bubbles: true, cancelable: true };
+  window.dispatchEvent(new KeyboardEvent("keydown", init));
+  // the key-up keeps player.js's held-key set clean
+  window.dispatchEvent(new KeyboardEvent("keyup", init));
+}
 
 function isCoarse() {
   try {

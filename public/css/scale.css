@@ -75,9 +75,13 @@
   stroke-dasharray: 4 3;
 }
 
-.scaleStrip .scaleBus text {
+.scaleStrip .scaleBusLabel {
   font-size: 10.5px;
-  fill: rgba(159, 176, 191, 0.85);
+  fill: rgba(190, 204, 216, 0.95);
+  paint-order: stroke;
+  stroke: rgba(22, 29, 38, 0.9);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .scaleOther path {

@@ -28,8 +28,17 @@
  * - settings (optional, settings.js): "subtitles" hides the caption box while
  *   the voice is audible, "narration" turns the automatic hall intros off.
  *
- * Also exported: exhibitScript(ex), exhibitLines(ex), HALL_INTROS, pickVoice().
+ * - Secret rooms (world.js ROOMS with secret: true, the Exit Passage and the
+ *   Ice Cream Court): their welcome is never spoken, listed or exposed until
+ *   the visitor has actually stood inside (tick() saw them there, or the
+ *   optional isRevealed(roomId) says so, e.g. minimap.isRevealed).
+ *
+ * Also exported: exhibitScript(ex), exhibitLines(ex), HALL_INTROS (public
+ * halls only), pickVoice(), estimateSeconds().
  */
+
+import { SPECIES } from "./species.js";
+import { ROOMS } from "./world.js";
 
 const RATE = 0.95;
 const WORDS_PER_SEC = 2.5 * RATE; // a calm guide voice at rate 0.95
@@ -44,7 +53,7 @@ const STORE_INTROS = "dino-museum:guide-intros:v1"; // sessionStorage: intros he
 /* ------------------------------------------------------------------ */
 
 /** Room id (world.js ROOMS) → 2–3 sentence welcome, spoken once per visit. */
-export const HALL_INTROS = {
+export const HALL_INTROS = Object.freeze({
   lobby:
     "Welcome to the museum. Overhead flies Quetzalcoatlus, one of the largest flying animals that ever lived, and nearby are Archaeopteryx and Rhamphorhynchus. Follow the signs to the halls, and press E at any exhibit to read more.",
   rotunda:
@@ -61,9 +70,23 @@ export const HALL_INTROS = {
     "Welcome to the Marine Reptile Hall. While dinosaurs ruled the land, other reptiles ruled the seas: dolphin-shaped ichthyosaurs, long-necked plesiosaurs and huge mosasaurs. None of the animals in this hall are dinosaurs.",
   theater:
     "This is the Screening Theatre. Take a seat, then press E to choose a fight for the big screen. Some match-ups are backed by fossil evidence, and others are pure what-ifs.",
+});
+
+// Welcomes for the secret rooms: kept out of HALL_INTROS so nothing that lists
+// the intros can give the ending away. Spoken only once the visitor is inside.
+const SECRET_INTROS = {
   court:
-    "You've found the Ice Cream Court at the end of the tour. Pick a gelato at the counter, and thank you for visiting the museum.",
+    "You've found the Ice Cream Court, the museum's little secret at the end of the tour. Pick a gelato at the counter, and thank you for visiting.",
 };
+
+const SECRET_ROOMS = new Set(["court", "xpassage", ...(ROOMS || []).filter((r) => r.secret).map((r) => r.id)]);
+const introText = (key) => HALL_INTROS[key] || SECRET_INTROS[key] || "";
+
+/** Touch screens have no E key: there the intros ask for a tap on the action button. */
+function forPointer(text) {
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  return coarse ? text.replace(/\bpress E\b/g, "tap the action button") : text;
+}
 
 // hall names (world.js HALL_LABEL / roomNameAt) → room id, so either works
 const HALL_NAMES = {
@@ -81,7 +104,7 @@ const HALL_NAMES = {
 function roomKey(roomOrName) {
   const s = String(roomOrName || "").trim();
   if (!s) return "";
-  if (HALL_INTROS[s]) return s;
+  if (introText(s) || SECRET_ROOMS.has(s)) return s;
   return HALL_NAMES[s.toLowerCase()] || s;
 }
 
@@ -156,10 +179,13 @@ const MAX_WORDS = 95; // ~40 s
 /** Exhibit record (exhibits.js) or species entry (species.js) → one flat shape. */
 function normalise(ex) {
   if (!ex) return null;
-  const info = ex.info || {};
+  // exhibit records leave out the label fields (say, meaning): take them from the catalogue
+  const info = { ...(SPECIES[ex.id]?.info || {}), ...(ex.info || {}) };
   return {
     id: ex.id || "",
     title: ex.title || ex.name || "",
+    meaning: ex.meaning ?? info.meaning ?? "",
+    notDinoNote: ex.notDinosaur || info.notDinosaur ? ex.notDinoNote ?? info.notDinoNote ?? "" : "",
     era: ex.era ?? info.era ?? "",
     period: ex.period ?? info.period ?? "",
     length: ex.length ?? info.length ?? "",
@@ -167,7 +193,7 @@ function normalise(ex) {
     diet: ex.diet ?? info.diet ?? "",
     blurb: ex.blurb ?? info.blurb ?? "",
     facts: ex.facts ?? info.facts ?? [],
-    pronounce: ex.pronounce ?? info.pronounce ?? "",
+    pronounce: ex.pronounce ?? ex.say ?? info.pronounce ?? info.say ?? "",
   };
 }
 
@@ -263,11 +289,28 @@ export function exhibitLines(ex, { fact = 0 } = {}) {
   const e = normalise(ex);
   if (!e || !e.title) return [];
   const say = e.pronounce || PRONOUNCE[e.id] || "";
-  const facts = Array.isArray(e.facts) ? e.facts.filter(Boolean) : [];
+  let facts = Array.isArray(e.facts) ? e.facts.filter(Boolean) : [];
+  // the "not a dinosaur" line is already said: pick a fact that adds something
+  if (e.notDinoNote) {
+    const fresh = facts.filter((f) => !/not (a )?dinosaurs?\b/i.test(f));
+    if (fresh.length) facts = fresh;
+  }
   const pick = facts.length ? facts[((fact % facts.length) + facts.length) % facts.length] : "";
 
   const head = [{ text: `This is ${e.title}.` }];
   if (say) head.push({ text: `Say it with me: ${e.title}.`, caption: `Say it: ${say}.` });
+  // the name's meaning, unless the fact we are about to read already says it
+  const named = /name means|means ['‘"“]/i.test(pick);
+  const meaning = String(e.meaning || "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/[.\s]+$/, "");
+  const meaningLine = !meaning || named
+    ? null
+    : /^named (after|for)\b/i.test(meaning)
+      ? { text: `It is ${meaning}.` }
+      : { text: `The name means “${meaning}”.` };
+  if (meaningLine) head.push(meaningLine);
+  if (e.notDinoNote) head.push({ text: "It isn't a dinosaur at all." }, { text: sentence(e.notDinoNote) });
   const body = [eraSentence(e.era, e.period), sizeSentence(e.length, e.weight), dietSentence(e.diet)]
     .filter(Boolean)
     .map((text) => ({ text }));
@@ -286,6 +329,8 @@ export function exhibitLines(ex, { fact = 0 } = {}) {
     if (count(lines) + words(second) <= MAX_WORDS) lines.push({ text: second });
   }
   if (count(lines) < MIN_WORDS) lines.push({ text: "Take a closer look before you move on to the next stop." });
+  // a long entry: the name's meaning is the first thing to give up
+  if (count(lines) > MAX_WORDS && meaningLine) lines = lines.filter((l) => l !== meaningLine);
   return lines;
 }
 
@@ -382,14 +427,19 @@ function saveHeard(set) {
  * @param {object} [opts.settings]  settings.js instance (get("subtitles"), get("narration"))
  * @param {HTMLElement} [opts.root] where the caption box goes (default document.body)
  * @param {string} [opts.stopHint]  key shown in the caption box, e.g. "N"
+ * @param {(roomId: string) => boolean} [opts.isRevealed]  secret-room reveal state (minimap.isRevealed)
  */
-export function createNarrator({ audio = null, settings = null, root = null, stopHint = "" } = {}) {
+export function createNarrator({ audio = null, settings = null, root = null, stopHint = "", isRevealed = null } = {}) {
   const synth = typeof window !== "undefined" && "speechSynthesis" in window ? window.speechSynthesis : null;
   const Utterance = typeof window !== "undefined" ? window.SpeechSynthesisUtterance : null;
   const hasEngine = !!(synth && Utterance);
 
   let voice = null;
-  let engineBroken = false; // set when the engine never starts a sentence
+  // sentences in a row the engine failed to start. Chrome sometimes wedges
+  // after cancel(); a few misses (not one) mean speech is really unavailable.
+  let failures = 0;
+  let lastCancel = 0;
+  const isBroken = () => failures >= 3;
   let run = null; // the script being played
   let gen = 0;
   const heard = loadHeard();
@@ -397,6 +447,17 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
   // tick() state
   let lastRoom = "";
   let pending = null; // { room, since }
+  const entered = new Set(); // secret rooms the visitor has stood in (this page)
+
+  const revealed = (key) => {
+    if (!SECRET_ROOMS.has(key)) return true;
+    if (entered.has(key) || heard.has(key)) return true; // heard: its intro played, so they were inside
+    try {
+      return !!isRevealed?.(key);
+    } catch {
+      return false;
+    }
+  };
 
   function refreshVoice() {
     if (!hasEngine) return;
@@ -443,13 +504,35 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
       return fallback;
     }
   };
-  const voiceAllowed = () => hasEngine && !engineBroken && !audio?.muted && (audio?.volume ?? 1) > 0.001;
+  const voiceAllowed = () => hasEngine && !isBroken() && !audio?.muted && (audio?.volume ?? 1) > 0.001;
 
   /* ---------------- caption box ---------------- */
   let box = null;
   let labelEl = null;
   let textEl = null;
   let hideTimer = 0;
+  let placeTimer = 0;
+  let lift = 0;
+
+  // keep clear of the interaction prompt ("E  Read about T. rex"), wherever the
+  // current layout puts it: a two-line subtitle would otherwise sit under it
+  function place() {
+    if (!box || box.hidden) return;
+    const prompt = document.getElementById("prompt");
+    let need = 0;
+    if (prompt && !prompt.classList.contains("hidden") && prompt.offsetParent !== null) {
+      const p = prompt.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      const bottom = b.bottom + lift; // where the box sits unlifted
+      const top = bottom - b.height;
+      const across = b.left < p.right && b.right > p.left;
+      if (across && top < p.bottom && bottom > p.top) need = Math.ceil(bottom - p.top + 8);
+    }
+    if (need !== lift) {
+      lift = need;
+      box.style.setProperty("--gc-lift", `${lift}px`);
+    }
+  }
 
   function ensureBox() {
     if (box || typeof document === "undefined") return box;
@@ -461,9 +544,15 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
       <div class="gcHead">
         <span class="gcIcon" aria-hidden="true"></span>
         <span class="gcLabel"></span>
-        ${stopHint ? `<span class="gcHint"><kbd>${escapeHtml(stopHint)}</kbd> stop</span>` : ""}
+        ${stopHint ? `<button type="button" class="gcHint" aria-label="Stop the audio guide"><kbd>${escapeHtml(stopHint)}</kbd> stop</button>` : ""}
       </div>
       <p class="gcText"></p>`;
+    // the hint is also a button: touch screens have no N key to stop a talk
+    box.querySelector(".gcHint")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      stop();
+    });
     labelEl = box.querySelector(".gcLabel");
     textEl = box.querySelector(".gcText");
     (root || document.body).appendChild(box);
@@ -477,12 +566,26 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     if (!showIt) {
       box.classList.remove("show");
       box.hidden = true;
+      clearInterval(placeTimer);
+      placeTimer = 0;
       return;
     }
     // with a voice, screen readers already hear it; captions-only is announced
     box.setAttribute("role", spoken ? "presentation" : "status");
     box.setAttribute("aria-live", spoken ? "off" : "polite");
-    labelEl.textContent = label || "Audio guide";
+    // "Audio guide · T. rex": the prefix goes first when the box is narrow
+    // (captions.css), since the headphones icon already says it
+    const full = label || "Audio guide";
+    const cut = full.indexOf(" · ");
+    labelEl.textContent = "";
+    if (cut > 0) {
+      const pre = document.createElement("span");
+      pre.className = "gcPre";
+      pre.textContent = full.slice(0, cut + 3);
+      labelEl.append(pre, full.slice(cut + 3));
+    } else {
+      labelEl.textContent = full;
+    }
     // one span per word so boundary events can dim what is still to come
     textEl.textContent = "";
     textEl.classList.remove("tracking");
@@ -500,6 +603,8 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
       at += part.length;
     }
     box.hidden = false;
+    place();
+    if (!placeTimer) placeTimer = setInterval(place, 300);
     // next frame so the fade-in runs from the hidden state
     requestAnimationFrame(() => box && box.classList.add("show"));
   }
@@ -515,7 +620,11 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     box.classList.remove("show");
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      if (box && !run) box.hidden = true;
+      if (box && !run) {
+        box.hidden = true;
+        clearInterval(placeTimer);
+        placeTimer = 0;
+      }
     }, 260);
   }
 
@@ -580,11 +689,14 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
       u.lang = "en-GB";
     }
     let started = false;
+    let startedAt = 0;
     const id = gen;
     const alive = () => !r.done && run === r && id === gen && r.utt === u;
     u.onstart = () => {
       if (!alive()) return;
       started = true;
+      failures = 0;
+      startedAt = performance.now();
       clearTimeout(r.timer);
       // generous ceiling: some engines never fire onend (Chrome GC bug)
       const expect = (words(line.text) / WORDS_PER_SEC) * 1000;
@@ -603,13 +715,20 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
       if (alive() && e.name !== "sentence" && !line.caption) markWord(e.charIndex ?? 0);
     };
     u.onend = () => {
-      if (alive()) next(r);
+      if (!alive()) return;
+      // an engine with no audio out (muted tab, headless) "finishes" a sentence
+      // at once: hold the subtitle long enough to read rather than flash it by
+      const spent = performance.now() - (startedAt || performance.now());
+      const readable = Math.max(1200, (caption.length / READ_CPS) * 600);
+      clearTimeout(r.timer);
+      if (spent < readable) r.timer = setTimeout(() => alive() && next(r), readable - spent);
+      else next(r);
     };
     u.onerror = (e) => {
       if (!alive()) return;
       if (e.error === "interrupted" || e.error === "canceled") return;
       // no voices, blocked autoplay, synthesis failure: subtitles carry on alone
-      if (!started && e.error !== "not-allowed") engineBroken = true;
+      if (!started && e.error !== "not-allowed") failures++;
       r.utt = null;
       clearTimeout(r.timer);
       captionLine(r, caption);
@@ -619,7 +738,7 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     r.timer = setTimeout(() => {
       // the engine never started: treat speech as unavailable from now on
       if (!alive() || started) return;
-      engineBroken = true;
+      failures++;
       r.utt = null;
       try {
         synth.cancel();
@@ -628,13 +747,21 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
       }
       captionLine(r, caption);
     }, START_TIMEOUT);
-    try {
-      synth.speak(u);
-    } catch {
-      engineBroken = true;
-      clearTimeout(r.timer);
-      captionLine(r, caption);
-    }
+    const go = () => {
+      if (!alive()) return;
+      try {
+        synth.resume(); // a cancel() can leave Chrome's queue paused
+        synth.speak(u);
+      } catch {
+        failures++;
+        clearTimeout(r.timer);
+        captionLine(r, caption);
+      }
+    };
+    // Chrome drops a speak() issued right after cancel()
+    const since = performance.now() - lastCancel;
+    if (since < 120) setTimeout(go, 120 - since);
+    else go();
   }
 
   /**
@@ -669,6 +796,7 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     r.utt = null;
     run = null;
     if (hasEngine) {
+      lastCancel = performance.now();
       try {
         synth.cancel();
       } catch {
@@ -709,7 +837,9 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
    */
   function hallIntro(roomId, { force = false } = {}) {
     const key = roomKey(roomId);
-    const text = HALL_INTROS[key];
+    // a secret room stays secret, even with force, until the visitor is inside
+    if (!revealed(key)) return false;
+    const text = introText(key);
     if (!text) return false;
     if (!force) {
       if (heard.has(key)) return false;
@@ -719,7 +849,7 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     }
     heard.add(key);
     saveHeard(heard);
-    return speak(text, { id: `hall:${key}`, label: "Audio guide · Welcome" });
+    return speak(forPointer(text), { id: `hall:${key}`, label: "Audio guide · Welcome" });
   }
 
   /**
@@ -732,7 +862,8 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     const now = performance.now();
     if (key !== lastRoom) {
       lastRoom = key;
-      pending = HALL_INTROS[key] && !heard.has(key) ? { room: key, since: now } : null;
+      if (SECRET_ROOMS.has(key)) entered.add(key);
+      pending = introText(key) && !heard.has(key) ? { room: key, since: now } : null;
       return false;
     }
     if (!pending) return false;
@@ -763,16 +894,21 @@ export function createNarrator({ audio = null, settings = null, root = null, sto
     get current() {
       return run ? run.id : "";
     },
+    /** The welcome text for a room ("" for none, or for a secret room not yet entered). */
+    introFor(roomId) {
+      const key = roomKey(roomId);
+      return revealed(key) ? introText(key) : "";
+    },
     /** true when a real voice can play (false: subtitles only) */
     get available() {
-      return hasEngine && !engineBroken;
+      return hasEngine && !isBroken();
     },
     get voice() {
       return voice ? `${voice.name} (${voice.lang})` : "";
     },
     /** Rooms whose intro was heard this visit. */
     get heard() {
-      return [...heard];
+      return [...heard].filter(revealed);
     },
     /** Forget the heard intros (e.g. a "replay intros" setting). */
     resetIntros() {

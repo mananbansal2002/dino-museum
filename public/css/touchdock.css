@@ -190,12 +190,24 @@ body:has(#battleOverlay:not(.hidden)) .touch-dock {
   }
 }
 
+/* the dock's Use button replaces player.js's own one in the same slot */
+body.has-touch-dock .touch-controls .touch-use {
+  display: none !important;
+}
+
 /* the dock has its own Chat button, so the HUD's round chat bubble steps
    aside; it still comes back as the full input when focused */
 body.has-touch-dock #chatInput:not(:focus):not(.open) {
   position: absolute;
   opacity: 0;
   pointer-events: none;
+}
+
+/* the chat column ends a clear thumb gap before the 120px button strip */
+@media (pointer: coarse) and (min-height: 501px) {
+  body.has-touch-dock #bottomright {
+    width: min(340px, calc(100vw - 2 * var(--hud-gap) - 128px - var(--safe-l) - var(--safe-r)));
+  }
 }
 
 /* phones in portrait: the prompt moves left so it clears the button strip */

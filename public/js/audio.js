@@ -82,6 +82,10 @@ export function zoneForHall(name) {
 
 const STORE_MUTED = "dino-museum:audio:muted";
 const STORE_VOLUME = "dino-museum:audio:volume";
+const STORE_CHANNELS = "dino-museum:audio:channels";
+
+/** Sound groups the visitor can switch off one by one (settings → Audio). */
+export const SOUND_CHANNELS = ["roars", "steps", "crowd", "ambience", "chimes"];
 
 function load(key, fallback) {
   try {
@@ -213,6 +217,16 @@ export function createAudio() {
   let muted = load(STORE_MUTED, "0") === "1";
   let volume = clamp(parseFloat(load(STORE_VOLUME, "0.8")) || 0, 0, 1);
   if (!Number.isFinite(volume)) volume = 0.8;
+  // settings sliders (settings.js persists them; these are just the live values)
+  let musicVolume = 1;
+  let sfxVolume = 1;
+  const channels = Object.fromEntries(SOUND_CHANNELS.map((k) => [k, true]));
+  try {
+    Object.assign(channels, JSON.parse(load(STORE_CHANNELS, "{}")) || {});
+  } catch {
+    /* bad stored value: all on */
+  }
+  const on = (k) => channels[k] !== false;
   let ducked = false;
   let ambientOn = false;
   let zone = "atrium";
@@ -294,10 +308,11 @@ export function createAudio() {
     master.connect(comp);
 
     sfx = c.createGain();
+    sfx.gain.value = sfxVolume;
     sfx.connect(master);
 
     ambBus = c.createGain();
-    ambBus.gain.value = 0.7;
+    ambBus.gain.value = 0.7 * musicVolume;
     ambDuck = c.createGain();
     ambDuck.gain.value = ducked ? 0.22 : 1;
     ambBus.connect(ambDuck);
@@ -722,7 +737,7 @@ export function createAudio() {
   }
 
   /** Looped recording into a bed, faded in; the bed's sources stop it. */
-  function bedSample(bed, buf, gain, fade = 3) {
+  function bedSample(bed, buf, gain, fade = 3, into = bed.out) {
     const s = ctx.createBufferSource();
     s.buffer = buf;
     s.loop = true;
@@ -732,7 +747,7 @@ export function createAudio() {
     const g = ctx.createGain();
     g.gain.value = 0;
     s.connect(g);
-    g.connect(bed.out);
+    g.connect(into);
     bedStart(bed, s, a + Math.random() * (b - a) * 0.9);
     rampTo(g.gain, gain, fade);
     return g;
@@ -748,7 +763,8 @@ export function createAudio() {
     const crowd = CROWD_LEVEL[bed.name];
     if (crowd && !bed.crowd) {
       const buf = variant("amb_crowd");
-      if (buf) bed.crowd = bedSample(bed, buf, crowd, fade);
+      bed.crowdLevel = crowd;
+      if (buf) bed.crowd = bedSample(bed, buf, on("crowd") ? crowd : 0, fade, bed.fade);
     }
   }
 
@@ -910,14 +926,18 @@ export function createAudio() {
   /* ambience beds                                                     */
   /* ---------------------------------------------------------------- */
   function makeBed(name, level = 1, wet = 0.35) {
-    const out = ctx.createGain();
-    out.gain.value = 0;
-    out.connect(ambBus);
+    // out: the bed's own layers, gated by the "ambience" switch; fade: the zone
+    // fade, which the crowd layer joins directly so it has its own switch
+    const fade = ctx.createGain();
+    fade.gain.value = 0;
+    fade.connect(ambBus);
     const send = gainNode(wet);
-    out.connect(send);
+    fade.connect(send);
     send.connect(ambRevSend);
+    const out = gainNode(on("ambience") ? 1 : 0);
+    out.connect(fade);
     // starters: (re)start the bed's timer chains — run again on revive
-    const bed = { name, out, level, sources: [], timers: new Set(), starters: [], alive: true, reaper: 0 };
+    const bed = { name, out, fade, level, sources: [], timers: new Set(), starters: [], alive: true, reaper: 0 };
     return bed;
   }
 
@@ -977,7 +997,7 @@ export function createAudio() {
   }
 
   function fadeIn(bed, seconds) {
-    rampTo(bed.out.gain, bed.level, seconds);
+    rampTo(bed.fade.gain, bed.level, seconds);
   }
 
   /**
@@ -995,7 +1015,7 @@ export function createAudio() {
       stopBed(bed);
       return;
     }
-    rampTo(bed.out.gain, 0, seconds);
+    rampTo(bed.fade.gain, 0, seconds);
     const prev = fading.get(bed.name);
     if (prev && prev !== bed) stopBed(prev);
     fading.set(bed.name, bed);
@@ -1008,7 +1028,7 @@ export function createAudio() {
     if (fading.get(bed.name) === bed) fading.delete(bed.name);
     bed.sources.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } });
     bed.sources.length = 0;
-    try { bed.out.disconnect(); } catch { /* ignore */ }
+    try { bed.fade.disconnect(); } catch { /* ignore */ }
   }
 
   /** Bring back a bed of this name that is still fading out, or return null. */
@@ -1180,11 +1200,11 @@ export function createAudio() {
     bedOsc(bed, "sine", 110.3, 0.004);
     // distant echoes of other visitors
     every(bed, 14, 32, () => {
-      if (["atrium", "gallery"].includes(zone)) farFootsteps(bed);
+      if (on("steps") && ["atrium", "gallery"].includes(zone)) farFootsteps(bed);
     }, rand(6, 14));
     // occasional far-off roar from another hall
     every(bed, 45, 110, () => {
-      if (ducked || activeRoars > 1) return;
+      if (ducked || activeRoars > 1 || !on("roars")) return;
       if (["theatre", "icecream", "marine", "plaza"].includes(zone)) return;
       const kind = Math.random() < 0.6 ? "trex" : "sauropod";
       const far = { dest: bed.out, level: 0.6, distance: rand(30, 42), pan: rand(-0.7, 0.7) };
@@ -1319,7 +1339,7 @@ export function createAudio() {
     if (!ambientOn) return;
     if (roomBed) {
       roomBed.level = ROOM_LEVEL[zone] ?? 1;
-      rampTo(roomBed.out.gain, roomBed.level, ZONE_FADE);
+      rampTo(roomBed.fade.gain, roomBed.level, ZONE_FADE);
     }
     killBed(zoneBed, ZONE_FADE);
     zoneBed = null;
@@ -1389,6 +1409,40 @@ export function createAudio() {
       if (ready() && !muted) rampTo(master.gain, masterTarget(), 0.15);
     },
 
+    get musicVolume() {
+      return musicVolume;
+    },
+    get sfxVolume() {
+      return sfxVolume;
+    },
+    /** Music & ambience level (0..1), scaling the ambience bus. */
+    setMusicVolume(v) {
+      musicVolume = clamp(Number(v) || 0, 0, 1);
+      if (ready()) rampTo(ambBus.gain, 0.7 * musicVolume, 0.15);
+    },
+    /** Sound-effects level (0..1), scaling the sfx bus. */
+    setSfxVolume(v) {
+      sfxVolume = clamp(Number(v) || 0, 0, 1);
+      if (ready()) rampTo(sfx.gain, sfxVolume, 0.15);
+    },
+
+    /** Whether a sound group (SOUND_CHANNELS) is switched on. */
+    channelOn(name) {
+      return on(name);
+    },
+    /** Switch one sound group on or off; remembered across visits. */
+    setChannel(name, value) {
+      if (!SOUND_CHANNELS.includes(name)) return;
+      channels[name] = !!value;
+      save(STORE_CHANNELS, JSON.stringify(channels));
+      if (!ready()) return;
+      for (const bed of [roomBed, zoneBed]) {
+        if (!bed) continue;
+        if (name === "ambience") rampTo(bed.out.gain, value ? 1 : 0, 0.4);
+        if (name === "crowd" && bed.crowd) rampTo(bed.crowd.gain, value ? bed.crowdLevel : 0, 0.4);
+      }
+    },
+
     /** Lower (on) or restore (off) the ambience, e.g. while a video plays. */
     duck(on = true) {
       ducked = !!on;
@@ -1445,6 +1499,7 @@ export function createAudio() {
      *   sauropod). opts.pan: -1 (left) .. 1 (right).
      */
     roar(power = 1, opts = {}) {
+      if (!on("roars")) return;
       const c = ensure();
       if (!c || !playable() || activeRoars >= 3) return;
       const { zone: only, distance, range, pan } = opts || {};
@@ -1469,6 +1524,7 @@ export function createAudio() {
 
     /** Footstep; surface "stone" (default) | "marble" | "wood" | "parquet" | "carpet" | "rug". */
     step(vol = 1, surface = "stone") {
+      if (!on("steps")) return;
       const c = ensure();
       if (!c || !playable()) return;
       const now = c.currentTime;
@@ -1479,6 +1535,7 @@ export function createAudio() {
 
     /** Landing after a jump / fall: a heavier, duller footfall plus body thump. */
     land(impact = 1, surface = "stone") {
+      if (!on("steps")) return;
       const c = ensure();
       if (!c || !playable()) return;
       const k = clamp(Number(impact) || 1, 0.2, 2);
@@ -1500,6 +1557,7 @@ export function createAudio() {
 
     /** Soft UI tick. */
     click(freq = 660) {
+      if (!on("chimes")) return;
       const c = ensure();
       if (!c || !playable()) return;
       const f = clamp(Number(freq) || 660, 80, 6000);
@@ -1518,6 +1576,7 @@ export function createAudio() {
 
     /** Bell-like arpeggio for discoveries / rewards. opts.zone gates it like roar(). */
     chime(base = 523.25, opts = {}) {
+      if (!on("chimes")) return;
       const c = ensure();
       if (!c || !playable()) return;
       const only = opts?.zone;
@@ -1549,6 +1608,7 @@ export function createAudio() {
 
     /** Ice-cream slurp: gurgly rising noise, a squeak and a little pop. */
     slurp() {
+      if (!on("chimes")) return;
       const c = ensure();
       if (!c || !playable()) return;
       const t = c.currentTime + 0.01;

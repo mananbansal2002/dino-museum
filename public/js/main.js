@@ -20,6 +20,18 @@ import { createBattlePicker, fetchVideoCatalogue } from "./battlepicker.js";
 import { createScreenEmbed } from "./screen-embed.js";
 import { createCrowd } from "./crowd.js";
 import { buildGelateria } from "./gelato.js";
+import { SPECIES } from "./species.js";
+import { buildPlinthLabels } from "./labels.js";
+import { buildWayfinding } from "./wayfinding.js";
+import { buildScaleTapes } from "./scaletape.js";
+import { createNarrator } from "./narrator.js";
+import { getSettings, bindSettings } from "./settings.js";
+import { openSettings, settingsOpen } from "./settingspanel.js";
+import { createLoading, watchPerformance } from "./loading.js";
+import { createAtmosphere } from "./atmosphere.js";
+import { initQuiz, buildQuizKiosks, openQuiz, isQuizOpen, closeQuiz } from "./quiz.js";
+import { createBigMap, teleportPlayer } from "./bigmap.js";
+import { createTouchDock, pressKey } from "./touchdock.js";
 
 preloadModels(["male", "female"]);
 
@@ -48,16 +60,27 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1016);
 scene.fog = new THREE.Fog(0x0b1016, 120, 320);
 
+// the visitor's saved preferences (quality, volumes, look, FOV, accessibility)
+const settings = getSettings();
+
 const camera = new THREE.PerspectiveCamera(
-  55,
+  settings.get("fov"),
   window.innerWidth / window.innerHeight,
   0.1,
   420
 );
 camera.position.set(0, 6, 20);
 
+// real loading progress (the café label stays neutral until the court is found;
+// `minimap` is declared further down and only asked from a later paint)
+const loading = createLoading({ isRevealed: (id) => minimap.isRevealed(id) });
+
 const world = buildWorld(scene);
-const lookdev = applyLookdev({ renderer, scene, camera });
+// hall quiz kiosks go in first, so everything placed later keeps clear of them
+const quizKiosks = buildQuizKiosks(world.group, world);
+world.interactables.push(...quizKiosks.interactables);
+// a manual quality choice also turns lookdev's frame-time step-down off
+const lookdev = applyLookdev({ renderer, scene, camera, quality: settings.get("quality") });
 
 // phones and tablets get the light versions of the heavy dressing
 const QUALITY =
@@ -72,17 +95,69 @@ const propsReady = import("./props.js")
     return props;
   })
   .catch((err) => console.warn("props: could not dress the halls", err));
+loading.track(propsReady, "props", "exhibits");
 const live = placeLiveModels({ scene, world, camera, quality: QUALITY });
+loading.track(live.ready, "live models", "dinosaurs");
 // the gelato bar replaces the primitive kiosk once the halls are dressed
 let gelateria = null;
+const endGelateria = loading.add("gelateria", "cafe");
 propsReady
   .then(() => {
     gelateria = buildGelateria({ scene, world, COURT, renderer, quality: QUALITY });
     window.__museum.gelateria = gelateria;
   })
+  .finally(endGelateria)
   .catch((err) => console.warn("gelato: could not build the bar", err));
+
+// Hall dressing that has to see the props: brass plinth labels, wayfinding
+// totems + hall intro panels, then the life-size floor tapes (which route
+// around everything before them). Each one is its own task, so a slow device
+// keeps drawing frames and answering the server between them, and each is
+// isolated, so one failing never takes the others down.
+let wayfinding = null;
+let scaleTapes = null;
+const nextTask = () => new Promise((r) => setTimeout(r, 0));
+function dressStep(label, build) {
+  try {
+    build();
+  } catch (err) {
+    console.warn(`${label}: could not be placed`, err);
+  }
+  return nextTask();
+}
+const endDressing = loading.add("hall dressing", "exhibits");
+propsReady
+  .then(nextTask)
+  .then(() =>
+    dressStep("labels", () => {
+      window.__museum.labels = buildPlinthLabels(world.group, world);
+      lookdev.refresh(); // the stands get the gallery's wood trim
+    })
+  )
+  .then(() =>
+    dressStep("wayfinding", () => {
+      wayfinding = buildWayfinding(world.group, world, { scene, renderer, quality: QUALITY });
+      world.interactables.push(...wayfinding.interactables);
+      window.__museum.wayfinding = wayfinding;
+    })
+  )
+  .then(() =>
+    dressStep("scale tapes", () => {
+      scaleTapes = buildScaleTapes(scene, world, SPECIES, { scene });
+      window.__museum.scaleTapes = scaleTapes;
+    })
+  )
+  .finally(endDressing);
+
 // background visitors (local only, never networked, no name tags)
-const crowd = createCrowd({ scene, world, camera, count: QUALITY === "low" ? 5 : 12, quality: QUALITY });
+const crowd = createCrowd({
+  scene,
+  world,
+  camera,
+  count: QUALITY === "low" ? 5 : 12,
+  quality: QUALITY === "low" || settings.get("quality") === "low" ? "low" : "high",
+});
+if (crowd.ready) loading.track(crowd.ready, "crowd", "cafe");
 
 /** Floor finish under a point, for footstep sounds (matches lookdev's floors). */
 const FLOOR_SURFACE = {
@@ -102,8 +177,31 @@ function surfaceAt(x, z) {
 
 const fx = createFX(scene);
 const audio = createAudio();
+// quality, field of view and the volumes follow the settings store live
+const boundSettings = bindSettings({ settings, lookdev, camera, audio });
 const remote = createRemotePlayers(scene);
 const minimap = createMinimap(document.getElementById("minimap"));
+// the audio guide; secret rooms stay silent until the minimap reveals them
+const narrator = createNarrator({
+  audio,
+  settings,
+  stopHint: "N",
+  isRevealed: (id) => minimap.isRevealed(id),
+});
+// the full-screen museum map, with fast travel to halls already visited
+const bigMap = createBigMap({
+  getLocal: () => S.player?.state || null,
+  getPlayers: () => remote.list.map((r) => ({ x: r.x, z: r.z, color: r.color, name: r.name })),
+  // secret rooms appear on the big map as soon as the minimap reveals them
+  isRevealed: (id) => minimap.isRevealed(id),
+  onTravel: (roomId, point) => {
+    if (!S.player) return;
+    teleportPlayer(S.player, point);
+    const name = roomNameAt(point.x, point.z);
+    ui.setHall(name);
+    ui.toast(`Travelled to ${name}`);
+  },
+});
 const eraView = createEraView({ renderer });
 const videoPlayer = createVideoPlayer();
 const screenEmbed = createScreenEmbed({ renderer, camera, screenMesh: world.screen });
@@ -128,10 +226,12 @@ const picker = createBattlePicker({
       picker.close();
       cinema.stop();
       watchBattle(false);
+      narrator.stop();
       if (!screenEmbed.play(video.id, { title: video.title })) return;
       audio.duck(true);
       ui.toast(`🎬 ${video.title}${video.channel ? ` · ${video.channel}` : ""} — Esc to stop`);
     } else {
+      narrator.stop();
       videoPlayer.open(video, battle?.videos || null);
     }
   },
@@ -274,6 +374,7 @@ const ui = createUI({
   onExhibitVideos: (ex) => {
     // verified clips from /data/videos.json, played in the site
     const list = catalogue.species?.[ex.id] || [];
+    if (list.length) narrator.stop();
     if (!(list.length && videoPlayer.open(list[0], list))) ui.toast("No videos for this one yet");
   },
   onLookChange: () => {
@@ -282,7 +383,82 @@ const ui = createUI({
   // a tap on the prompt (or the touch "use" button) does what E does
   onPromptTap: () => useAction(),
   onToggleSound: () => toggleSound(),
+  // the exhibit card's 🎧 Listen chip: start (or stop) the audio guide talk
+  onListen: (ex) => toggleGuide(ex),
+  onSettings: () => showSettings(),
 });
+
+/* ------------------------------------------------------------------ */
+/* feature systems that need the UI                                     */
+/* ------------------------------------------------------------------ */
+initQuiz({
+  toast: (text, kind) => ui.toast(text, kind),
+  onComplete: (r) => {
+    if (!r.firstPerfect) return;
+    S.score += 15;
+    S.net?.emit("action", { type: "score", payload: 15 });
+    audio.chime();
+  },
+});
+
+// PA announcements and the crowd murmur (secret rooms are never named before they are found)
+const atmosphere = createAtmosphere({
+  audio,
+  narrator,
+  ui,
+  getState: () => ({
+    x: S.joined && S.player ? S.player.state.x : null,
+    z: S.joined && S.player ? S.player.state.z : null,
+    busy:
+      cinema.playing || screenEmbed.playing || videoPlayer.isOpen() || eraView.isOpen() || mediaOverlayOpen(),
+    remotes: remote.list,
+    npcs: crowd.npcs,
+    reduced: !!settings.get("reducedMotion") || QUALITY === "low",
+    speech: settings.get("narration") !== false,
+    pa: settings.get("announcements") !== false,
+    revealed: (id) => minimap.isRevealed(id),
+  }),
+});
+
+// on "auto" quality, sustained slow frames step the graphics down a level
+const LOOKDEV_PINNED = new URLSearchParams(location.search).has("lookdev");
+const perf = watchPerformance({
+  level: lookdev.quality,
+  onDrop: ({ to, fps }) => {
+    if (LOOKDEV_PINNED || settings.get("quality") !== "auto") return false;
+    lookdev.setQuality(to, { manual: false });
+    ui.toast(`Running at ${fps} fps, switched graphics to ${to}`);
+  },
+});
+if (LOOKDEV_PINNED) perf.stop();
+settings.watch("quality", (q) => {
+  if (q === "auto") perf.resume();
+  else perf.pause();
+  perf.setLevel(lookdev.quality);
+});
+
+// reduced motion: a class for the CSS (settings.js also sets data-reduced-motion)
+// and no head bob for the player
+settings.watch("reducedMotion", (on) => {
+  document.documentElement.classList.toggle("reduced-motion", !!on);
+  S.player?.setReducedMotion?.(on);
+});
+
+/** The settings panel (O key or the ⚙ chip in the HUD). */
+function showSettings() {
+  return openSettings({
+    settings,
+    getStats: () => lookdev.stats(),
+    onTestSound: (kind) => (kind === "music" ? audio.chime(392) : audio.chime()),
+  });
+}
+
+/** The audio guide for an exhibit: the same exhibit again stops it. */
+function toggleGuide(ex) {
+  if (!ex) return;
+  if (narrator.speaking && narrator.current === ex.id) narrator.stop();
+  else narrator.speakExhibit(ex);
+}
 
 function toggleSound() {
   audio.ensure();
@@ -555,6 +731,12 @@ async function startGame(opts) {
       color: S.color,
       onTouchAction: () => useAction(),
     });
+    // look sensitivity / invert Y, and no head bob with reduced motion
+    boundSettings.attachPlayer(S.player);
+    S.player.setReducedMotion?.(settings.get("reducedMotion"));
+    // phone / tablet action buttons (no-op on mouse + keyboard)
+    S.dock = createTouchDock({ onAction: pressKey });
+    window.__museum.dock = S.dock;
     upgradeCharacter(S.player.character);
     // your own name tag would just float in the middle of the view
     S.player.character.tag.visible = false;
@@ -571,7 +753,6 @@ async function startGame(opts) {
     }
     ui.setPlayers(rosterList(), S.myId);
     ui.enterGame();
-    showLoadingUntilReady();
     collapseKeyHelpLater();
     ui.chat({
       system: true,
@@ -679,6 +860,7 @@ function watchBattle(on) {
   if (on === S.watchingBattle) return;
   S.watchingBattle = on;
   if (on) {
+    narrator.stop();
     ui.showBattle(cinema.current);
     ui.setBattleProgress(cinema.progress);
   } else {
@@ -707,6 +889,7 @@ function interact(it) {
         audio.chime();
         fx.burst("sparkle", it.x, 2.2, it.z, 22);
       }
+      S.cardExhibit = ex;
       ui.showExhibit(ex);
       break;
     }
@@ -780,9 +963,24 @@ function interact(it) {
     }
     case "era": {
       ui.setPrompt(null);
+      narrator.stop();
       eraView.open(it.era);
       document.body.classList.add("immersive");
       audio.duck(true);
+      break;
+    }
+    case "totem":
+    case "intro": {
+      const d = wayfinding?.describe(it);
+      if (!d) return;
+      ui.modal(d.html);
+      const close = document.querySelector("#modalBody #wayClose"); // wayfinding.js builds it
+      if (close) close.onclick = () => ui.closeModal();
+      break;
+    }
+    case "quiz": {
+      ui.setPrompt(null);
+      openQuiz(it.hall);
       break;
     }
     default:
@@ -983,7 +1181,15 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (anyPanelOpen()) {
-    if (e.code === "Escape") ui.closeAll();
+    if (e.code === "Escape") {
+      ui.closeAll();
+      closeQuiz();
+    } else if (e.code === "KeyN" && ui.isCardOpen()) {
+      // the audio guide also works with the exhibit card open: N stops
+      // whatever is playing (the caption says so), else reads this card
+      if (narrator.speaking) narrator.stop();
+      else if (S.cardExhibit) narrator.speakExhibit(S.cardExhibit);
+    }
     return;
   }
   switch (e.code) {
@@ -1014,10 +1220,26 @@ window.addEventListener("keydown", (e) => {
       ui.toast(S.player.toggleCamera() === 0 ? "Third person camera" : "First person camera");
       break;
     case "KeyM":
-      document.getElementById("minimap").classList.toggle("big");
+      // Shift+M keeps the old minimap size toggle; the map closes itself on M / Esc
+      if (e.shiftKey) document.getElementById("minimap").classList.toggle("big");
+      else bigMap.open();
       break;
     case "KeyL":
       toggleSound();
+      break;
+    case "KeyN": {
+      if (narrator.speaking) {
+        narrator.stop();
+        break;
+      }
+      const it = nearestInteractable();
+      const ex = it?.type === "exhibit" ? exhibitById(it.exhibitId) : null;
+      if (ex) narrator.speakExhibit(ex);
+      else ui.toast("Stand at an exhibit and press N for the audio guide 🎧");
+      break;
+    }
+    case "KeyO":
+      showSettings();
       break;
     default:
       break;
@@ -1026,6 +1248,9 @@ window.addEventListener("keydown", (e) => {
 
 function anyPanelOpen() {
   return (
+    bigMap.isOpen() ||
+    settingsOpen() ||
+    isQuizOpen() ||
     ui.isModalOpen() ||
     ui.isCardOpen() ||
     ui.isIceOpen() ||
@@ -1076,25 +1301,6 @@ function collapseKeyHelpLater() {
   }, 10000);
 }
 
-/**
- * Keep the loading card up until the world (and the props, within reason)
- * is in and a frame of the visitor's view has been drawn.
- */
-function showLoadingUntilReady() {
-  const box = document.getElementById("loading");
-  if (!box) return;
-  const text = document.getElementById("loadingText");
-  const bar = document.getElementById("loadingBar");
-  box.classList.remove("hidden");
-  if (text) text.textContent = "Building the museum…";
-  const propsOrTimeout = Promise.race([propsReady, new Promise((r) => setTimeout(r, 8000))]);
-  propsOrTimeout.then(() => {
-    if (bar) bar.style.width = "100%";
-    S.loadingFrames = 2;
-  });
-  S.hideLoading = () => box.classList.add("hidden");
-}
-
 /* ------------------------------------------------------------------ */
 /* main loop                                                            */
 /* ------------------------------------------------------------------ */
@@ -1133,6 +1339,7 @@ function animate() {
     }
     const vyBefore = S.player.state.vy;
     S.player.update(dt);
+    bigMap.track(S.player.state.x, S.player.state.z);
     for (const r of remote.list) {
       if (!r.upgraded) {
         r.upgraded = true;
@@ -1171,11 +1378,33 @@ function animate() {
     } else {
       ui.setPrompt(null);
     }
-    S.player.setTouchAction(it && !S.inputBlocked ? it.label : null);
+    const useLabel = it && !S.inputBlocked ? it.label : null;
+    S.player.setTouchAction(useLabel); // its button is hidden by touchdock.css when the dock is up
+    if (S.dock) {
+      S.dock.setUseLabel(useLabel);
+      const canDig = it?.type === "dig";
+      S.dock.setEatAvailable(!S.inputBlocked && (canDig || held.has(ME)), canDig ? "Dig" : "Eat");
+      S.dock.setVisible(S.joined);
+    }
 
     const hallName = roomNameAt(S.player.state.x, S.player.state.z);
     ui.setHall(hallName);
     audio.setZone(hallName);
+    // hall intros, once per visit; held during a screening, a video, the era
+    // view or while the visitor is busy with the quiz, the map or the settings
+    const guideQuiet =
+      inTheatre() || mediaOverlayOpen() || eraView.isOpen() || isQuizOpen() || bigMap.isOpen() || settingsOpen();
+    narrator.tick(roomAt(S.player.state.x, S.player.state.z)?.id, { quiet: guideQuiet });
+    // a talk over an open exhibit card or popup: it makes room for the subtitles
+    const guideCard = narrator.speaking && (ui.isCardOpen() || ui.isModalOpen());
+    if (guideCard !== S.guideCard) {
+      S.guideCard = guideCard;
+      document.body.classList.toggle("guide-card", guideCard);
+    }
+    // the card's Listen chip turns into Stop while its own talk is playing
+    if (ui.isCardOpen()) ui.setListening(narrator.speaking && narrator.current === S.cardExhibit?.id);
+    // standing on a life-size floor tape: say how far along the animal you are
+    tapeHint(dt);
     // the screening overlay follows you in and out of the theatre
     const inside = inTheatre();
     watchBattle(cinema.playing && inside);
@@ -1202,6 +1431,7 @@ function animate() {
     ["vendors", vendor],
     ["live exhibits", live],
     ["crowd", crowd],
+    ["atmosphere", atmosphere],
   ]) {
     try {
       system.update(dt, S.player?.state, remote.list);
@@ -1225,6 +1455,8 @@ function animate() {
   cinema.update(dt);
   cinema.render();
   fx.update(dt);
+  wayfinding?.update(dt);
+  quizKiosks.update?.(clock.elapsedTime);
 
   // minimap
   if (S.joined && S.player) {
@@ -1236,12 +1468,45 @@ function animate() {
     if (rosterTimer <= 0) {
       rosterTimer = 0.35;
       ui.setPlayers(rosterList(), S.myId);
+      // the scoops counter would give the secret ending away: it appears with the court
+      const scoops = document.getElementById("statScoops")?.parentElement;
+      if (scoops) scoops.classList.toggle("hidden", !minimap.isRevealed("court"));
     }
   }
 
   renderFrame(dt);
-  // the loading card goes once the first frames of the visitor's view are drawn
-  if (S.loadingFrames > 0 && --S.loadingFrames === 0) S.hideLoading?.();
+}
+
+/**
+ * The floor tapes: the first time the visitor steps onto one, a toast says
+ * how far along the animal they are standing ("5 m along the T. rex").
+ */
+const TAPE_CHECK_S = 0.4;
+let tapeTimer = 0;
+let tapeOn = null;
+const tapesHinted = new Set();
+function tapeHint(dt) {
+  tapeTimer -= dt;
+  if (tapeTimer > 0 || !scaleTapes?.measureAt || !S.player) return;
+  tapeTimer = TAPE_CHECK_S;
+  let m = null;
+  try {
+    m = scaleTapes.measureAt(S.player.state.x, S.player.state.z);
+  } catch {
+    m = null;
+  }
+  const id = m?.id || null;
+  if (id === tapeOn) return;
+  tapeOn = id;
+  if (!m || tapesHinted.has(id) || anyPanelOpen()) return;
+  tapesHinted.add(id);
+  const along = Math.max(0, Math.round(m.metres ?? 0));
+  const total = Math.round(m.length || 0);
+  ui.toast(
+    m.wingspan
+      ? `📏 You're ${along} m across ${m.name}'s ${total} m wingspan`
+      : `📏 You're ${along} m along ${m.name}, ${total} m nose to tail`
+  );
 }
 
 function rosterList() {
@@ -1286,6 +1551,11 @@ window.addEventListener("eraview:close", (e) => {
 
 animate();
 
+// tapping the minimap opens the full museum map (touch and mouse)
+document.getElementById("minimap")?.addEventListener("click", () => {
+  if (S.joined && !anyPanelOpen()) bigMap.open();
+});
+
 // expose a tiny debug handle (used by the console and by the browser tests)
 window.__museum = {
   crowd,
@@ -1306,6 +1576,18 @@ window.__museum = {
   screenEmbed,
   videoPlayer,
   props: null,
+  gelateria: null,
+  labels: null,
+  wayfinding: null,
+  scaleTapes: null,
+  quiz: quizKiosks,
+  narrator,
+  settings,
+  bigMap,
+  atmosphere,
+  loading,
+  perf,
+  dock: null,
   get player() {
     return S.player;
   },

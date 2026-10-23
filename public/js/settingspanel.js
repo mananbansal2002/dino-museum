@@ -30,9 +30,9 @@ const TABS = [
 
 const QUALITY_INFO = {
   auto: { label: "Auto", desc: "Picks a level for this device and steps down if frames get slow." },
-  low: { label: "Low", desc: "No post-processing or soft shadows. Best for phones and older laptops." },
-  medium: { label: "Medium", desc: "Shadows and light bloom, without the heavier screen effects." },
-  high: { label: "High", desc: "Full lighting, ambient occlusion and reflections." },
+  low: { label: "Low", desc: "Textures and architecture only, at a reduced resolution. Best for phones and older laptops." },
+  medium: { label: "Medium", desc: "Adds reflections and light shafts, without the post-processing pass." },
+  high: { label: "High", desc: "Full resolution with anti-aliasing, bloom and film grade." },
 };
 
 const KEYS = [
@@ -43,10 +43,13 @@ const KEYS = [
   ["E", "Interact"],
   ["V", "Roar"],
   ["B", "Wave"],
-  ["F", "Dig / eat ice cream"],
+  ["F", "Dig"],
   ["G", "Group photo"],
   ["C", "Switch camera"],
-  ["M", "Minimap size"],
+  ["M", "Museum map"],
+  ["Shift M", "Minimap size"],
+  ["1 – 9", "Travel (map open)"],
+  ["N", "Audio guide"],
   ["T", "Chat"],
   ["L", "Sound on / off"],
   ["O", "Settings"],
@@ -294,8 +297,15 @@ export function createSettingsPanel({
   const a = panes.audio;
   const pct = (v) => `${Math.round(v * 100)}%`;
   slider(a, "masterVolume", "Master volume", "Everything you hear in the museum.", pct);
-  slider(a, "musicVolume", "Music & ambience", "Hall atmosphere, music boxes and room tone.", pct);
+  slider(a, "musicVolume", "Music & ambience", "Hall atmosphere, the crowd and room tone.", pct);
   slider(a, "sfxVolume", "Sound effects", "Roars, footsteps, chimes and clicks.", pct);
+  toggle(a, "soundRoars", "Dinosaur roars", "Exhibit roars, far-off calls and the V key.");
+  toggle(a, "soundSteps", "Footsteps", "Your steps, landings and other visitors walking.");
+  toggle(a, "soundCrowd", "Crowd chatter", "The murmur of other visitors in the halls.");
+  toggle(a, "soundAmbience", "Hall ambience", "Room tone, jungle, rain and sea sounds in each hall.");
+  toggle(a, "soundChimes", "Chimes & clicks", "Pickups, buttons, quiz answers and the ice cream counter.");
+  toggle(a, "announcements", "Announcer", "Museum announcements over the speakers.");
+  toggle(a, "narration", "Audio guide", "Exhibit talks and hall welcomes read aloud.");
   if (onTestSound) {
     const t = row(a, "Test", "Play a short sound at the current volume.");
     const b = el("button", "chip set-test", "▶ play");
@@ -332,7 +342,6 @@ export function createSettingsPanel({
   const x = panes.access;
   toggle(x, "reducedMotion", "Reduce motion", "Fewer particles, no screen shake and calmer menu animations.");
   toggle(x, "subtitles", "Subtitles", "Show captions for narration and videos when available.");
-  toggle(x, "narration", "Audio narration", "Read exhibit introductions aloud when you arrive in a hall.");
 
   container.appendChild(root);
 
@@ -576,7 +585,8 @@ export function createSettingsPanel({
     get tab() {
       return tab;
     },
-    setTab: (t) => setTab(t),
+    // keyboard focus on a tab follows the selection (or it would look picked)
+    setTab: (t) => setTab(t, !!document.activeElement?.closest?.(".set-tabs")),
     /** Last measured FPS shown in the readout (NaN until the first update). */
     get fps() {
       return parseFloat(fpsVal.textContent);

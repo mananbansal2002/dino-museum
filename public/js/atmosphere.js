@@ -1,4 +1,4 @@
-import { roomAt as worldRoomAt } from "./world.js";
+import { roomAt as worldRoomAt, ROOMS } from "./world.js";
 import { clamp } from "./util.js";
 
 /**
@@ -8,14 +8,19 @@ import { clamp } from "./util.js";
  *   const atmosphere = createAtmosphere({ audio, narrator, ui, getState });
  *   atmosphere.update(dt); // every frame
  *
- * PA: every 3–6 minutes (the first one sooner) a two-tone chime sounds, a
- * caption card slides in under the toasts and, when a narrator is passed,
+ * PA: every 3–6 minutes (the first one sooner) a three-note chime sounds, a
+ * caption card slides in on top of the toast stack and, when a narrator is passed,
  * the announcement is read out. Announcements are picked from a shuffled bag
  * (never the same one twice in a row) and skip the ones that make no sense
- * where you stand (no "the Ice Cream Court is open" inside the court). One
- * that falls due while a video, screening, era window or narration plays
- * waits until it has been quiet for a few seconds; one already sounding is
- * cut short when such a thing starts.
+ * where you stand. One that falls due while a video, screening, era window
+ * or narration plays waits until it has been quiet for a few seconds; one
+ * already sounding is cut short when such a thing starts.
+ *
+ * Secret rooms (world.js ROOMS with secret: true: the tour's surprise ending)
+ * are never named before the visitor has walked into them: an announcement
+ * whose text mentions one is held back until then, the stock ones and
+ * announce(text) alike. A room counts as found once the local player has
+ * stood in it, or when getState().revealed(id) says so (minimap.isRevealed).
  *
  * Occupancy: who else is in your room (other players, plus the background
  * visitors when passed). When audio has setOccupancy(n) it is told; until
@@ -29,16 +34,21 @@ import { clamp } from "./util.js";
  *   npcs        [{x, z}] background visitors (crowd.npcs), optional
  *   muted       sound off: captions only (audio.muted is used when missing)
  *   reduced     reduced settings: no speech, no slide-in, fewer announcements
+ *   speech      false: chime + caption, never a voice
  *   pa          false turns announcements off (murmur stays)
+ *   revealed    (roomId) => bool: that secret room is no longer a secret
  * }
  * Every field is optional. audio.ducked set by someone else also counts as
  * busy, so videos / era views hold the PA even when `busy` is not wired.
  *
- * narrator (optional): { say(text) | speak(text) → Promise?, speaking?, cancel?() }.
- * createSpeechNarrator() below wraps the browser's speech synthesis in that
- * shape for when no narrator module exists.
+ * narrator (optional): narrator.js's createNarrator() — speak(text, { id,
+ * label, onEnd }), speaking, current, available, stop() — reads the
+ * announcement in its own subtitle box (our card steps aside while it talks),
+ * and its exhibit talks / hall intros hold the PA. Any { say | speak(text) →
+ * Promise?, speaking?, cancel?() } works too: createSpeechNarrator() below
+ * wraps the browser's speech synthesis in that shape.
  *
- * Returns { update(dt), announce(text, opts), say(id), occupancy, next,
+ * Returns { update(dt), announce(text, opts), say(id), reveal(id), occupancy, next,
  *   announcing, setEnabled(on), enabled, stats(), dispose() }.
  */
 
@@ -50,9 +60,10 @@ export const ANNOUNCEMENTS = [
     when: (c) => c.room !== "theater",
   },
   {
+    // a secret until the visitor has found it (see secretNamed): only then a reminder
     id: "icecream",
-    text: "The Ice Cream Court is open at the end of the tour. Treat yourself before you head home!",
-    when: (c) => c.room !== "court" && c.room !== "xpassage",
+    text: "The Ice Cream Court is open until closing. Treat yourself to a scoop before you head home!",
+    when: (c) => c.seen("court") && c.room !== "court" && c.room !== "xpassage",
   },
   {
     id: "touch",
@@ -92,6 +103,22 @@ const MURMUR_MAX = 0.045; // procedural murmur gain at a full room
 const STYLE_ID = "atmosphere-style";
 
 const rnd = (random, [a, b]) => a + random() * (b - a);
+const PA_ID = "pa"; // the narrator run id of an announcement
+const PA_LABEL = "Museum announcement";
+
+/** The secret rooms, and the words that would give each away. */
+const SECRETS = ROOMS.filter((r) => r.secret).map((r) => ({
+  id: r.id,
+  // "Ice Cream Court" also matches "ice-cream court"
+  re: new RegExp(r.name.trim().split(/\s+/).join("[\\s-]+"), "i"),
+}));
+
+/** The first secret room `text` names that `seen(id)` has not unlocked, or null. */
+export function secretNamed(text, seen = () => false) {
+  const t = String(text || "");
+  for (const s of SECRETS) if (!seen(s.id) && s.re.test(t)) return s.id;
+  return null;
+}
 
 export function createAtmosphere({
   audio = null,
@@ -118,6 +145,7 @@ export function createAtmosphere({
   let lastOccSent = -1;
   const counters = { announced: 0, held: 0, cut: 0, chimes: 0, spoken: 0 };
   let murmurLayer = null;
+  const seenSecret = new Set(); // secret rooms the local player has stood in
 
   /* ---------------------------------------------------------------- */
   /* state                                                             */
@@ -134,6 +162,18 @@ export function createAtmosphere({
 
   const isMuted = (s) => (s.muted !== undefined ? !!s.muted : !!audio?.muted);
   const narrating = () => !!(narrator && (narrator.speaking || narrator.busy));
+  /** narrator.js's guide: has its own subtitle box and stop(). */
+  const guideNarrator = () => !!narrator && typeof narrator.speakExhibit === "function";
+
+  /** Has the visitor found secret room `id`? */
+  function seen(id, s = null) {
+    if (seenSecret.has(id)) return true;
+    try {
+      return !!(s || readState()).revealed?.(id);
+    } catch {
+      return false;
+    }
+  }
 
   /** Something else is playing: hold (or cut) the PA. */
   function isBusy(s) {
@@ -168,6 +208,7 @@ export function createAtmosphere({
   transition: opacity 0.5s, transform 0.5s;
 }
 .pa-caption.out { opacity: 0; transform: translateY(-6px); }
+.pa-caption.handoff { display: none; }
 .pa-caption.still { animation: none; transition: opacity 0.5s; }
 .pa-caption.still.out { transform: none; }
 .pa-caption .pa-head {
@@ -210,7 +251,7 @@ export function createAtmosphere({
     const host = document.getElementById("toasts");
     if (!host) {
       // no toast stack (a different page): the plain UI toast still informs
-      ui?.toast?.(`📢 ${text}`);
+      ui?.toast?.(`Announcement: ${text}`);
       return null;
     }
     injectStyle();
@@ -310,7 +351,7 @@ export function createAtmosphere({
   /* announcements                                                     */
   /* ---------------------------------------------------------------- */
   function pick(ctx) {
-    const fits = messages.filter((m) => !m.when || m.when(ctx));
+    const fits = messages.filter((m) => (!m.when || m.when(ctx)) && !secretNamed(m.text, ctx.seen));
     if (!fits.length) return null;
     bag = bag.filter((id) => fits.some((m) => m.id === id));
     if (!bag.length) {
@@ -334,6 +375,8 @@ export function createAtmosphere({
   function announce(text, opts = {}) {
     const s = readState();
     if (!enabled || s.pa === false || !text) return false;
+    // never, not even forced: a secret room named before it was found
+    if (secretNamed(text, (id) => seen(id, s))) return false;
     if (!opts.force && isBusy(s)) return false;
     if (current) finish(true);
 
@@ -349,7 +392,7 @@ export function createAtmosphere({
       el: showCaption(text, { reduced, quietSound: !sound }),
       left: hold + (sound ? CHIME_LEAD : 0),
       speaking: false,
-      speakAt: sound && !reduced && narrator ? CHIME_LEAD : -1,
+      speakAt: sound && !reduced && s.speech !== false && narrator ? CHIME_LEAD : -1,
       spoken: null,
     };
     current = a;
@@ -364,11 +407,37 @@ export function createAtmosphere({
 
   function speak(a) {
     a.speakAt = -1;
+    if (guideNarrator()) {
+      // subtitles-only (no voice, sound off): our card already is the caption
+      if (narrator.available === false) return;
+      let ok = false;
+      try {
+        ok = narrator.speak(a.text, {
+          id: PA_ID,
+          label: PA_LABEL,
+          onEnd: (reason) => {
+            a.speaking = false;
+            // read to the end: the guide's box was the caption, we are done
+            if (reason === "done") a.left = 0;
+          },
+        });
+      } catch {
+        ok = false;
+      }
+      if (!ok) return;
+      a.speaking = true;
+      a.guide = true;
+      counters.spoken++;
+      // the guide's subtitle box shows the words now: one caption, not two
+      // (ours comes back if the guide stops before the reading time is up)
+      a.el?.classList.add("handoff");
+      return;
+    }
     const fn = narrator?.say || narrator?.speak;
     if (!fn) return;
     let r;
     try {
-      r = fn.call(narrator, a.text, { kind: "pa" });
+      r = fn.call(narrator, a.text, { kind: PA_ID, id: PA_ID, label: PA_LABEL });
     } catch {
       return;
     }
@@ -398,7 +467,12 @@ export function createAtmosphere({
     current = null;
     if (cut) {
       counters.cut++;
-      if (a.speaking) narrator?.cancel?.();
+      if (a.speaking) {
+        // stop only our own announcement, never a talk that replaced it
+        if (a.guide) {
+          if (narrator.current === PA_ID) narrator.stop?.();
+        } else narrator?.cancel?.();
+      }
     }
     hideCaption(a.el, cut);
     if (weDucked) {
@@ -421,6 +495,7 @@ export function createAtmosphere({
       if (a.speakAt <= 0) speak(a);
     }
     if (a.speaking && a.untilFlag) a.speaking = !!narrator?.speaking;
+    if (a.guide && !a.speaking && a.left > 0) a.el?.classList.remove("handoff");
     a.left -= dt;
     // the caption stays for as long as the voice is still reading
     if (a.left <= 0 && !a.speaking) finish(false);
@@ -435,7 +510,7 @@ export function createAtmosphere({
       if (wait > -dt) counters.held++;
       return;
     }
-    const m = pick({ room, occupancy });
+    const m = pick({ room, occupancy, seen: (id) => seen(id, s) });
     if (m) announce(m.text, { id: m.id });
     const scale = s.reduced ? 1.5 : 1;
     wait = rnd(random, interval) * scale;
@@ -447,6 +522,7 @@ export function createAtmosphere({
   function countOccupancy(s) {
     const here = roomAt(s.x, s.z);
     room = here?.id || null;
+    if (here?.secret) seenSecret.add(here.id);
     let players = 0;
     let npcs = 0;
     if (room) {
@@ -601,6 +677,10 @@ export function createAtmosphere({
       const m = messages.find((x) => x.id === id);
       return m ? announce(m.text, { ...opts, id: m.id }) : false;
     },
+    /** Mark a secret room as found (e.g. from the minimap's reveal). */
+    reveal(id) {
+      if (SECRETS.some((x) => x.id === id)) seenSecret.add(id);
+    },
     /** { players, npcs, total, room, level 0..1 } in the local player's room. */
     get occupancy() {
       return { ...occupancy };
@@ -627,6 +707,7 @@ export function createAtmosphere({
         quiet: +quiet.toFixed(2),
         murmur: murmurLayer ? +murmurLayer.out.gain.value.toFixed(4) : 0,
         murmurHook: typeof audio?.setOccupancy === "function",
+        secretsSeen: SECRETS.filter((x) => seen(x.id)).map((x) => x.id),
       };
     },
     dispose() {

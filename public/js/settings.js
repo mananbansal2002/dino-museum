@@ -9,6 +9,10 @@
  *   settings.watch("quality", (q) => lookdev.setQuality(q))  // now + on change
  *   settings.reset()                         // back to DEFAULTS
  *
+ *   // apply it to the game (quality, FOV, volumes; look once a player exists)
+ *   const bound = bindSettings({ lookdev, camera, audio });
+ *   bound.attachPlayer(S.player);
+ *
  * Every value is validated on the way in (enums, clamped ranges, booleans),
  * so a hand-edited or stale localStorage entry can never put the game into a
  * bad state. Storage is best effort: private windows and blocked site data
@@ -41,9 +45,25 @@ const SCHEMA = {
   reducedMotion: { type: "bool", def: () => prefersReducedMotion() },
   subtitles: { type: "bool", def: () => true },
   narration: { type: "bool", def: () => true },
+  // one switch per sound group (audio.js SOUND_CHANNELS) plus the PA
+  soundRoars: { type: "bool", def: () => true },
+  soundSteps: { type: "bool", def: () => true },
+  soundCrowd: { type: "bool", def: () => true },
+  soundAmbience: { type: "bool", def: () => true },
+  soundChimes: { type: "bool", def: () => true },
+  announcements: { type: "bool", def: () => true },
 };
 
 export const SETTING_KEYS = Object.keys(SCHEMA);
+
+/** settings key → audio.js sound channel */
+const SOUND_SWITCHES = {
+  soundRoars: "roars",
+  soundSteps: "steps",
+  soundCrowd: "crowd",
+  soundAmbience: "ambience",
+  soundChimes: "chimes",
+};
 
 /** Fresh defaults (evaluated now: media queries and the audio key may change). */
 export function defaultSettings() {
@@ -278,4 +298,156 @@ let shared = null;
 export function getSettings() {
   if (!shared) shared = createSettings();
   return shared;
+}
+
+/* ------------------------------------------------------------------ */
+/* wiring                                                               */
+/* ------------------------------------------------------------------ */
+// mirrored from player.js (MOUSE_SENS, the pitch factor and its clamp): the
+// look adapter below rescales what the player already applied
+const LOOK_K = 0.0024;
+const LOOK_PITCH = 0.875;
+const PITCH_MIN = -1.15;
+const PITCH_MAX = 0.75;
+const clampPitch = (p) => Math.min(PITCH_MAX, Math.max(PITCH_MIN, p));
+
+function urlLookdevOverride() {
+  try {
+    return new URLSearchParams(window.location.search).has("lookdev");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Look sensitivity + invert Y for a player.js player. Uses
+ * player.setLookSettings({ sensitivity, invertY }) when the player has it;
+ * otherwise rescales the player's own mouse / touch look after it runs (the
+ * yaw/pitch live on player.state), so nothing in player.js has to change.
+ * Returns an unbind function.
+ */
+export function bindLookSettings(player, settings = getSettings()) {
+  if (!player?.state) return () => {};
+  if (typeof player.setLookSettings === "function") {
+    return settings.watch(["mouseSensitivity", "invertY"], () =>
+      player.setLookSettings({ sensitivity: settings.get("mouseSensitivity"), invertY: settings.get("invertY") })
+    );
+  }
+  const st = player.state;
+  const active = () => settings.get("mouseSensitivity") !== 1 || settings.get("invertY");
+  let before = null;
+  let touchBefore = null;
+  let dragging = false; // mirrors player.js: drag-look on the canvas while unlocked
+
+  // capture phase runs before player.js (bubble, on window / document); the
+  // bubble listeners are added after the player's, so they run after it
+  const onCapture = () => {
+    before = { yaw: st.camYaw, pitch: st.pitch };
+  };
+  const onDown = (e) => {
+    if (!player.inputEnabled || player.locked) return;
+    if (e.target?.tagName === "CANVAS" && (e.button === 0 || e.button === 2)) dragging = true;
+  };
+  const onUp = () => {
+    dragging = false;
+  };
+  const onMove = (e) => {
+    const b = before;
+    before = null;
+    if (!b || !active() || !player.inputEnabled || !(player.locked || dragging)) return;
+    const s = settings.get("mouseSensitivity");
+    const sign = settings.get("invertY") ? -1 : 1;
+    // recomputed from the raw movement (not the clamped result) so inverted
+    // look still moves away from a pitch limit
+    st.camYaw = b.yaw - (e.movementX || 0) * LOOK_K * s;
+    st.pitch = clampPitch(b.pitch - (e.movementY || 0) * LOOK_K * LOOK_PITCH * s * sign);
+  };
+  const onTouchCapture = () => {
+    touchBefore = { yaw: st.camYaw, pitch: st.pitch };
+  };
+  const onTouchMove = () => {
+    const b = touchBefore;
+    touchBefore = null;
+    if (!b || !active()) return;
+    const dy = st.camYaw - b.yaw;
+    const dp = st.pitch - b.pitch;
+    if (!dy && !dp) return; // the joystick finger, or input disabled
+    const s = settings.get("mouseSensitivity");
+    st.camYaw = b.yaw + dy * s;
+    st.pitch = clampPitch(b.pitch + dp * s * (settings.get("invertY") ? -1 : 1));
+  };
+
+  window.addEventListener("mousemove", onCapture, true);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mousedown", onDown);
+  window.addEventListener("mouseup", onUp);
+  window.addEventListener("blur", onUp);
+  document.addEventListener("touchmove", onTouchCapture, { capture: true, passive: true });
+  document.addEventListener("touchmove", onTouchMove, { passive: true });
+  return () => {
+    window.removeEventListener("mousemove", onCapture, true);
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mousedown", onDown);
+    window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("blur", onUp);
+    document.removeEventListener("touchmove", onTouchCapture, { capture: true });
+    document.removeEventListener("touchmove", onTouchMove);
+  };
+}
+
+/**
+ * Apply the store to the running game and keep it applied. Every target is
+ * optional and duck-typed:
+ *   lookdev   setQuality(q) — skipped while a ?lookdev= URL override is set
+ *   camera    THREE.PerspectiveCamera: fov
+ *   audio     setMasterVolume(v); setMusicVolume / setSfxVolume when present
+ *   player    via bindLookSettings (or attachPlayer() once it exists)
+ * Returns { attachPlayer(player), dispose() }.
+ */
+export function bindSettings({ settings = getSettings(), lookdev = null, camera = null, audio = null, player = null } = {}) {
+  const offs = [];
+  let offLook = null;
+
+  if (lookdev?.setQuality && !urlLookdevOverride()) {
+    // "auto" is lookdev's own starting point: only a manual choice needs
+    // applying now (pass quality: settings.get("quality") to applyLookdev to
+    // also keep auto's frame-time step-down off for manual levels)
+    if (settings.get("quality") !== "auto") lookdev.setQuality(settings.get("quality"));
+    offs.push(
+      settings.onChange((k, v) => {
+        if (k === "quality") lookdev.setQuality(v);
+      })
+    );
+  }
+  if (camera) {
+    offs.push(
+      settings.watch("fov", (v) => {
+        if (camera.fov === v) return;
+        camera.fov = v;
+        camera.updateProjectionMatrix?.();
+      })
+    );
+  }
+  if (audio) {
+    offs.push(settings.watch("masterVolume", (v) => audio.setMasterVolume?.(v)));
+    offs.push(settings.watch("musicVolume", (v) => audio.setMusicVolume?.(v)));
+    offs.push(settings.watch("sfxVolume", (v) => audio.setSfxVolume?.(v)));
+    for (const [key, channel] of Object.entries(SOUND_SWITCHES)) {
+      offs.push(settings.watch(key, (v) => audio.setChannel?.(channel, v)));
+    }
+  }
+
+  const api = {
+    attachPlayer(p) {
+      offLook?.();
+      offLook = p ? bindLookSettings(p, settings) : null;
+    },
+    dispose() {
+      offLook?.();
+      offLook = null;
+      for (const off of offs.splice(0)) off();
+    },
+  };
+  if (player) api.attachPlayer(player);
+  return api;
 }

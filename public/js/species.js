@@ -593,7 +593,7 @@ export const SPECIES = {
     info: {
       latin: "Centrosaurus apertus", author: "Lambe, 1904", say: "SEN-troh-SORE-us",
       meaning: "pointed lizard, after the hornlets on its frill",
-      discovered: { by: "Lawrence Lambe", where: "Red Deer River, Alberta, Canada" },
+      discovered: { year: 1901, by: "Lawrence Lambe", where: "Red Deer River, Alberta, Canada" },
       specimen: "Bonebeds in Dinosaur Provincial Park hold the remains of hundreds of individuals",
       era: "Late Cretaceous", period: "c. 76.5–75.5 million years ago",
       habitat: "Dinosaur Park Formation, Alberta, Canada",
@@ -1318,6 +1318,7 @@ export const SPECIES = {
       latin: "Dimetrodon limbatus", author: "(Cope, 1877)", say: "dy-MET-roh-don",
       meaning: "two measures of teeth",
       discovered: { year: 1845, by: "Donald McLeod", where: "Prince Edward Island, Canada" },
+      note: "That first find, a jaw from Prince Edward Island, was named Bathygnathus in 1854 and only recognised as Dimetrodon in 2015; the species shown here was named from Texas fossils.",
       notDinosaur: true,
       notDinoNote: "A Permian synapsid: closer to mammals, including you, than to any dinosaur.",
       era: "Early Permian", period: "c. 295–272 million years ago",

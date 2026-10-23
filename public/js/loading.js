@@ -7,8 +7,8 @@
  * that is not a single file (props, live models, the gelateria, the crowd),
  * and drives the existing #loading / #loadingBar / #loadingText card with it.
  *
- * While the join screen is up the card sits inside the join card as a slim
- * strip (it never covers or blocks the buttons). Once the visitor is in, it
+ * While the join screen is up the card sits beside the join buttons as a slim
+ * strip (it never covers or blocks them, and nothing moves when it goes). Once the visitor is in, it
  * moves back into the HUD and stays until the last asset is in and a couple
  * of frames have been drawn. It never shows again after that, even though
  * the live models keep streaming in lazily as you walk around.
@@ -29,11 +29,16 @@ export const PHASES = [
   { id: "halls", label: "Building the halls" },
   { id: "exhibits", label: "Hanging the exhibits" },
   { id: "dinosaurs", label: "Waking the dinosaurs" },
-  { id: "cafe", label: "Opening the café" },
+  // the café is in the Ice Cream Court, the tour's secret ending: until the
+  // visitor has walked in, this phase goes by a neutral name (it is also when
+  // the background visitors arrive)
+  { id: "cafe", label: "Opening the café", secretLabel: "Welcoming the visitors", secretRoom: "court" },
 ];
 const PHASE_IDS = PHASES.map((p) => p.id);
 /** ms each in-flight phase stays on screen before the next one gets a turn */
 const PHASE_DWELL = 2200;
+/** how many files an unfinished task counts as on the progress bar */
+const TASK_WEIGHT = 12;
 
 /** Quality ladder, best first (matches lookdev's tiers). */
 export const QUALITY_LEVELS = ["ultra", "high", "medium", "low"];
@@ -52,13 +57,22 @@ function phaseOfUrl(url) {
 
 const STYLE_ID = "loading-style";
 const CSS = `
-#loading.ld-join{position:static;transform:none;left:auto;top:auto;width:auto;margin:14px 0 0;
-  padding:12px 14px 12px;background:rgba(255,255,255,0.04);box-shadow:none;animation:none;z-index:auto;
-  pointer-events:none;gap:2px 12px}
-#loading.ld-join .spin{width:20px;height:20px;border-width:2px}
-#loading.ld-join .ltitle{font-size:13px}
-#loading.ld-join #loadingText{font-size:12px}
-#loading.ld-join .lbar{margin-top:8px;height:3px}
+#loading.ld-join{position:static;transform:none;left:auto;top:auto;width:auto;margin:0;
+  flex:1 1 220px;min-width:0;align-self:center;padding:7px 12px 8px;border-radius:12px;
+  background:rgba(255,255,255,0.04);box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  animation:none;z-index:auto;pointer-events:none;gap:0 9px}
+#loading.ld-join .spin{grid-row:auto;width:14px;height:14px;border-width:2px}
+#loading.ld-join .ltitle{display:none}
+#loading.ld-join #loadingText{font-size:12px;line-height:16px;min-height:0;color:var(--text,#e8eef5)}
+#loading.ld-join .lbar{margin-top:6px;height:3px}
+#loading.ld-hud{top:calc(var(--hud-gap,16px) + var(--safe-t,0px));transform:translateX(-50%);
+  width:min(290px,calc(100vw - 32px));padding:10px 14px;gap:0 10px;border-radius:14px;pointer-events:none}
+#loading.ld-hud .spin{width:16px;height:16px;border-width:2px}
+#loading.ld-hud .ltitle{font-size:13px}
+#loading.ld-hud #loadingText{font-size:11.5px;min-height:0}
+#loading.ld-hud .lbar{margin-top:8px;height:3px}
+@media (max-width:900px){#loading.ld-hud{top:calc(var(--safe-t,0px) + 186px)}}
+@media (max-height:500px){#loading.ld-hud{top:calc(var(--hud-gap,16px) + var(--safe-t,0px));width:min(250px,calc(100vw - 560px))}}
 #loading.ld-done .spin{animation:none;border-color:rgba(124,220,160,0.9)}
 #loading.ld-fade{opacity:0;transition:opacity 0.45s ease}
 `;
@@ -80,6 +94,8 @@ function injectStyle() {
  * @param {number} [opts.stallMs] give up sooner when nothing has finished for this long
  * @param {number} [opts.settleMs] quiet time with nothing pending before it is done
  *   (loads chain: a manifest fetch is followed by the models it lists)
+ * @param {(roomId:string) => boolean} [opts.isRevealed] whether a secret room has been
+ *   found (minimap.isRevealed); without it secret rooms are never named
  * @param {(info:{timedOut:boolean, ms:number, files:number, failed:string[]}) => void} [opts.onDone]
  * @returns the loading tracker (see the returned object below)
  */
@@ -88,6 +104,7 @@ export function createLoading({
   timeout = 60000,
   stallMs = 15000,
   settleMs = 600,
+  isRevealed,
   onDone,
 } = {}) {
   const box = document.getElementById("loading");
@@ -174,7 +191,8 @@ export function createLoading({
     const ph = PHASE_IDS.includes(phase) ? phase : "halls";
     let key = String(label);
     for (let n = 2; tasks.has(key); n++) key = `${label}#${n}`;
-    const task = { phase: ph, done: false };
+    // registered after the end: kept for done() but not counted
+    const task = { phase: ph, done: false, late: finished };
     tasks.set(key, task);
     if (!finished) counts[ph].started++;
     changed();
@@ -207,6 +225,12 @@ export function createLoading({
     for (const id of PHASE_IDS) n += counts[id].started - counts[id].ended;
     return n;
   }
+  /**
+   * Share of the known work that is done. An unfinished task stands for the
+   * files it has yet to ask for (placing the props fetches dozens of models),
+   * so it weighs TASK_WEIGHT files; without that the first few textures
+   * would finish and the bar would leap ahead of the real download.
+   */
   function fraction() {
     let s = 0;
     let e = 0;
@@ -214,6 +238,7 @@ export function createLoading({
       s += counts[id].started;
       e += counts[id].ended;
     }
+    for (const t of tasks.values()) if (!t.done && !t.late) s += TASK_WEIGHT - 1;
     return s ? e / s : 0;
   }
   /**
@@ -238,6 +263,19 @@ export function createLoading({
     return shownPhase;
   }
 
+  /** What a phase is called on screen (secret rooms stay unnamed until found). */
+  function phaseLabel(id) {
+    const p = PHASES.find((q) => q.id === id);
+    if (!p.secretRoom) return p.label;
+    let found = false;
+    try {
+      found = !!isRevealed?.(p.secretRoom);
+    } catch {
+      /* treat as not found */
+    }
+    return found ? p.label : p.secretLabel;
+  }
+
   function changed() {
     if (finished) return;
     if (!raf) raf = requestAnimationFrame(paint);
@@ -254,10 +292,22 @@ export function createLoading({
     if (!finished && pending() === 0) finish(false);
   }
   // a slow connection that is still making progress keeps the card up (up to
-  // `timeout`); one that has stalled (a request that never answers) does not
+  // `timeout`); one that has stalled (a request that never answers) does not.
+  // Only time the page was actually running counts: building the halls and
+  // compiling shaders can block the main thread for many seconds at a time
+  // (software GL especially), and that is not a stalled download.
+  let aliveMs = 0;
+  let idleMs = 0;
+  let lastTick = t0;
+  let endSeen = lastEnd;
   const hardStop = setInterval(() => {
     const now = performance.now();
-    if (now - t0 > timeout || now - lastEnd > stallMs) finish(true);
+    const step = Math.min(now - lastTick, 1500);
+    lastTick = now;
+    aliveMs += step;
+    idleMs = lastEnd !== endSeen ? 0 : idleMs + step;
+    endSeen = lastEnd;
+    if (aliveMs > timeout || idleMs > stallMs) finish(true);
   }, 1000);
   // nothing registered at all (everything cached / no loaders): settle anyway
   changed();
@@ -273,17 +323,21 @@ export function createLoading({
     box.setAttribute("aria-valuemin", "0");
     box.setAttribute("aria-valuemax", "100");
     box.setAttribute("aria-valuenow", String(pct));
+    // the join strip is one line (it sits in the button row and must stay
+    // shorter than the buttons): its title is hidden, the text carries it all
+    const join = mode === "join";
     if (finished) {
       if (title) title.textContent = "The museum is open";
-      if (text) text.textContent = "Enjoy your visit!";
+      if (text) text.textContent = join ? "The museum is open" : "Enjoy your visit!";
       box.setAttribute("aria-valuetext", "Loaded");
       return;
     }
     const ph = currentPhase();
     const c = counts[ph];
-    const label = PHASES.find((p) => p.id === ph).label;
+    const label = phaseLabel(ph);
     if (title) title.textContent = `Building the museum… ${pct}%`;
-    if (text) text.textContent = c.started > 1 ? `${label} · ${c.ended} of ${c.started}` : `${label}…`;
+    const detail = c.started > 1 ? `${label} · ${c.ended} of ${c.started}` : `${label}…`;
+    if (text) text.textContent = join ? `${pct}% · ${detail}` : detail;
     box.setAttribute("aria-valuetext", `${label}, ${pct}%`);
   }
 
@@ -327,12 +381,17 @@ export function createLoading({
     if (where === "join") {
       const card = joinEl?.querySelector(".card");
       if (!card) return;
-      const status = card.querySelector("#joinStatus");
-      card.insertBefore(box, status || null);
+      // beside the join buttons (same row, so nothing shifts when it goes),
+      // or above the status line when the card has no button row
+      const actions = card.querySelector(".row.actions");
+      if (actions) actions.appendChild(box);
+      else card.insertBefore(box, card.querySelector("#joinStatus"));
       box.classList.add("ld-join");
     } else {
       if (home?.parent) home.parent.insertBefore(box, home.next && home.next.parentNode === home.parent ? home.next : null);
       box.classList.remove("ld-join");
+      // over the museum it is a small strip at the top, clear of the view
+      box.classList.add("ld-hud");
     }
     mode = where;
     box.classList.remove("hidden", "ld-fade");
@@ -346,7 +405,7 @@ export function createLoading({
     box.classList.add("ld-fade");
     setTimeout(() => {
       box.classList.add("hidden");
-      box.classList.remove("ld-join", "ld-fade");
+      box.classList.remove("ld-join", "ld-hud", "ld-fade");
       if (home?.parent && box.parentNode !== home.parent) {
         home.parent.insertBefore(box, home.next && home.next.parentNode === home.parent ? home.next : null);
       }
@@ -451,6 +510,7 @@ export function watchPerformance({
   let underMs = 0;
   let quietUntil = performance.now() + warmupMs;
   let last = 0;
+  let longRun = 0; // consecutive frames over 250 ms
   let paused = false;
   let stopped = false;
   let raf = 0;
@@ -471,11 +531,18 @@ export function watchPerformance({
       ms = last ? now - last : 0;
       last = now;
     }
-    // hidden tab / long hitch (alt-tab, a modal, GC): not a frame-time signal
-    if (!(ms > 0) || ms > 250 || document.hidden) {
+    // hidden tab: not a frame-time signal
+    if (!(ms > 0) || document.hidden) {
       overMs = 0;
+      longRun = 0;
       return;
     }
+    // a lone long frame is a hitch (GC, a modal, a texture upload) and is
+    // skipped; a run of them is a device that is simply that slow
+    if (ms > 250) {
+      if (++longRun < 4) return;
+      ms = 250;
+    } else longRun = 0;
     if (now < quietUntil) return;
     ema += (ms - ema) * 0.08;
     if (ema > budgetMs) {

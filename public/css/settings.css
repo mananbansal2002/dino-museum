@@ -151,8 +151,8 @@
 }
 
 .set-pane {
-  /* every tab keeps the same height so the card does not jump */
-  min-height: 286px;
+  /* the card is anchored at the top, so a shorter tab only lifts the footer */
+  padding-bottom: 6px;
 }
 
 .set-row {
@@ -509,7 +509,15 @@
     margin: 0 16px;
   }
 
-  .set-row:not(.set-row-stack) {
+  /* all four tabs fit a 360px phone without scrolling */
+  .set-tab {
+    flex: 1 1 auto;
+    padding: 8px 6px;
+    font-size: 12.5px;
+  }
+
+  /* sliders drop under their label; switches stay on the right */
+  .set-row:has(.set-range) {
     flex-wrap: wrap;
   }
 
@@ -531,6 +539,13 @@
   }
 
   .set-hint {
+    display: none;
+  }
+}
+
+/* phones and tablets without a keyboard: the key reference is noise */
+@media (hover: none) and (pointer: coarse) {
+  .set-keys {
     display: none;
   }
 }

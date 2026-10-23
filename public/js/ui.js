@@ -14,6 +14,9 @@ import {
 } from "./character.js";
 import { makeGelato } from "./gelato.js";
 import { createAvatarPreview } from "./avatarpreview.js";
+import { renderLabelHtml, bindLabelCard } from "./labels.js";
+import { renderScaleHtml } from "./scaletape.js";
+import { attachSheetSwipe } from "./touchdock.js";
 
 export const FLAVOURS = [
   { id: "strawberry", name: "Strawberry", color: 0xff9aa2 },
@@ -599,6 +602,13 @@ export function createUI(callbacks = {}) {
   soundBtn.id = "soundToggle";
   soundBtn.onclick = () => callbacks.onToggleSound?.();
   $("copyRoom").after(soundBtn);
+
+  // settings (O on a keyboard): quality, volumes, look and accessibility
+  const settingsBtn = $("settingsBtn");
+  if (settingsBtn) settingsBtn.onclick = (e) => {
+    e.currentTarget.blur();
+    callbacks.onSettings?.();
+  };
   function setSound(muted) {
     soundBtn.textContent = muted ? "🔇 sound" : "🔊 sound";
     soundBtn.title = muted ? "Sound is off (L)" : "Sound is on (L)";
@@ -732,6 +742,11 @@ export function createUI(callbacks = {}) {
               ? `<button type="button" class="chip" id="exhibitVideos" aria-label="Watch ${escapeHtml(ex.title)} videos">▶ videos</button>`
               : ""
           }
+          ${
+            callbacks.onListen
+              ? `<button type="button" class="chip" id="exhibitListen" title="Audio guide (N)" aria-label="Listen to the audio guide for ${escapeHtml(ex.title)}">🎧 Listen</button>`
+              : ""
+          }
           <button type="button" class="chip" id="closeExhibit">close ✕</button>
         </div>
       </div>
@@ -740,6 +755,7 @@ export function createUI(callbacks = {}) {
         <figcaption id="exCredit"></figcaption>
       </figure>
       <p class="lead">${escapeHtml(ex.blurb || "")}</p>
+      ${renderLabelHtml(ex)}
       <div class="exGrid">
         <div class="stat"><span>Period</span><b>${escapeHtml(ex.period || "—")}</b></div>
         <div class="stat"><span>Habitat</span><b>${escapeHtml(ex.habitat || "—")}</b></div>
@@ -751,6 +767,7 @@ export function createUI(callbacks = {}) {
       <div class="bars">
         ${bar("Size", stats.size)}${bar("Speed", stats.speed)}${bar("Bite", stats.bite)}${bar("Brain", stats.brain)}
       </div>
+      ${renderScaleHtml(ex, { shirt: look.shirt })}
       ${
         ex.facts?.length
           ? `<ul class="facts">${ex.facts.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>`
@@ -758,6 +775,9 @@ export function createUI(callbacks = {}) {
       }
     `;
     $("closeExhibit").onclick = hideExhibit;
+    bindLabelCard(body);
+    const listen = $("exhibitListen");
+    if (listen) listen.onclick = () => callbacks.onListen?.(ex);
     const videos = $("exhibitVideos");
     if (videos) videos.onclick = () => callbacks.onExhibitVideos?.(ex);
     setupHero($("exHero"), ex);
@@ -879,6 +899,8 @@ export function createUI(callbacks = {}) {
   $("exhibitCard").addEventListener("click", (e) => {
     if (e.target.id === "exhibitCard") hideExhibit();
   });
+  // phones: the card is a bottom sheet (touchdock.css); swipe it down to close
+  attachSheetSwipe($("exhibitCardBody"), hideExhibit);
 
   // ---------------- ice cream ----------------
   let ice = { flavour: FLAVOURS[0], scoops: 1, style: "cone", toppings: [] };
@@ -1028,6 +1050,14 @@ export function createUI(callbacks = {}) {
     closeModal,
     isModalOpen: () => !$("modal").classList.contains("hidden"),
     isCardOpen: () => !$("exhibitCard").classList.contains("hidden"),
+    /** The card's Listen chip reads Stop while the card's own talk plays. */
+    setListening(on) {
+      const chip = $("exhibitListen");
+      if (!chip || chip.getAttribute("aria-pressed") === String(!!on)) return;
+      chip.setAttribute("aria-pressed", String(!!on));
+      chip.classList.toggle("on", !!on);
+      chip.textContent = on ? "■ Stop" : "🎧 Listen";
+    },
     isIceOpen: () => !$("iceCream").classList.contains("hidden"),
     closeAll: () => {
       hideExhibit();

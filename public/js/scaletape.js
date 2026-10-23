@@ -508,7 +508,8 @@ export function buildScaleTapes(group, world, SPECIES = CATALOGUE, opts = {}) {
     const len = parseLength(spec.info?.length);
     if (!len) continue;
     const room = WORLD.ROOMS.find((r) => r.id === p.room);
-    if (!room) continue;
+    // the secret rooms stay a surprise: nothing of ours is ever laid in them
+    if (!room || room.secret) continue;
     jobs.push({ p, spec, len, room });
   }
   // the biggest animals pick their floor first
@@ -640,8 +641,8 @@ export function buildScaleTapes(group, world, SPECIES = CATALOGUE, opts = {}) {
         const v1 = 1 - (row * NUM_CELL_H) / atlas.h;
         const v0 = 1 - ((row + 1) * NUM_CELL_H) / atlas.h;
         const f = textFrame(at.dx, at.dz);
-        const off = HW + (major ? 0.2 : 0.15);
-        const h = major ? 0.17 : 0.13;
+        const off = HW + (major ? 0.2 : 0.16);
+        const h = major ? 0.19 : 0.15;
         numerals.push(at.x + f.ux * off, DECAL_Y, at.z + f.uz * off, f.rx, f.rz, f.ux, f.uz, h * 2, h, u0, v0, u1, v1);
       }
     }
@@ -825,8 +826,28 @@ export function silhouette(spec, len) {
     const t = spec.headType || "theropod";
     const ry = { theropod: 0.24, raptor: 0.2, duckbill: 0.2, fish: 0.14, beak: 0.2, dome: 0.32, ceratopsian: 0.26 }[t] ?? 0.22;
     const cx = nx + head * 0.4;
-    shapes.push(ellipse(cx, ny, head * 0.52, head * ry, tilt));
-    if (t === "ceratopsian" || f.frill) shapes.push(ellipse(nx - head * 0.05, ny + head * 0.32, head * 0.22, head * 0.48, -0.5));
+    if (t === "theropod" || t === "raptor" || t === "fish") {
+      // a wedge: deep at the jaw joint, tapering to the snout
+      const db = head * ry * 2.1;
+      const df = db * (t === "fish" ? 0.55 : 0.42);
+      const x0 = nx - head * 0.12;
+      const x1 = nx + head * 0.92;
+      const c = Math.cos(tilt);
+      const s = Math.sin(tilt);
+      const rot = ([x, y]) => [nx + (x - nx) * c - (y - ny) * s, ny + (x - nx) * s + (y - ny) * c];
+      shapes.push(
+        [
+          [x0, ny + db * 0.5],
+          [x0 + head * 0.38, ny + db * 0.55],
+          [x1 - head * 0.08, ny + df * 0.55],
+          [x1, ny + df * 0.2],
+          [x1 - head * 0.04, ny - df * 0.5],
+          [x0 + head * 0.34, ny - db * 0.45],
+          [x0, ny - db * 0.3],
+        ].map(rot)
+      );
+    } else shapes.push(ellipse(cx, ny, head * 0.52, head * ry, tilt));
+    if (t === "ceratopsian" || f.frill) shapes.push(ellipse(nx - head * 0.12, ny + head * 0.3, head * 0.3, head * 0.44, -0.85));
     if (f.horns) shapes.push(tri([cx - head * 0.05, ny + head * 0.12], [cx + head * 0.12, ny + head * 0.12], [cx + head * 0.45, ny + head * 0.62]));
     if (f.noseHorn) shapes.push(tri([cx + head * 0.25, ny + head * 0.1], [cx + head * 0.38, ny + head * 0.1], [cx + head * 0.42, ny + head * 0.38]));
     if (f.crest || f.headCrest) shapes.push(tri([cx - head * 0.3, ny + head * 0.12], [cx + head * 0.15, ny + head * 0.15], [cx - head * 0.6, ny + head * 0.55]));
@@ -919,7 +940,7 @@ export function silhouette(spec, len) {
   // biped (and flyers measured nose to tail)
   shapes.push(ellipse(B * 0.32, H + r[0] * 0.15, B * 0.56, r[0] * 0.78, 0.08));
   const n0 = [B * 0.78, H + r[0] * 0.4];
-  const n1 = [n0[0] + neck * 0.55, H + rise + r[0] * 0.25];
+  const n1 = [n0[0] + neck * 0.6, H + rise * 0.7 + r[0] * 0.25];
   shapes.push(limb(n0, n1, r[2] * 1.05, r[2] * 0.72, -neck * 0.1));
   headFor(n1[0] - head * 0.12, n1[1]);
   const t0 = [-B * 0.08, H + r[0] * 0.2];
@@ -943,7 +964,7 @@ export function silhouette(spec, len) {
     shapes.push(limb(a0, [a0[0] + al * 0.35, a0[1] - al], r[0] * 0.18, r[0] * 0.06, al * 0.15));
   }
   if (f.sail) {
-    const arc = ellipse(B * 0.3, H + r[0] * 0.55, B * 0.42, r[0] * 1.25, 0.05, 32).filter((p) => p[1] >= H + r[0] * 0.5);
+    const arc = ellipse(B * 0.3, H + r[0] * 0.55, B * 0.38, r[0] * 1.02, 0.05, 32).filter((p) => p[1] >= H + r[0] * 0.5);
     shapes.push(arc);
   }
   return { shapes };
@@ -979,14 +1000,17 @@ function scaledOutline(spec) {
 
 /** A 1.75 m adult, front-ish, feet at (0, 0), in metres. */
 function humanShapes() {
-  const h = HUMAN_H;
+  // right half of a standing adult, neck to crotch; mirrored for the left
+  const right = [
+    [0.05, 1.5], [0.16, 1.47], [0.205, 1.42], [0.225, 1.2], [0.245, 0.9], [0.232, 0.84], [0.2, 0.85],
+    [0.19, 1.12], [0.172, 1.25], [0.166, 1.0], [0.16, 0.9], [0.13, 0.07], [0.145, 0], [0.03, 0], [0.034, 0.07], [0.02, 0.8],
+  ];
+  const k = HUMAN_H / 1.75;
+  const body = [...right, [0, 0.82], ...right.slice().reverse().map(([x, y]) => [-x, y])].map(([x, y]) => [x * k, y * k]);
   return [
-    ellipse(0, h - 0.115, 0.095, 0.115, 0, 20), // head
-    limb([0, h - 0.24], [0, h * 0.5], 0.2, 0.16), // torso
-    limb([-0.06, h * 0.5], [-0.09, 0.02], 0.075, 0.05), // legs
-    limb([0.06, h * 0.5], [0.09, 0.02], 0.075, 0.05),
-    limb([-0.2, h - 0.3], [-0.25, h * 0.48], 0.05, 0.035), // arms
-    limb([0.2, h - 0.3], [0.25, h * 0.48], 0.05, 0.035),
+    ellipse(0, HUMAN_H - 0.115, 0.093, 0.115, 0, 24), // head
+    [[-0.045, HUMAN_H - 0.2], [0.045, HUMAN_H - 0.2], [0.05, 1.5 * k], [-0.05, 1.5 * k]], // neck
+    body,
   ];
 }
 
@@ -1019,31 +1043,51 @@ export function renderScaleHtml(ex, opts = {}) {
   const top = 34; // room for the dimension line
   const ground = Hpx - 34; // room for the ruler numbers
   const gap = 0.7; // metres between the visitor and the animal
+  const YOU_HALF = 36; // half the "You · 1.75 m" label, px
   const bus = a.length >= 10 && !other ? { l: 12, h: 3.2 } : null;
   const span = Math.max(a.width, other ? other.width : 0, bus ? bus.l : 0);
-  const worldW = HUMAN_W + gap + span;
   const worldH = Math.max(HUMAN_H, a.height, other ? other.height : 0, bus ? bus.h : 0);
-  const k = Math.min((W - padL - padR) / worldW, (ground - top) / worldH);
-  const ox = padL + (HUMAN_W / 2) * k; // the visitor's centre
-  const ax = padL + (HUMAN_W + gap) * k; // the animal's nose / left wingtip
+  // the visitor's label must clear both the card edge and the animal's nose
+  const place = (k) => {
+    const ox = Math.max(padL + (HUMAN_W / 2) * k, YOU_HALF + 2);
+    const ax = Math.max(ox + (HUMAN_W / 2 + gap) * k, ox + YOU_HALF + 6);
+    return { ox, ax };
+  };
+  let k = (ground - top) / worldH;
+  for (let i = 0; i < 3; i++) {
+    const { ax } = place(k);
+    if (ax + span * k <= W - padR + 0.5) break;
+    k = Math.min(k, (W - padR - ax) / span);
+  }
+  let { ox, ax } = place(k);
+  // a small animal leaves the strip half empty: centre the group instead
+  const slack = W - padR - (ax + span * k);
+  if (slack > 8) {
+    ox += slack / 2;
+    ax += slack / 2;
+  }
   const P = (x0, pts) => "M" + pts.map(([x, y]) => `${(x0 + x * k).toFixed(1)},${(ground - y * k).toFixed(1)}`).join("L") + "Z";
   const paths = (x0, shapes) => shapes.map((s) => `<path d="${P(x0, s)}"/>`).join("");
 
   const parts = [];
-  // ruler: metres from the animal's nose
+  // ruler: metres from the animal's nose; labels at least ~30 px apart
   const rulerEnd = span;
-  const step = rulerEnd > 30 ? 5 : rulerEnd > 14 ? 2 : 1;
-  const minor = k > 120 ? 0.1 : k > 40 ? 0.5 : k >= 5 ? 1 : 5;
+  const step = [0.1, 0.25, 0.5, 1, 2, 5, 10].find((s) => s * k >= 30) ?? 10;
+  const minor = (step / 2) * k >= 7 ? step / 2 : step;
+  const fmtTick = (m) => (step < 1 ? String(+m.toFixed(2)) : String(Math.round(m)));
+  const lastLabel = Math.floor(rulerEnd / step + 1e-6) * step;
   const ticks = [];
   for (let i = 0; i * minor <= rulerEnd + 1e-6; i++) {
     const m = i * minor;
     const x = ax + m * k;
-    const whole = Math.abs(m - Math.round(m)) < 1e-6;
-    const labelled = whole && Math.round(m) % step === 0;
+    const labelled = Math.abs(m / step - Math.round(m / step)) < 1e-6;
     ticks.push(`<line x1="${x.toFixed(1)}" y1="${ground}" x2="${x.toFixed(1)}" y2="${ground + (labelled ? 7 : 4)}"/>`);
-    if (labelled) ticks.push(`<text x="${x.toFixed(1)}" y="${ground + 19}" text-anchor="middle">${Math.round(m)}</text>`);
+    if (labelled) {
+      const unit = Math.abs(m - lastLabel) < 1e-6 ? " m" : "";
+      ticks.push(`<text x="${x.toFixed(1)}" y="${ground + 19}" text-anchor="middle">${fmtTick(m)}${unit}</text>`);
+    }
   }
-  parts.push(`<g class="scaleRuler"><line x1="${padL - 6}" y1="${ground}" x2="${W - padR + 6}" y2="${ground}"/>${ticks.join("")}<text x="${(ax + rulerEnd * k + 4).toFixed(1)}" y="${ground + 19}" text-anchor="start">m</text></g>`);
+  parts.push(`<g class="scaleRuler"><line x1="${padL - 6}" y1="${ground}" x2="${W - padR + 6}" y2="${ground}"/>${ticks.join("")}</g>`);
 
   if (bus) {
     const bx = ax;
@@ -1053,7 +1097,7 @@ export function renderScaleHtml(ex, opts = {}) {
     parts.push(
       `<g class="scaleBus"><rect x="${bx.toFixed(1)}" y="${(ground - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${(bh - wheel * 0.6).toFixed(1)}" rx="${(0.4 * k).toFixed(1)}"/>` +
         `<circle cx="${(bx + 2.2 * k).toFixed(1)}" cy="${(ground - wheel).toFixed(1)}" r="${wheel.toFixed(1)}"/><circle cx="${(bx + bw - 2.6 * k).toFixed(1)}" cy="${(ground - wheel).toFixed(1)}" r="${wheel.toFixed(1)}"/>` +
-        `<text x="${(bx + bw - 4).toFixed(1)}" y="${(ground - bh - 4).toFixed(1)}" text-anchor="end">12 m bus</text></g>`
+        `</g>`
     );
   }
   if (other) {
@@ -1061,6 +1105,16 @@ export function renderScaleHtml(ex, opts = {}) {
     parts.push(`<text class="scaleOtherLabel" x="${(ax + other.width * k - 2).toFixed(1)}" y="${(ground - other.height * k - 4).toFixed(1)}" text-anchor="end">${esc(CATALOGUE[opts.compareWith].name)} · ${esc(other.len.label)}</text>`);
   }
   parts.push(`<g class="scaleAnimal" fill="${hexColor(spec.color)}">${paths(ax, a.shapes)}</g>`);
+  // the bus label goes where the animal is not: low in the bus's back end
+  // for most (tails run high there, legs stand further forward), top left for
+  // the long sauropods (whose legs fill the back end but whose necks rise
+  // well clear of the front); a halo keeps it readable either way
+  if (bus) {
+    const long = a.length >= 16;
+    const lx = long ? ax + 6 : ax + bus.l * k - 6;
+    const ly = long ? ground - bus.h * k + 13 : ground - 0.5 * k * 0.6 - 6;
+    parts.push(`<text class="scaleBusLabel" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${long ? "start" : "end"}">12 m bus</text>`);
+  }
   // the visitor
   const shirt = opts.shirt ? ` style="fill:${esc(opts.shirt)}"` : "";
   parts.push(`<g class="scaleHuman"${shirt}>${paths(ox, humanShapes())}</g>`);
