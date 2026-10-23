@@ -1166,6 +1166,109 @@ function createPhotoStreamer(captions, fallbackLoader) {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* presence lighting                                                    */
+/* ------------------------------------------------------------------ */
+// Like a real gallery's occupancy-sensed track lights: an exhibit rests at a
+// calm level and comes up to full when the visitor walks up to it. Nothing
+// here is a real light: the exhibit "spotlight" is an additive floor pool
+// and beam (instance colours scale them) plus the backlit picture.
+const PRESENCE_REST = 0.66; // pool / beam brightness at rest (1 = the old look)
+const PRESENCE_FULL = 1.38; // ... with a visitor at the exhibit
+const PRESENCE_PIC_REST = 0.86; // picture brightness at rest, x its own colour
+const PRESENCE_PIC_FULL = 1.08;
+const PRESENCE_NEAR = 4; // m from the plinth or its display case
+const PRESENCE_RISE = 0.8; // s to come up
+const PRESENCE_HOLD = 3; // s it stays up after the visitor leaves
+const PRESENCE_FALL = 1.6; // s to settle back
+
+function boxDistance(b, x, z) {
+  const dx = Math.max(b.minX - x, 0, x - b.maxX);
+  const dz = Math.max(b.minZ - z, 0, z - b.maxZ);
+  return Math.hypot(dx, dz);
+}
+
+/**
+ *   presence.update(dt, x, z)   // every frame, with the local visitor's position
+ *   presence.stats()            // { active, lit } (tests / debugging)
+ * Only exhibits in the visitor's room are tested; ones still fading are kept
+ * in a short active list. No allocations per frame.
+ */
+function createPresenceLighting(items, pools, beams) {
+  const byRoom = new Map();
+  for (const it of items) {
+    if (!it.room) continue;
+    if (!byRoom.has(it.room)) byRoom.set(it.room, []);
+    byRoom.get(it.room).push(it);
+  }
+  const active = [];
+  const c = new THREE.Color();
+  const ease = (t) => t * t * (3 - 2 * t);
+  function apply(it) {
+    const e = ease(it.level);
+    c.setScalar(PRESENCE_REST + (PRESENCE_FULL - PRESENCE_REST) * e);
+    pools.setColorAt(it.i, c);
+    beams.setColorAt(it.i, c);
+    if (it.base < 0) it.base = it.mat.color.r;
+    it.mat.color.setScalar(Math.min(1, it.base * (PRESENCE_PIC_REST + (PRESENCE_PIC_FULL - PRESENCE_PIC_REST) * e)));
+  }
+  // pictures start at the resting level too (after lookdev has set their colour)
+  let primed = false;
+  function prime() {
+    primed = true;
+    for (const it of items) apply(it);
+    if (pools.instanceColor) pools.instanceColor.needsUpdate = true;
+    if (beams.instanceColor) beams.instanceColor.needsUpdate = true;
+  }
+  function update(dt, x, z) {
+    if (!primed) prime();
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    const step = Math.min(dt, 0.1);
+    const room = roomAt(x, z);
+    const list = room ? byRoom.get(room.id) : null;
+    if (list) {
+      for (let n = 0; n < list.length; n++) {
+        const it = list[n];
+        const d = Math.min(boxDistance(it.box, x, z), it.box2 ? boxDistance(it.box2, x, z) : Infinity);
+        if (d > PRESENCE_NEAR) continue;
+        it.hold = PRESENCE_HOLD;
+        if (!it.active) {
+          it.active = true;
+          active.push(it);
+        }
+      }
+    }
+    if (!active.length) return;
+    for (let n = active.length - 1; n >= 0; n--) {
+      const it = active[n];
+      if (it.hold > 0) {
+        it.hold -= step;
+        it.level = Math.min(1, it.level + step / PRESENCE_RISE);
+      } else {
+        it.level = Math.max(0, it.level - step / PRESENCE_FALL);
+      }
+      apply(it);
+      if (it.level <= 0 && it.hold <= 0) {
+        it.active = false;
+        active[n] = active[active.length - 1];
+        active.pop();
+      }
+    }
+    if (pools.instanceColor) pools.instanceColor.needsUpdate = true;
+    if (beams.instanceColor) beams.instanceColor.needsUpdate = true;
+  }
+  return {
+    update,
+    stats() {
+      let lit = 0;
+      for (const it of items) if (it.level > 0.5) lit++;
+      return { active: active.length, lit, total: items.length };
+    },
+    /** Per-exhibit level (tests / debugging). */
+    level: (index) => (items[index] ? items[index].level : 0),
+  };
+}
+
 export function buildWorld(scene) {
   const group = new THREE.Group();
   scene.add(group);
@@ -1606,6 +1709,8 @@ export function buildWorld(scene) {
   }
 
   const spotDummy = new THREE.Object3D();
+  const presenceItems = [];
+  const presenceRest = new THREE.Color().setScalar(PRESENCE_REST);
   let k = 0; // instance index of the next panel
   for (const panel of EXHIBIT_PANELS) {
     const spec = SPECIES[panel.id];
@@ -1736,8 +1841,26 @@ export function buildWorld(scene) {
     fixture.position.set(panel.x, ceiling - 0.2, panel.z);
     group.add(fixture);
     tag(fixture, "emissive");
+
+    // presence lighting: this exhibit's pool, beam and picture brighten as
+    // the visitor walks up (see createPresenceLighting)
+    const disp = DISPLAYS.find((d) => d.speciesId === panel.id);
+    presenceItems.push({
+      i,
+      room: room ? room.id : null,
+      box: { minX: panel.minX, maxX: panel.maxX, minZ: panel.minZ, maxZ: panel.maxZ },
+      box2: disp ? disp.bounds : null,
+      mat: imageMat,
+      base: -1, // the picture's resting colour, read on the first update (lookdev sets it)
+      level: 0,
+      hold: 0,
+      active: false,
+    });
+    pools.setColorAt(i, presenceRest);
+    beams.setColorAt(i, presenceRest);
   }
   pools.instanceMatrix.needsUpdate = true;
+  const presence = createPresenceLighting(presenceItems, pools, beams);
 
   // image credits, fetched once
   if (typeof fetch === "function") {
@@ -2384,6 +2507,7 @@ export function buildWorld(scene) {
     screenTex,
     sun,
     photos,
+    presence,
   };
 }
 

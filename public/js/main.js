@@ -1635,6 +1635,8 @@ function animate() {
   // behind the join screen)
   if (S.player) world.photos.update(dt, S.player.state.x, S.player.state.z);
   else world.photos.update(dt, camera.position.x, camera.position.z);
+  // exhibit lights come up as the local visitor walks up to them
+  if (S.player && world.presence) world.presence.update(dt, S.player.state.x, S.player.state.z);
   if (S.joined) updateCourt(dt);
 
   // animated exhibits

@@ -39,6 +39,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { createHallThemes } from "./halls.js";
 
 const TIERS = ["low", "medium", "high", "ultra"];
 const TEX = "/textures/";
@@ -423,6 +424,10 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     if (["cretaceous", "triassic", "jurassic", "marine", "predator"].includes(roomId)) return lib.parquet;
     return lib.terrazzo;
   }
+
+  // per-hall finishes, murals, frieze, caustics (halls.js)
+  const themes = createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, maxAniso });
+  themes.setPaint((id, r) => paintColor(id, r.wall));
 
   /* ---------------- classification ---------------- */
   const tmpV = new THREE.Vector3();
@@ -864,6 +869,12 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     const nearWindow = (x, z, pad) => windows.some((w) => Math.hypot(w.x - x, w.z - z) < pad);
     const pilasterDone = new Set();
     const doorDone = new Set();
+    const faces = []; // every wall face, for the hall themes
+    const dadoBatches = new Map(); // material -> box batch
+    const dadoBatch = (mat) => {
+      if (!dadoBatches.has(mat)) dadoBatches.set(mat, boxBatch(mat, `lookdev-dado-${dadoBatches.size}`));
+      return dadoBatches.get(mat);
+    };
 
     /** Box on a wall face: a = along offset, y = centre height, out = distance off the face. */
     for (const w of walls) {
@@ -885,17 +896,26 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
         };
         const theatre = room.id === "theater";
         const winHere = nearWindow(w.x, w.z, 4.6);
+        faces.push({ room, alongX, s, fx0, fz0, x: w.x, z: w.z, L, h, paint: paintColor(room.id, room.wall) });
 
-        // panelled wainscot, skirting and dado rail
+        // panelled wainscot, skirting and dado rail (the finish is the hall's own)
         if (!theatre) {
-          put(wood, 0, 0.6, 0.02, L, 1.2, 0.05);
-          put(wood, 0, 0.09, 0.05, L, 0.18, 0.06); // skirting
-          put(wood, 0, 1.19, 0.06, L + 0.02, 0.07, 0.08); // dado rail
-          const n = Math.max(1, Math.round(L / 1.5));
-          const pw = L / n;
-          for (let i = 0; i < n; i++) {
-            const a = -L / 2 + pw * (i + 0.5);
-            put(wood, a, 0.66, 0.055, pw - 0.26, 0.68, 0.03); // raised field
+          const d = themes.dado(room.id);
+          const panel = d ? dadoBatch(d.mat) : wood;
+          const rail = d ? dadoBatch(d.trim) : wood;
+          put(panel, 0, 0.6, 0.02, L, 1.2, 0.05);
+          put(rail, 0, 0.09, 0.05, L, 0.18, 0.06); // skirting
+          put(rail, 0, 1.19, 0.06, L + 0.02, 0.07, 0.08); // dado rail
+          if (!d || d.fields) {
+            const n = Math.max(1, Math.round(L / 1.5));
+            const pw = L / n;
+            for (let i = 0; i < n; i++) {
+              const a = -L / 2 + pw * (i + 0.5);
+              put(panel, a, 0.66, 0.055, pw - 0.26, 0.68, 0.03); // raised field
+            }
+          } else {
+            // stone dado: a plinth course and a moulded cap instead of fields
+            put(rail, 0, 1.06, 0.07, L + 0.02, 0.05, 0.06);
           }
         }
         // crown moulding (stepped) at the ceiling line
@@ -914,6 +934,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
             const ez = alongX ? fz0 : w.z + e;
             const k = `${r2(ex)},${r2(ez)},${s},${alongX}`;
             if (pilasterDone.has(k) || (winHere && nearWindow(ex, ez, 4.4))) continue;
+            if (themes.pilasterHidden(ex, ez, s, alongX)) continue; // a mural hangs here
             pilasterDone.add(k);
             const ea = e;
             put(mould, ea, 0.65, 0.1, 0.92, 1.3, 0.2); // pedestal base
@@ -1019,13 +1040,14 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
       }
     }
 
-    for (const batch of [wood, mould, metal, brass]) {
+    for (const batch of [wood, mould, metal, brass, ...dadoBatches.values()]) {
       const m = batch.build();
       if (m) {
         fx.add(m);
         stats.architecture += m.count;
       }
     }
+    themes.build(fx, faces, boxBatch);
   }
 
   /**
@@ -1226,6 +1248,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     l.position.y = Math.max(3.5, a.pos.y - 2.2);
     l.distance = Math.max(24, a.range * 1.1);
     l.userData.peak = 150;
+    l.color.copy(themes.lightTint(a.room) || WARM);
   }
 
   /* ---------------- environment ---------------- */
@@ -1415,6 +1438,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
 
     updateLights(dt);
     updateFog(dt);
+    themes.update(dt, camera);
 
     if (composer) {
       if (grade) grade.uniforms.uTime.value = elapsed;
@@ -1509,6 +1533,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     get auto() {
       return auto;
     },
+    themes,
     render,
     resize,
     setQuality,
