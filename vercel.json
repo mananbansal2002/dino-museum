@@ -4,12 +4,10 @@
   "outputDirectory": "public",
   "functions": {
     "api/socket.js": {
-      "maxDuration": 300,
-      "memory": 1024
+      "maxDuration": 300
     }
   },
   "rewrites": [
-    { "source": "/api/socket/socket.io/:path*", "destination": "/api/socket" },
-    { "source": "/((?!api/|socket\\.io/).*)", "destination": "/api/socket" }
+    { "source": "/((?!api/).*)", "destination": "/api/socket" }
   ]
 }

@@ -710,10 +710,10 @@ console.log(`✓ ${walls.length} wall slabs, every hall is sealed`);
     if (typeof world.wayArrow === "function" && Math.abs(world.wayArrow(s)) > Math.PI / 2 + 1e-6) fail(`the wayfinding sign ${s.id} points backwards`);
   }
   const toCourt = (roomId) => signs.some((s) => s.dest === "court" && s.room === roomId);
-  if (!toCourt("lobby")) fail("no sign in the Entrance Atrium points to the Ice Cream Court");
-  if (!toCourt("jurassic")) fail("no sign in the Jurassic Hall points to the Ice Cream Court");
+  // the court is a secret ending: no sign may name it before you get there
+  if (toCourt("lobby")) fail("a sign in the Entrance Atrium gives away the Ice Cream Court");
   if (!signs.some((s) => s.kind === "lightbox" && s.room === "jurassic")) fail("the exit to the Ice Cream Court has no lightbox");
-  console.log(`✓ ${signs.length} wayfinding signs lead to the ice cream court, all above head height`);
+  console.log(`✓ ${signs.length} wayfinding sign(s), above head height; the ice cream court stays a secret`);
 }
 
 /* fine-grained walk test with the real collision code: every point of

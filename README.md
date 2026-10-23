@@ -71,6 +71,8 @@ npm run check        # catalogue, floor plan, walls, module graph, dom contract
 npm run smoke        # boots the server, two clients join, chat/move/leave
 npm test             # check + smoke
 npm run journey      # real browser run (needs the dev server on :3111)
+node scripts/live.mjs https://dino-museum-ten.vercel.app/ 300 --crowd
+                     # long run: connection, frame loop, npc path stress
 ```
 
 `npm run check` is the interesting one: it builds the real museum, measures
@@ -91,6 +93,12 @@ The client only ever uses the websocket transport, so no sticky sessions are
 needed. To run more than one instance (so rooms survive a cold start) set
 `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; the server then
 syncs rosters and events through Redis.
+
+A Vercel function is killed at `maxDuration` (300 s on Hobby), so every visitor
+gets a new socket about every five minutes. That is expected: `public/js/net.js`
+resumes the same player, in the same room and at the same spot, and the museum
+keeps rendering — the gap is roughly two seconds. For sessions without any drop
+at all, run `server.js` on a long-lived host instead.
 
 ## Notes
 

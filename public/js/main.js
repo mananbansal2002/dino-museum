@@ -1196,9 +1196,23 @@ function animate() {
     }
   }
 
-  vendor.update(dt, S.player?.state);
-  live.update(dt, S.player?.state);
-  crowd.update(dt, S.player?.state, remote.list);
+  // Ambient life. Each system is isolated so one bad npc can never freeze the
+  // whole museum (a throw here used to stop the frame before it was rendered).
+  for (const [name, system] of [
+    ["vendors", vendor],
+    ["live exhibits", live],
+    ["crowd", crowd],
+  ]) {
+    try {
+      system.update(dt, S.player?.state, remote.list);
+    } catch (err) {
+      if (!S.ambientErrors) S.ambientErrors = new Set();
+      if (!S.ambientErrors.has(name)) {
+        S.ambientErrors.add(name);
+        console.error(`Ambient update failed (${name}); continuing without it:`, err);
+      }
+    }
+  }
 
   // animated exhibits
   for (const a of world.animated) {
@@ -1283,6 +1297,9 @@ window.__museum = {
   cinema,
   remote,
   roomAt,
+  get net() {
+    return S.net;
+  },
   lookdev,
   live,
   picker,

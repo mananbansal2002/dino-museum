@@ -1068,11 +1068,29 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
       n.timer = rand(1, 2.5);
       return;
     }
+    if (!p.length) {
+      // already standing on the goal: no waypoints needed
+      finishWalk(n);
+      return;
+    }
     n.path = p;
     n.wp = 0;
     n.stuckT = 0;
     n.stuckRef = [n.x, n.z];
     n.stuckClock = 0;
+  }
+
+  /** End a walk safely, whether or not the npc still has a goal. */
+  function finishWalk(n) {
+    n.path = null;
+    n.speed = 0;
+    if (n.goal) {
+      arrive(n);
+      return;
+    }
+    n.state = "idle";
+    n.timer = rand(1, 2.5);
+    idle(n);
   }
 
   function arrive(n) {
@@ -1246,8 +1264,13 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
   }
 
   function steer(n, dt) {
-    if (n.pathPending || !n.path) {
+    if (n.pathPending || !n.path || !n.path.length) {
       n.speed = Math.max(0, n.speed - 3 * dt);
+      return;
+    }
+    if (!n.path[n.wp]) {
+      // the path ran out (stale waypoint index): treat it as arrival
+      finishWalk(n);
       return;
     }
     let [tx, tz] = n.path[n.wp];
@@ -1257,6 +1280,10 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
     const lastWp = n.wp === n.path.length - 1;
     if (!lastWp && dist < 0.45) {
       n.wp++;
+      if (!n.path[n.wp]) {
+        finishWalk(n);
+        return;
+      }
       [tx, tz] = n.path[n.wp];
       dx = tx - n.x;
       dz = tz - n.z;
@@ -1645,6 +1672,8 @@ export function createCrowd({ scene, world, camera, count = 12, quality = "high"
     update,
     npcs,
     ready,
+    /** test hook: make an npc walk again (used by scripts/live.mjs --crowd) */
+    requestPath,
     dispose,
     root,
     nav,

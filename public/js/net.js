@@ -57,7 +57,7 @@ function storage() {
   }
 }
 
-/** First path to try: the one that worked last time, else a guess by host. */
+/** First path to try: the one that worked last time, else the default. */
 function initialPathIndex() {
   try {
     const i = CANDIDATES.indexOf(storage()?.getItem(PATH_KEY));
@@ -65,8 +65,7 @@ function initialPathIndex() {
   } catch {
     /* unreadable storage */
   }
-  const host = globalThis.location?.hostname || "";
-  return /\.vercel\.app$/i.test(host) ? CANDIDATES.indexOf("/api/socket/socket.io") : 0;
+  return 0;
 }
 
 function rememberPath(path) {
