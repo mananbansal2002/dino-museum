@@ -9,6 +9,7 @@ import {
   ACCESSORIES,
   DEFAULT_HAIR,
   DEFAULT_LOOK,
+  SPECIAL_PRESETS,
   randomLook,
   normalizeLook,
 } from "./character.js";
@@ -453,6 +454,8 @@ export function createUI(callbacks = {}) {
    * kind: "color" (items {id,name,hex}, value = hex),
    *       "text"  (items {id,name}, value = id),
    *       "body"  (BODY_TYPES, value = id, icon + name)
+   *       "special" (SPECIAL_PRESETS + none, value = id, outfit swatch + name)
+   * Picking anything but a special character leaves the special character (its colours stay).
    */
   function swatchRow(containerId, items, current, onPick, kind = "color") {
     const box = $(containerId);
@@ -462,7 +465,7 @@ export function createUI(callbacks = {}) {
       const value = kind === "color" ? item.hex : item.id;
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "sw" + (kind === "text" ? " txt" : kind === "body" ? " body" : "");
+      b.className = "sw" + (kind === "text" ? " txt" : kind === "body" ? " body" : kind === "special" ? " special" : "");
       b.title = item.name;
       b.setAttribute("aria-label", item.name);
       if (kind === "color") {
@@ -474,6 +477,15 @@ export function createUI(callbacks = {}) {
         const label = document.createElement("span");
         label.textContent = item.name;
         b.append(icon, label);
+      } else if (kind === "special") {
+        const chip = document.createElement("span");
+        chip.className = "outfit";
+        const [top, bottom] = item.swatch || ["transparent", "transparent"];
+        chip.style.background = item.swatch ? `linear-gradient(180deg, ${top} 0 55%, ${bottom} 55% 100%)` : "";
+        if (!item.swatch) chip.textContent = "∅";
+        const label = document.createElement("span");
+        label.textContent = item.name;
+        b.append(chip, label);
       } else {
         b.textContent = item.name;
       }
@@ -481,6 +493,7 @@ export function createUI(callbacks = {}) {
       b.classList.toggle("active", active);
       b.setAttribute("aria-pressed", active ? "true" : "false");
       b.onclick = () => {
+        if (kind !== "special") look.preset = "none";
         onPick(value);
         refreshSwatches();
         renderLook();
@@ -491,6 +504,17 @@ export function createUI(callbacks = {}) {
   }
 
   function refreshSwatches() {
+    swatchRow(
+      "swSpecial",
+      [{ id: "none", name: "None" }, ...SPECIAL_PRESETS],
+      look.preset,
+      (v) => {
+        // a preset fills in its body, colours, hair and accessory; "none" keeps them to tweak
+        if (v === "none") look.preset = "none";
+        else Object.assign(look, normalizeLook({ preset: v }));
+      },
+      "special"
+    );
     swatchRow(
       "swBody",
       BODY_TYPES,

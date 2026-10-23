@@ -12,6 +12,7 @@ import { clamp, damp, lerp, makeBlobShadow, makeNameTag } from "./util.js";
 /*     hair:      HAIR_STYLES id                                        */
 /*     hairColor: "#rrggbb"   (HAIR_COLORS or any valid hex)            */
 /*     accessory: ACCESSORIES id                                        */
+/*     preset:    "none" | SPECIAL_PRESETS id (overrides everything)    */
 /*   }                                                                  */
 /*                                                                      */
 /* normalizeLook() whitelists every field, so it is safe to run on      */
@@ -84,6 +85,39 @@ export const ACCESSORIES = [
   { id: "headlamp", name: "Headlamp" },
 ];
 
+/**
+ * Special characters: complete outfits with their own textures and add-ons (models.js /
+ * special.js). A preset implies the body and overrides the colours, hair and accessory —
+ * `look` holds what the procedural stand-in (and the 2D doll) draws until the rigged model
+ * is in; swatch is the outfit's [top, bottom] for the customiser button.
+ */
+export const SPECIAL_PRESETS = [
+  {
+    id: "him-hills",
+    name: "Him · Hills",
+    swatch: ["#38446c", "#e9e8e2"],
+    look: { body: "male", skin: "#8c5e42", shirt: "#38446c", pants: "#e9e8e2", hair: "curly", hairColor: "#16110d", accessory: "glasses" },
+  },
+  {
+    id: "him-rooftop",
+    name: "Him · Rooftop",
+    swatch: ["#17171b", "#45454b"],
+    look: { body: "male", skin: "#8c5e42", shirt: "#17171b", pants: "#151518", hair: "curly", hairColor: "#16110d", accessory: "glasses" },
+  },
+  {
+    id: "her-hills",
+    name: "Her · Hills",
+    swatch: ["#6476cc", "#ecedeb"],
+    look: { body: "female", skin: "#9a684d", shirt: "#6476cc", pants: "#ecedeb", hair: "long", hairColor: "#1d1611", accessory: "none" },
+  },
+  {
+    id: "her-rooftop",
+    name: "Her · Rooftop",
+    swatch: ["#1f264c", "#1f1b1d"],
+    look: { body: "female", skin: "#9a684d", shirt: "#1f264c", pants: "#1f1b1d", hair: "long", hairColor: "#1d1611", accessory: "none" },
+  },
+];
+
 /** Hair used when the visitor has not picked a style for their body type. */
 export const DEFAULT_HAIR = { male: "short", female: "long" };
 
@@ -95,6 +129,7 @@ export const DEFAULT_LOOK = Object.freeze({
   hair: "short",
   hairColor: "#2b1d12",
   accessory: "cap",
+  preset: "none",
 });
 
 /**
@@ -112,6 +147,11 @@ const ids = (list) => new Set(list.map((x) => x.id));
 const BODY_IDS = ids(BODY_TYPES);
 const HAIR_IDS = ids(HAIR_STYLES);
 const ACC_IDS = ids(ACCESSORIES);
+const PRESET_IDS = new Set(["none", ...SPECIAL_PRESETS.map((p) => p.id)]);
+const PRESET_LOOKS = new Map(SPECIAL_PRESETS.map((p) => [p.id, p.look]));
+
+/** The special preset of a look, or null. */
+export const specialPreset = (look) => SPECIAL_PRESETS.find((p) => p.id === look?.preset) || null;
 
 function cleanHex(v, palette, fallback) {
   if (typeof v !== "string") return fallback;
@@ -133,6 +173,9 @@ function cleanId(v, allowed, legacy, fallback) {
 /** Returns a fresh, fully validated look. Unknown / bad fields fall back to defaults. */
 export function normalizeLook(look) {
   const src = look && typeof look === "object" ? look : {};
+  const preset = cleanId(src.preset, PRESET_IDS, null, "none");
+  // a special preset decides the body, colours, hair and accessory
+  if (preset !== "none") return { ...PRESET_LOOKS.get(preset), preset };
   const body = cleanId(src.body, BODY_IDS, null, DEFAULT_LOOK.body);
   const hairIn = src.hair ?? src.hairStyle;
   return {
@@ -143,6 +186,7 @@ export function normalizeLook(look) {
     hair: cleanId(hairIn, HAIR_IDS, LEGACY_HAIR, DEFAULT_HAIR[body]),
     hairColor: cleanHex(src.hairColor, HAIR_COLORS, DEFAULT_LOOK.hairColor),
     accessory: cleanId(src.accessory, ACC_IDS, LEGACY_ACC, "none"),
+    preset,
   };
 }
 

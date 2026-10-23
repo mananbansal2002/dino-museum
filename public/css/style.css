@@ -949,6 +949,51 @@ button.ghost:active {
   color: #fff3d6;
 }
 
+/* special characters: an outfit chip + name, a little starred band above the rest */
+.specialRow {
+  padding: 7px 8px;
+  margin: 0 -8px 2px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255, 209, 102, 0.12), rgba(255, 209, 102, 0.03));
+  border: 1px solid rgba(255, 209, 102, 0.22);
+}
+
+.specialRow .lookLabel {
+  color: #ffd166;
+}
+
+.sw.special {
+  width: auto;
+  height: 30px;
+  padding: 0 10px 0 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.sw.special .outfit {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sw.special.active {
+  background: linear-gradient(180deg, rgba(255, 209, 102, 0.28), rgba(245, 165, 36, 0.18));
+  color: #fff3d6;
+}
+
 /* ---------------- in-game overlays (exhibit / ice cream / modal) ---------------- */
 #exhibitCard,
 #iceCream,

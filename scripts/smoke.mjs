@@ -116,6 +116,7 @@ try {
     hair: "h2",
     hairColor: "red", // invalid colour, dropped
     accessory: "a1",
+    preset: "her-hills", // a special character, kept
     evil: "<script>", // unknown key, dropped
   };
   const aliceJoin = await join(alice, { name: "  Alice \n ", color: 0xffc857, look: aliceLook, room: "smoke" });
@@ -134,7 +135,7 @@ try {
     meInRoster &&
       meInRoster.name === "Alice" &&
       JSON.stringify(meInRoster.look) ===
-        JSON.stringify({ skin: "#e6b48f", shirt: "#2ec4b6", hair: "h2", accessory: "a1", body: "female" }),
+        JSON.stringify({ skin: "#e6b48f", shirt: "#2ec4b6", hair: "h2", accessory: "a1", body: "female", preset: "her-hills" }),
     "name trimmed and look sanitised on join",
     `look/name not sanitised: ${JSON.stringify(meInRoster)}`
   );
@@ -280,7 +281,7 @@ try {
 
   /* ---- look updates ---- */
   const looked = waitFor(bob, "look");
-  alice.emit("look", { body: "robot", shirt: "#ABCDEF", hair: "x".repeat(40), accessory: "a5" });
+  alice.emit("look", { body: "robot", shirt: "#ABCDEF", hair: "x".repeat(40), accessory: "a5", preset: "HER-HILLS" });
   const look = await looked;
   check(
     look.id === aliceJoin.id && JSON.stringify(look.look) === JSON.stringify({ shirt: "#abcdef", accessory: "a5" }),

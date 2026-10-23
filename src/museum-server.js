@@ -66,6 +66,8 @@ const BATTLE_ID_RE = /^[a-z0-9-]{1,40}$/;
 const LOOK_COLOR_KEYS = new Set(["skin", "shirt", "pants", "hairColor"]);
 const LOOK_STRING_KEYS = new Set(["hair", "accessory"]);
 const LOOK_BODIES = new Set(["male", "female"]);
+/** Special characters (public/js/character.js SPECIAL_PRESETS): exact ids only. */
+const LOOK_PRESETS = new Set(["none", "him-hills", "him-rooftop", "her-hills", "her-rooftop"]);
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 const NAME_MAX = 18;
 const CHAT_MAX = 240;
@@ -127,6 +129,7 @@ export function sanitizeLook(raw) {
     if (typeof v === "string" && v.length <= 16 && /^[\w-]+$/.test(v)) out[key] = v;
   }
   if (typeof raw.body === "string" && LOOK_BODIES.has(raw.body)) out.body = raw.body;
+  if (typeof raw.preset === "string" && LOOK_PRESETS.has(raw.preset)) out.preset = raw.preset;
   return Object.keys(out).length ? out : null;
 }
 

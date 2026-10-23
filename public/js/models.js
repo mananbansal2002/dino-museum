@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { DEFAULT_HAIR } from "./character.js";
 import { clamp, damp } from "./util.js";
+import { createSpecialRig, preloadSpecial, SPECIAL_ASSETS } from "./special.js";
 
 /**
  * Rigged glTF visitor avatars: the realistic Microsoft Rocketbox pair (MIT, see
@@ -347,7 +348,9 @@ const _tint = new THREE.Color();
  */
 function recolorTint(rig, look, spec) {
   const body = rig.materials.get(spec.recolor.body);
-  if (body && look.shirt) body.color.copy(_white).lerp(_tint.set(look.shirt), SHIRT_TINT);
+  // a special preset brings its own outfit texture: no tint over it
+  if (body && SPECIAL_ASSETS[look.preset]) body.color.copy(_white);
+  else if (body && look.shirt) body.color.copy(_white).lerp(_tint.set(look.shirt), SHIRT_TINT);
   const hair = rig.materials.get(spec.recolor.hair);
   if (hair && look.hairColor) {
     const avg = textureAverage(hair.map);
@@ -495,6 +498,8 @@ export async function upgradeCharacter(character) {
     body = bodyOf(character.look);
     try {
       loaded = await loadHuman(body);
+      // a special outfit's textures too, so it appears dressed (a failure keeps the base outfit)
+      await preloadSpecial(character.look.preset).catch(() => null);
     } catch (err) {
       console.warn("[models] keeping the procedural avatar:", err?.message || err);
       return false;
@@ -585,12 +590,37 @@ export async function upgradeCharacter(character) {
       fit.add(group);
     }
   }
+  // special presets (special.js): outfit textures, skirts, hair and add-ons, on mounts made
+  // now at the rest pose (Rocketbox only — the low-poly fallback keeps the procedural look)
+  const special =
+    spec.recolor.kind === "tint" && head && spine && hips
+      ? createSpecialRig({
+          rig,
+          body,
+          mounts: {
+            head: mountOnBone(rig, head, new THREE.Vector3()),
+            spine: mountOnBone(rig, spine, new THREE.Vector3()),
+            hips: mountOnBone(rig, hips, new THREE.Vector3()),
+          },
+        })
+      : null;
   const syncHair = () => {
+    if (special && SPECIAL_ASSETS[character.look.preset]) {
+      // the preset's own hair and add-ons; of the glTF cards only her eyelashes stay
+      for (const o of glbHair) o.visible = !SPECIAL_ASSETS[character.look.preset].noCards;
+      if (att) {
+        att.hair.visible = false;
+        att.accessory.visible = false;
+      }
+      return;
+    }
+    if (att) att.accessory.visible = true;
     // the glTF's own hair is its body's default style; other styles (and hats over it) use the procedural hair
     const own = !att || (character.look.hair === DEFAULT_HAIR[body] && !COVERS_HAIR.has(character.look.accessory));
     for (const o of glbHair) o.visible = own;
     if (att) att.hair.visible = !own;
   };
+  special?.set(character.look.preset);
   syncHair();
 
   const clips = {};
@@ -628,6 +658,7 @@ export async function upgradeCharacter(character) {
   const procDispose = character.dispose?.bind(character);
 
   character.rig = rig;
+  character.special = special;
   character.modelBody = body;
   character.modelSpec = spec;
 
@@ -647,7 +678,11 @@ export async function upgradeCharacter(character) {
     const item = grip.children[0] || null;
     character.group.remove(rig.model);
     for (const [group, parent] of homes) parent.add(group);
-    if (att) att.hair.visible = true;
+    if (att) {
+      att.hair.visible = true;
+      att.accessory.visible = true;
+    }
+    special?.dispose();
     rig.dispose();
     if (procedural) procedural.visible = true;
     character.update = procUpdate;
@@ -657,6 +692,7 @@ export async function upgradeCharacter(character) {
     if (procSetSitting) character.setSitting = procSetSitting;
     if (procDispose) character.dispose = procDispose;
     character.rig = null;
+    character.special = null;
     character.modelBody = null;
     character.modelSpec = null;
     procSetHeld(item);
@@ -671,6 +707,7 @@ export async function upgradeCharacter(character) {
       return;
     }
     recolor();
+    special?.set(character.look.preset);
     syncHair();
   };
 
