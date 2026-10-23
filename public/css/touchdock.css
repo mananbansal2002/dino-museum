@@ -1,0 +1,280 @@
+/* ================================================================ touch action dock
+   Built by js/touchdock.js on coarse pointers only. Geometry follows
+   player.js: Jump is a 72px circle at right 22px, bottom
+   (--touch-safe-bottom - 74px); its Use slot sits at right 106px in the same
+   row. The HUD chat column (style.css) leaves a 110px strip on the right
+   above --touch-safe-bottom, which is where the small buttons live. */
+
+.touch-dock {
+  position: fixed;
+  inset: 0;
+  z-index: 11; /* above the HUD (10) and player.js's touch layer (5), below overlays (40) */
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.touch-dock[hidden],
+.td-btn[hidden] {
+  display: none !important;
+}
+
+/* nothing to press while a panel, the chat keyboard or a screening is up */
+body:has(.overlay:not(.hidden)) .touch-dock,
+body:has(#hud.hidden) .touch-dock,
+body:has(#chatInput:focus) .touch-dock,
+body:has(#battleOverlay:not(.hidden)) .touch-dock {
+  display: none;
+}
+
+.td-btn {
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: var(--text, #f3ecdf);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  outline: none;
+}
+
+.td-ico {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(12, 17, 24, 0.52);
+  border: 1.5px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  transition:
+    transform 0.12s var(--ease-out, ease-out),
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.td-ico svg {
+  width: 23px;
+  height: 23px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+.td-lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.85),
+    0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.td-btn:active .td-ico,
+.td-btn.td-pop .td-ico {
+  background: rgba(255, 200, 87, 0.32);
+  border-color: rgba(255, 200, 87, 0.85);
+}
+
+.td-btn:active .td-ico {
+  transform: scale(0.9);
+}
+
+.td-btn.td-pop .td-ico {
+  animation: tdPop 0.28s var(--ease-spring, ease-out);
+}
+
+.td-btn:focus-visible .td-ico {
+  box-shadow: 0 0 0 3px rgba(255, 200, 87, 0.55);
+}
+
+/* map toggled big */
+.td-btn.td-on .td-ico {
+  background: rgba(255, 200, 87, 0.26);
+  border-color: rgba(255, 200, 87, 0.8);
+  color: var(--accent, #ffc857);
+}
+
+/* F only exists while there is something to eat or dig; the slot stays put
+   so the other buttons never jump under a thumb */
+.td-btn.td-off {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.td-btn[data-action="eat"]:not(.td-off) .td-ico {
+  border-color: rgba(255, 143, 171, 0.7);
+  background: rgba(255, 143, 171, 0.2);
+  animation: tdIn 0.3s var(--ease-spring, ease-out);
+}
+
+/* small buttons: a 2 x 3 block in the strip above Jump */
+.td-grid {
+  position: absolute;
+  right: calc(12px + var(--safe-r, 0px));
+  bottom: calc(var(--touch-safe-bottom, 170px) + 6px + var(--safe-b, 0px));
+  display: grid;
+  grid-template-columns: repeat(2, 50px);
+  gap: 8px 8px;
+}
+
+/* the big contextual Use (E) button, left of Jump in the same row */
+.td-use {
+  position: absolute;
+  right: 106px;
+  bottom: calc(var(--touch-safe-bottom, 170px) - 74px + var(--safe-b, 0px));
+  gap: 0;
+}
+
+.td-use .td-ico {
+  width: 72px;
+  height: 72px;
+  background: rgba(255, 200, 87, 0.3);
+  border: 2px solid rgba(255, 200, 87, 0.85);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.4),
+    0 0 0 5px rgba(255, 200, 87, 0.12);
+}
+
+.td-use .td-ico svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* the verb sits inside the circle, the label row underneath is not needed */
+.td-use .td-lbl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 13px;
+  text-align: center;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+}
+
+.td-use .td-ico svg {
+  margin-bottom: 14px;
+}
+
+.td-use.td-in .td-ico {
+  animation: tdIn 0.3s var(--ease-spring, ease-out);
+}
+
+.td-use:active .td-ico,
+.td-use.td-pop .td-ico {
+  background: rgba(255, 200, 87, 0.5);
+}
+
+@keyframes tdPop {
+  40% {
+    transform: scale(0.86);
+  }
+}
+
+@keyframes tdIn {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* the dock has its own Chat button, so the HUD's round chat bubble steps
+   aside; it still comes back as the full input when focused */
+body.has-touch-dock #chatInput:not(:focus):not(.open) {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* phones in portrait: the prompt moves left so it clears the button strip */
+@media (pointer: coarse) and (max-width: 640px) and (min-height: 501px) {
+  body.has-touch-dock #prompt {
+    left: calc(var(--hud-gap) + var(--safe-l));
+    transform: none;
+    max-width: calc(100vw - 2 * var(--hud-gap) - 126px - var(--safe-l) - var(--safe-r));
+    animation-name: tdRise;
+  }
+}
+
+@keyframes tdRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* phones in landscape: little height on the right (the minimap lives there),
+   so the small buttons become a 3 x 2 block left of Use, in the Jump row */
+@media (max-height: 500px) {
+  .td-grid {
+    right: calc(192px + var(--safe-r, 0px));
+    bottom: calc(var(--touch-safe-bottom, 150px) - 74px + var(--safe-b, 0px));
+    grid-template-columns: repeat(3, 48px);
+    gap: 6px 8px;
+  }
+  .td-small .td-ico {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ================================================================ exhibit card as a bottom sheet */
+@media (max-width: 640px) {
+  #exhibitCard {
+    align-items: flex-end;
+    padding: calc(var(--safe-t) + 28px) 0 0;
+    overflow: hidden;
+  }
+  #exhibitCard .card.wide {
+    width: 100%;
+    max-height: calc(100vh - var(--safe-t) - 28px);
+    max-height: calc(100dvh - var(--safe-t) - 28px);
+    border-radius: 22px 22px 0 0;
+    border-bottom: 0;
+    padding-bottom: calc(18px + var(--safe-b));
+    animation: tdSheetUp 0.34s var(--ease-out, ease-out) both;
+  }
+  /* grab handle on the sticky header, so it stays while scrolling */
+  #exhibitCard .card.wide .exTop {
+    padding-top: 24px;
+  }
+  #exhibitCard .card.wide .exTop::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    width: 42px;
+    height: 5px;
+    margin-left: -21px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+@keyframes tdSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .td-btn .td-ico,
+  .td-use.td-in .td-ico,
+  .td-btn.td-pop .td-ico,
+  #exhibitCard .card.wide {
+    animation: none !important;
+    transition: none !important;
+  }
+}

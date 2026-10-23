@@ -1,0 +1,155 @@
+/* ------------------------------------------------------------------ */
+/* specimen label block on the exhibit card (labels.js renderLabelHtml) */
+/* ------------------------------------------------------------------ */
+
+.specLabel {
+  --label-paper: #f3ecdc;
+  --label-ink: #241b12;
+  --label-soft: #6b5a46;
+  --label-rule: rgba(36, 27, 18, 0.16);
+  --label-dino: #2f6b47;
+  --label-not: #b8641a;
+  --label-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  margin: 16px 0 0;
+  padding: 14px 18px 12px;
+  background: linear-gradient(180deg, #f7f1e3, var(--label-paper));
+  color: var(--label-ink);
+  border-radius: 6px;
+  border-left: 5px solid var(--label-dino);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset, 0 8px 22px rgba(0, 0, 0, 0.35);
+  font-family: var(--label-serif);
+}
+
+.specLabel--not {
+  border-left-color: var(--label-not);
+}
+
+.specLabel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.specLabel-name {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.specLabel-latin {
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 600;
+  margin-right: 8px;
+  overflow-wrap: anywhere;
+}
+
+.specLabel-author {
+  font-size: 14px;
+  color: var(--label-soft);
+  white-space: nowrap;
+}
+
+.specBadge {
+  flex: none;
+  padding: 3px 10px 4px;
+  border-radius: 999px;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #fff8e8;
+  background: var(--label-dino);
+}
+
+.specBadge--not {
+  background: var(--label-not);
+  box-shadow: 0 0 0 3px rgba(184, 100, 26, 0.18);
+}
+
+.specLabel-say {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+.specLabel-k,
+.specLabel-rows dt {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--label-soft);
+}
+
+.specLabel-sayText {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.specLabel-speak {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--label-rule);
+  border-radius: 50%;
+  background: rgba(36, 27, 18, 0.06);
+  color: var(--label-ink);
+  cursor: pointer;
+}
+
+.specLabel-speak:hover,
+.specLabel-speak:focus-visible {
+  background: rgba(36, 27, 18, 0.14);
+  outline: none;
+}
+
+.specLabel-notNote {
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  border-radius: 4px;
+  background: rgba(184, 100, 26, 0.12);
+  color: #6a3a0f;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.specLabel-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px 18px;
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--label-rule);
+}
+
+.specLabel-rows > div {
+  min-width: 0;
+}
+
+.specLabel-rows dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.specLabel-where {
+  color: var(--label-soft);
+}
+
+@media (max-width: 520px) {
+  .specLabel {
+    padding: 12px 14px 10px;
+  }
+  .specLabel-latin {
+    font-size: 18px;
+  }
+}
