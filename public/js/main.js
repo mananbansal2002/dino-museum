@@ -144,6 +144,7 @@ let live = null;
 let crowd = null;
 let gelateria = null;
 let vendor = null;
+let extinction = null; // the Extinction Room's projection show (extinction.js)
 let resolveProps;
 const propsReady = new Promise((r) => (resolveProps = r));
 
@@ -219,6 +220,13 @@ async function bootAmbient() {
   })
     .catch((err) => console.warn("crowd: could not create it", err))
     .finally(endCrowd);
+  // the immersive projection room: builds itself once a visitor is close
+  await whenIdle(() => import("./extinction.js"))
+    .then((m) => {
+      extinction = m.createExtinctionRoom({ scene, camera, renderer, audio, quality: QUALITY, reducedMotion: () => !!settings.get("reducedMotion") });
+      window.__museum.extinction = extinction;
+    })
+    .catch((err) => console.warn("extinction room: could not create it", err));
 }
 
 // the Jurassic Hall's exit doorway: the court is built when a visitor nears it
@@ -1506,6 +1514,7 @@ const AMBIENT = [
   ["live exhibits", () => live],
   ["crowd", () => crowd],
   ["atmosphere", () => atmosphere],
+  ["extinction room", () => extinction],
 ];
 const MAP = { local: { x: 0, z: 0, ry: 0 }, remotes: [] };
 let mapTick = false;
@@ -1583,7 +1592,10 @@ function animate() {
     // hall intros, once per visit; held during a screening, a video, the era
     // view or while the visitor is busy with the quiz, the map or the settings
     const guideQuiet =
-      inTheatre() || mediaOverlayOpen() || eraView.isOpen() || isQuizOpen() || bigMap.isOpen() || settingsOpen();
+      inTheatre() || mediaOverlayOpen() || eraView.isOpen() || isQuizOpen() || bigMap.isOpen() || settingsOpen() || !!extinction?.inside;
+    // the Extinction Room's show has its own sound and captions: a hall welcome
+    // still running from the doorway stops as you walk in
+    if (extinction?.inside && narrator.speaking && narrator.current.startsWith("hall:")) narrator.stop();
     narrator.tick(roomAt(S.player.state.x, S.player.state.z)?.id, { quiet: guideQuiet });
     // a talk over an open exhibit card or popup: it makes room for the subtitles
     const guideCard = narrator.speaking && (ui.isCardOpen() || ui.isModalOpen());

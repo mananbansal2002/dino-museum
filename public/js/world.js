@@ -34,6 +34,9 @@ export const ROOMS = [
   { id: "scorridor", name: "South Corridor", cols: [14, 17], rows: [18, 19], floor: 0x2b3038, wall: 0x333a44, accent: 0xffc857, h: 6 },
   { id: "lobby", name: "Entrance Atrium", cols: [9, 22], rows: [20, 23], floor: 0x4d4a44, wall: 0x57544d, accent: 0xffd166, h: 11 },
   { id: "porch", name: "Entrance Plaza", cols: [13, 18], rows: [24, 27], floor: 0x5b6067, wall: 0x666b72, accent: 0x8ecae8, h: 9 },
+  // An immersive projection room off the south end of the Triassic Hall; the
+  // show itself lives in extinction.js. "dark": no hall light or fixture.
+  { id: "extinction", name: "Extinction Room", cols: [2, 6], rows: [22, 25], floor: 0x0b0b0c, wall: 0x101012, accent: 0xff8a4c, h: 9, dark: true },
   // The end of the tour: a bent exit passage leaves the far end of the
   // Jurassic Hall, runs down the east side of the building and turns into the
   // Ice Cream Court. Neither is visible from the entrance; both are hidden on
@@ -67,6 +70,7 @@ export const OPEN = new Set([
   "v:14,17", "v:15,17", "v:16,17", "v:17,17", // grand gallery -> south corridor
   "v:14,19", "v:15,19", "v:16,19", "v:17,19", // south corridor -> lobby
   "v:14,23", "v:15,23", "v:16,23", "v:17,23", // lobby -> entrance plaza
+  "v:4,21", // triassic hall -> extinction room
   "h:29,18", "h:29,19", // jurassic hall (far end) -> exit passage
   "v:30,22", // exit passage bends into the ice cream court
 ]);
@@ -522,6 +526,10 @@ export const BENCHES = [
   { id: "cretaceous", x: -78, z: -63, ry: Math.PI, looks: "the Cretaceous Hall" },
   { id: "marine", x: 49, z: -68.8, ry: Math.PI, looks: "the Mosasaurus" },
   { id: "jurassic", x: 71.5, z: 13.6, ry: -Math.PI / 2, looks: "the long-necks" },
+  // one long, low bench in the middle of the Extinction Room (drawn by
+  // extinction.js, which lights it with the projection)
+  { id: "extinction-1", x: -70.65, z: 55, ry: 0, looks: "the show", custom: true },
+  { id: "extinction-2", x: -67.35, z: 55, ry: 0, looks: "the show", custom: true },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -842,7 +850,7 @@ export function buildInteractables() {
       list.push({
         id: s.id,
         type: "seat",
-        area: "bench",
+        area: b.custom ? "projection" : "bench", // custom benches bring their own model
         x: s.x,
         z: s.z,
         radius: 0.9,
@@ -978,6 +986,7 @@ export const HALL_LABEL = {
   court: "Ice Cream Court",
   xpassage: "Exit Passage",
   porch: "Entrance Plaza",
+  extinction: "Extinction Room",
 };
 
 /**
@@ -1378,6 +1387,7 @@ export function buildWorld(scene) {
   const fixtureGeo = new THREE.CylinderGeometry(0.55, 0.72, 0.22, 12);
   const fixtureMats = new Map(); // accent -> material
   for (const room of ROOMS) {
+    if (room.dark) continue; // a projection room stays dark
     const w = (room.cols[1] - room.cols[0] + 1) * CELL;
     const d = (room.rows[1] - room.rows[0] + 1) * CELL;
     const cx = (g2w(room.cols[0]) + g2w(room.cols[1])) / 2;
@@ -2078,7 +2088,7 @@ export function buildWorld(scene) {
 
   for (const b of ATRIUM_BENCHES) addBench(b.x, b.z, b.ry);
   // benches in front of the big centrepieces (each holds two "seat" spots)
-  for (const b of BENCHES) addBench(b.x, b.z, b.ry);
+  for (const b of BENCHES) if (!b.custom) addBench(b.x, b.z, b.ry);
   // potted plants (the atrium's and the ice cream court's)
   for (const [x, z] of PLANTERS) addPlanter(x, z);
 

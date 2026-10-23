@@ -1606,6 +1606,142 @@ export function createAudio() {
       setTimeout(() => out.disconnect(), 2500);
     },
 
+    /**
+     * A sustained sound-design layer for an immersive show (the Extinction
+     * Room): "rumble" (sub-bass earth rumble), "fire" (a roaring firestorm
+     * with crackle) or "wind" (cold, ashen wind). Fades in over opts.attack
+     * seconds to opts.level. Returns { set(level, seconds), stop(seconds) },
+     * or null while the context cannot play.
+     */
+    layer(kind, { level = 1, attack = 2 } = {}) {
+      const c = ensure();
+      if (!c || !playable()) return null;
+      const t = c.currentTime + 0.02;
+      const out = c.createGain();
+      out.gain.setValueAtTime(0, t);
+      out.gain.linearRampToValueAtTime(level, t + Math.max(0.05, attack));
+      const dest = voiceOut(sfx, kind === "rumble" ? 0.08 : 0.22);
+      out.connect(dest);
+      const nodes = [];
+      let timer = 0;
+      const lfo = (param, rate, depth) => {
+        const o = c.createOscillator();
+        o.frequency.value = rate;
+        const d = gainNode(depth);
+        o.connect(d);
+        d.connect(param);
+        o.start(t);
+        nodes.push(o);
+      };
+      const noise = (buf, type, freq, q, gain) => {
+        const n = noiseSrc(buf, true);
+        const f = filter(type, freq, q);
+        const g = gainNode(gain);
+        n.connect(f);
+        f.connect(g);
+        g.connect(out);
+        n.start(t, Math.random() * 2);
+        nodes.push(n);
+        return { f, g };
+      };
+      if (kind === "rumble") {
+        const a = noise(noiseBrown, "lowpass", 85, 0.9, 0.9);
+        lfo(a.g.gain, 0.11, 0.35);
+        const b = noise(noiseBrown, "lowpass", 42, 1.4, 0.8);
+        lfo(b.g.gain, 0.07, 0.3);
+        const sub = c.createOscillator();
+        sub.frequency.value = 31;
+        const sg = gainNode(0.07);
+        sub.connect(sg);
+        sg.connect(out);
+        lfo(sub.frequency, 0.09, 2);
+        sub.start(t);
+        nodes.push(sub);
+      } else if (kind === "fire") {
+        const roar = noise(noisePink, "bandpass", 420, 0.5, 0.5);
+        lfo(roar.f.frequency, 0.17, 140);
+        lfo(roar.g.gain, 0.23, 0.18);
+        noise(noiseBrown, "lowpass", 240, 0.6, 0.55);
+        const hiss = noise(noiseWhite, "highpass", 3200, 0.5, 0.025);
+        lfo(hiss.g.gain, 0.4, 0.012);
+        // crackle: short bright noise pops at random
+        const pop = (when) => {
+          const n = noiseSrc(noiseWhite);
+          const f = filter("bandpass", rand(1400, 4200), rand(1.5, 4));
+          const g = c.createGain();
+          const end = perc(g.gain, when, rand(0.05, 0.22), 0.002, rand(0.015, 0.06));
+          n.connect(f);
+          f.connect(g);
+          g.connect(out);
+          n.start(when, rand(0, 1.5));
+          n.stop(end);
+        };
+        timer = setInterval(() => {
+          if (c.state !== "running") return;
+          const now = c.currentTime;
+          for (let i = 0, k = 1 + Math.floor(Math.random() * 4); i < k; i++) pop(now + 0.02 + Math.random() * 0.12);
+        }, 110);
+      } else {
+        const w = noise(noisePink, "bandpass", 420, 0.9, 0.45);
+        lfo(w.f.frequency, 0.08, 190);
+        lfo(w.g.gain, 0.13, 0.2);
+        const h = noise(noiseWhite, "highpass", 2600, 0.5, 0.018);
+        lfo(h.g.gain, 0.1, 0.01);
+      }
+      let stopped = false;
+      return {
+        set(v, seconds = 1) {
+          if (!stopped) rampTo(out.gain, Math.max(0, v), seconds);
+        },
+        stop(seconds = 2) {
+          if (stopped) return;
+          stopped = true;
+          clearInterval(timer);
+          rampTo(out.gain, 0, seconds);
+          setTimeout(() => {
+            for (const n of nodes) {
+              try {
+                n.stop();
+              } catch {
+                /* already stopped */
+              }
+            }
+            out.disconnect();
+            dest.disconnect();
+          }, seconds * 1000 + 150);
+        },
+      };
+    },
+
+    /** One huge, distant impact: a blast, a sub-bass drop and a long debris tail. */
+    impact(power = 1) {
+      const c = ensure();
+      if (!c || !playable()) return;
+      const k = clamp(Number(power) || 1, 0.2, 1.5);
+      const t = c.currentTime + 0.01;
+      const out = voiceOut(sfx, 0.35);
+      // the blast: a wide noise burst that darkens as it decays
+      const n = noiseSrc(noiseBrown);
+      const lp = filter("lowpass", 2400, 0.6);
+      lp.frequency.setValueAtTime(2400, t);
+      lp.frequency.exponentialRampToValueAtTime(90, t + 4);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.9 * k, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.25 * k, t + 1.2);
+      g.gain.exponentialRampToValueAtTime(0.002, t + 7);
+      g.gain.linearRampToValueAtTime(0, t + 7.1);
+      n.connect(lp);
+      lp.connect(g);
+      g.connect(out);
+      n.start(t, rand(0, 2));
+      n.stop(t + 7.2);
+      // the sub drop you feel in your chest
+      tone(out, { freq: 62, glideTo: 24, t, peak: 0.55 * k, attack: 0.02, decay: 3.2 });
+      tone(out, { type: "triangle", freq: 110, glideTo: 38, t, peak: 0.18 * k, attack: 0.01, decay: 1.4 });
+      setTimeout(() => out.disconnect(), 8000);
+    },
+
     /** Ice-cream slurp: gurgly rising noise, a squeak and a little pop. */
     slurp() {
       if (!on("chimes")) return;
