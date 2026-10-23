@@ -1,6 +1,6 @@
 {
-  "description": "Period murals hung in the era halls (public/js/halls.js). Charles R. Knight's Field Museum (Chicago) paintings of the 1920s-30s, downloaded from Wikimedia Commons as 1280 px thumbnails and re-encoded with sips at 1024 px wide, JPEG quality 80. No other edits.",
-  "license": "Public domain (as tagged on Wikimedia Commons; Knight's Field Museum murals, see each file page for the exact PD rationale)",
+  "description": "Murals and photomurals hung in the halls (public/js/halls.js). Paintings: Charles R. Knight (public domain). Triassic photomurals: Petrified Forest National Park, Arizona (Chinle Formation, Late Triassic), photographs by Andrew Kearns, CC BY 2.0. All downloaded from Wikimedia Commons as 1280 px thumbnails and re-encoded with sips at max 1024 px, JPEG quality 80. No other edits.",
+  "license": "Knight paintings: public domain (as tagged on Wikimedia Commons). Petrified Forest photographs: CC BY 2.0, attribution in each entry.",
   "murals": {
     "triassic.jpg": {
       "hall": "triassic",
@@ -106,6 +106,159 @@
       ],
       "source": "https://mm.fieldmuseum.org/7e58c24f-bc8c-4c22-8e50-3ea1901046ba",
       "description": "Reptiles That Invaded The Seas; Plesiosaurus and Stenopterygius, fish shaped ichthyosaur. Mesozoic, Jurassic. Charles Knight painting or mural."
+    },
+    "triassic2.jpg": {
+      "hall": "triassic",
+      "title": "Blue Mesa View- Petrified Forest National Park (17181860036)",
+      "artist": "Andrew Kearns from Mill Valley, United States",
+      "date": "2015-03-03 18:03",
+      "license": "CC BY 2.0",
+      "commons": "https://commons.wikimedia.org/wiki/File:Blue_Mesa_View-_Petrified_Forest_National_Park_(17181860036).jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/3/39/Blue_Mesa_View-_Petrified_Forest_National_Park_%2817181860036%29.jpg",
+      "originalSize": [
+        19637,
+        7288
+      ],
+      "source": "Blue Mesa View- Petrified Forest National Park",
+      "description": "The one place in the park where you can experience almost all the park has on offer in one place is Blue Mesa. Add some weather and you are in for an experience worth the space it takes up in your brain. All other experiences are adjuncts. I love Zeiss glass especially when it's in Arizona! 7 shot p",
+      "attribution": "\"Blue Mesa View- Petrified Forest National Park (17181860036)\" by Andrew Kearns, CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/), via Wikimedia Commons"
+    },
+    "triassic3.jpg": {
+      "hall": "triassic",
+      "title": "Red Basin- Petrified Forest National Park (16699213870)",
+      "artist": "Andrew Kearns from Mill Valley, United States",
+      "date": "2015-03-02 15:29",
+      "license": "CC BY 2.0",
+      "commons": "https://commons.wikimedia.org/wiki/File:Red_Basin-_Petrified_Forest_National_Park_(16699213870).jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Red_Basin-_Petrified_Forest_National_Park_%2816699213870%29.jpg",
+      "originalSize": [
+        9633,
+        3887
+      ],
+      "source": "Red Basin- Petrified Forest National Park",
+      "description": "Red Basin- Petrified Forest National Park",
+      "attribution": "\"Red Basin- Petrified Forest National Park (16699213870)\" by Andrew Kearns, CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/), via Wikimedia Commons"
+    },
+    "triassic4.jpg": {
+      "hall": "triassic",
+      "title": "Jasper Forest- Petrified Forest National Park (14736525130)",
+      "artist": "Andrew Kearns from Mill Valley, United States",
+      "date": "2014-08-14 22:20",
+      "license": "CC BY 2.0",
+      "commons": "https://commons.wikimedia.org/wiki/File:Jasper_Forest-_Petrified_Forest_National_Park_(14736525130).jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/f/fe/Jasper_Forest-_Petrified_Forest_National_Park_%2814736525130%29.jpg",
+      "originalSize": [
+        10060,
+        4477
+      ],
+      "source": "Jasper Forest- Petrified Forest National Park",
+      "description": "Jasper Forest is one of the most amazing places in the Petrified Forest National Park in Arizona. The colors of the sediments and of the red petrified woods are brought to light here by a post sunset glow! 7 images stitched together in PS.",
+      "attribution": "\"Jasper Forest- Petrified Forest National Park (14736525130)\" by Andrew Kearns, CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/), via Wikimedia Commons"
+    },
+    "jurassic3.jpg": {
+      "hall": "jurassic",
+      "title": "Archaeopteryx, Compsognathus and Rhamphorhynchus by Knight",
+      "artist": "Charles R. Knight",
+      "date": "1932",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Archaeopteryx,_Compsognathus_and_Rhamphorhynchus_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/f/f1/Archaeopteryx%2C_Compsognathus_and_Rhamphorhynchus_by_Knight.jpg",
+      "originalSize": [
+        1991,
+        1563
+      ],
+      "source": "https://mm.fieldmuseum.org/0c12af52-ef52-4452-8aeb-50460af7d4f4",
+      "description": "Archaeopteryx, Compsognathus and Rhamphorhynchus. Birds appeared in a world still dominated by Reptiles. Germany, Mesozoic Lower Jurassic. Charles Knight painting or mural on wall in Hall 38 Fossil Vertebrates. Wood letters spell out title: Birds Appeared in a World still dominated by reptiles. Germ"
+    },
+    "jurassic5.jpg": {
+      "hall": "jurassic",
+      "title": "Illustration of the Brontosaurus by Charles R. Knight",
+      "artist": "Charles R. Knight",
+      "date": "1897",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Illustration_of_the_Brontosaurus_by_Charles_R._Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Illustration_of_the_Brontosaurus_by_Charles_R._Knight.jpg",
+      "originalSize": [
+        4091,
+        2739
+      ],
+      "source": "Image 1 of New-York tribune (New York), July 6, 1919",
+      "description": "Illustration of Brontosaurus in the water, and Diplodocus on land."
+    },
+    "cretaceous3.jpg": {
+      "hall": "cretaceous",
+      "title": "Laelaps-Charles Knight-1897",
+      "artist": "Charles R. Knight",
+      "date": "1897date QS:P571,+1897-00-00T00:00:00Z/9",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Laelaps-Charles_Knight-1897.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Laelaps-Charles_Knight-1897.jpg",
+      "originalSize": [
+        3543,
+        2405
+      ],
+      "source": "https://www.theguardian.com/books/gallery/2017/jul/19/paleoart-the-strange-history-of-dinosaurs-in-art-in-pictures#img-4, earlier version from http://www.charlesrknight.com/Enlarge.htm?92",
+      "description": "Leaping Laelaps - Two Laelaps/Dryptosaurus fighting."
+    },
+    "cretaceous4.jpg": {
+      "hall": "cretaceous",
+      "title": "Agathaumas",
+      "artist": "Charles R. Knight",
+      "date": "1897",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Agathaumas.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/3/35/Agathaumas.jpg",
+      "originalSize": [
+        1125,
+        782
+      ],
+      "source": "https://digitalcollections.amnh.org/archive/Cro-Magnon-Man---by-Charles-R--Knight-2URM1TLOFQL5.html",
+      "description": "Charles R. Knight's restoration of Agathaumas sphenocerus .mw-parser-output .messagebox{margin:4px 0;width:auto;border-collapse:collapse;border:2px solid var(--border-color-progressive,#6485d1);background-color:var(--background-color-neutral-subtle,#fbfcff);color:var(--color-base,#202122);box-sizing"
+    },
+    "cretaceous5.jpg": {
+      "hall": "cretaceous",
+      "title": "Knight hadrosaurs",
+      "artist": "Charles R. Knight",
+      "date": "1897date QS:P571,+1897-00-00T00:00:00Z/9",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Knight_hadrosaurs.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Knight_hadrosaurs.jpg",
+      "originalSize": [
+        1990,
+        1385
+      ],
+      "source": "https://www.pbs.org/wgbh/americanexperience/features/dinosaurs-charles-r-knight/",
+      "description": "Historical life restoration of “Hadrosaurus mirabilis” (i.e. Edmontosaurus annectens aka Anatosaurus copei) by a lake."
+    },
+    "marine3.jpg": {
+      "hall": "marine",
+      "title": "The Snake-necked Elasmosaurus",
+      "artist": "Charles R. Knight",
+      "date": "1897",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:The_Snake-necked_Elasmosaurus.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/7/77/The_Snake-necked_Elasmosaurus.jpg",
+      "originalSize": [
+        1034,
+        724
+      ],
+      "source": "https://digitalcollections.amnh.org/archive/Cro-Magnon-Man---by-Charles-R--Knight-2URM1TLOFQL5.html",
+      "description": "Elasmosaurus platyurus."
+    },
+    "marine5.jpg": {
+      "hall": "marine",
+      "title": "Stenopterygius by Knight",
+      "artist": "Charles R. Knight",
+      "date": "1902",
+      "license": "Public domain",
+      "commons": "https://commons.wikimedia.org/wiki/File:Stenopterygius_by_Knight.jpg",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Stenopterygius_by_Knight.jpg",
+      "originalSize": [
+        769,
+        1066
+      ],
+      "source": "https://digitalcollections.amnh.org/archive/Ichthyosaurus-2URM1THAVJZ.html",
+      "description": "Stenopterygius quadriscissus."
     }
   }
 }

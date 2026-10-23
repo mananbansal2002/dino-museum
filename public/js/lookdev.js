@@ -49,14 +49,14 @@ const LIGHT_POOL = 6;
 
 /** Curated museum paint per hall (sRGB). Unknown rooms fall back to their own wall colour. */
 const PAINT = {
-  rotunda: 0xd6c09c,
-  lobby: 0xdecbae,
-  porch: 0xcfc8b8,
-  cretaceous: 0x9a5e45,
-  predator: 0x6e3034,
-  triassic: 0xae8550,
-  jurassic: 0x56705a,
-  marine: 0x2f5866,
+  rotunda: 0xd9c8a6, // warm Portland stone
+  lobby: 0xe6dcc8, // pale limestone
+  porch: 0xd8d1c2,
+  cretaceous: 0x7d2a2c, // oxblood
+  predator: 0x45474b, // slate
+  triassic: 0xc4823f, // desert ochre
+  jurassic: 0x33623f, // deep forest green
+  marine: 0x23405e, // deep navy
   theater: 0x4d3a3f,
   court: 0xe2c3b4,
 };
@@ -418,6 +418,26 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     return CORRIDOR_PAINT;
   }
 
+  /** The era halls get a ceiling washed with their wall colour (one material per hall). */
+  const CEILING_TINT = { triassic: 0.18, jurassic: 0.16, cretaceous: 0.14, marine: 0.18, predator: 0.1 };
+  const ceilingCache = new Map();
+  function ceilingFor(roomId) {
+    const k = CEILING_TINT[roomId];
+    if (!k) return lib.ceiling;
+    if (!ceilingCache.has(roomId)) {
+      const color = new THREE.Color(0xe4dccd).lerp(new THREE.Color(paintColor(roomId)), k);
+      const m = keep(
+        patchWorldUV(pbr("plaster", { roughness: 0.95, color, envMapIntensity: 0.5, side: THREE.DoubleSide }, { normal: false }), 4.0, {
+          macro: 0.04,
+          gain: 1.5,
+        }),
+        "ceiling"
+      );
+      ceilingCache.set(roomId, m);
+    }
+    return ceilingCache.get(roomId);
+  }
+
   function floorFor(roomId) {
     if (roomId === "theater") return lib.carpet;
     if (["rotunda", "lobby", "porch"].includes(roomId)) return lib.stoneFloor;
@@ -519,7 +539,7 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
       }
       case "ceiling": {
         const open = old && old.transparent && old.opacity < 0.9;
-        mesh.material = open ? lib.skylight : lib.ceiling;
+        mesh.material = open ? lib.skylight : ceilingFor(mesh.userData.room);
         mesh.castShadow = false;
         break;
       }
@@ -870,6 +890,20 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
     const pilasterDone = new Set();
     const doorDone = new Set();
     const faces = []; // every wall face, for the hall themes
+    const beamBatches = new Map();
+    const beamBatchFor = (roomId) => {
+      const k = CEILING_TINT[roomId];
+      if (!k) return null;
+      if (!beamBatches.has(roomId)) {
+        const color = new THREE.Color(0xf1e9da).lerp(new THREE.Color(paintColor(roomId)), Math.min(0.6, k * 3.4));
+        const m = keep(
+          patchWorldUV(pbr("plaster", { roughness: 0.8, color, envMapIntensity: 0.5 }, { normalScale: 0.25 }), 3.2, { macro: 0.03, gain: 1.6 }),
+          "moulding"
+        );
+        beamBatches.set(roomId, boxBatch(m, `lookdev-beams-${roomId}`));
+      }
+      return beamBatches.get(roomId);
+    };
     const dadoBatches = new Map(); // material -> box batch
     const dadoBatch = (mat) => {
       if (!dadoBatches.has(mat)) dadoBatches.set(mat, boxBatch(mat, `lookdev-dado-${dadoBatches.size}`));
@@ -933,7 +967,8 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
             const ex = alongX ? w.x + e : fx0;
             const ez = alongX ? fz0 : w.z + e;
             const k = `${r2(ex)},${r2(ez)},${s},${alongX}`;
-            if (pilasterDone.has(k) || (winHere && nearWindow(ex, ez, 4.4))) continue;
+            // (an era window can sit across two slabs: test the pilaster itself)
+            if (pilasterDone.has(k) || nearWindow(ex, ez, 4.4)) continue;
             if (themes.pilasterHidden(ex, ez, s, alongX)) continue; // a mural hangs here
             pilasterDone.add(k);
             const ea = e;
@@ -1031,16 +1066,18 @@ export function applyLookdev({ renderer, scene, camera, quality = "auto", adapti
         if (lantern) buildLantern(cx, cz, h, lantern.hx, lantern.hz, metal);
         continue;
       }
-      // halls: transverse beams on the bay lines + a perimeter beam
+      // halls: transverse beams on the bay lines + a perimeter beam (the era
+      // halls paint theirs in a deeper shade of the hall colour)
       const alongX = W >= D;
+      const beams = beamBatchFor(room.id) || mould;
       if (alongX) {
-        for (let x = b.x0 + C; x < b.x1 - 0.5; x += C) mould.add(x, h - 0.45, cz, 0.55, 0.9, D);
+        for (let x = b.x0 + C; x < b.x1 - 0.5; x += C) beams.add(x, h - 0.45, cz, 0.55, 0.9, D);
       } else {
-        for (let z = b.z0 + C; z < b.z1 - 0.5; z += C) mould.add(cx, h - 0.45, z, W, 0.9, 0.55);
+        for (let z = b.z0 + C; z < b.z1 - 0.5; z += C) beams.add(cx, h - 0.45, z, W, 0.9, 0.55);
       }
     }
 
-    for (const batch of [wood, mould, metal, brass, ...dadoBatches.values()]) {
+    for (const batch of [wood, mould, metal, brass, ...dadoBatches.values(), ...beamBatches.values()]) {
       const m = batch.build();
       if (m) {
         fx.add(m);

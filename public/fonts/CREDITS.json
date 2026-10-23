@@ -1,0 +1,8 @@
+{
+  "optimer-bold-titles.typeface.json": {
+    "use": "brass hall-title lettering (public/js/halls.js)",
+    "from": "three.js r160 examples/fonts/optimer_bold.typeface.json (Optimer Bold, MgOpen family by MAGENTA Ltd.)",
+    "license": "MgOpen font license, see LICENSE-optimer.txt",
+    "edits": "subset to A-Z, 0-9, space, hyphen, full stop and comma; renamed 'Optimer Titles' as the licence asks of modified versions"
+  }
+}

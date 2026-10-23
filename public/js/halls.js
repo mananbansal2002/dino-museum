@@ -12,6 +12,9 @@
  *     public domain, see /images/murals/CREDITS.json) hung above the dado
  *     in the era halls. Their pictures stream in like the exhibit photos:
  *     only when the visitor is in the hall or next to it,
+ *   - Petrified Forest photomurals (Chinle Formation, CC BY) in the Triassic Hall,
+ *   - a brass title (hall name and era dates) over each hall's feature wall,
+ *     from a 20 kB subset of Optimer Bold (/fonts/),
  *   - a slow water-caustic light drifting over the Marine Hall's ceiling
  *     and floor, and a per-hall tint for the roaming ceiling lights.
  *
@@ -26,11 +29,17 @@
  *   themes.update(dt, camera)      // every frame (no allocations)
  */
 import * as THREE from "three";
+import { FontLoader } from "three/addons/loaders/FontLoader.js";
+import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+
+const TITLE_FONT = "/fonts/optimer-bold-titles.typeface.json";
+const TITLE_SIZE = 1.25; // em size of a title (caps are ~0.75 of it)
 
 const MURAL_DIR = "/images/murals/";
 /** Canvas band of every mural (m above the floor); its frame sits around it. */
-const MURAL_Y0 = 4.0;
-const MURAL_H = 4.2;
+const MURAL_Y0 = 3.7;
+const MURAL_H = 5.0;
 const FRAME_W = 0.22;
 
 /**
@@ -39,13 +48,39 @@ const FRAME_W = 0.22;
  * aspect = width / height of the image.
  */
 export const MURALS = [
-  { room: "triassic", file: "triassic.jpg", side: "E", at: 27, aspect: 1024 / 771, h: 5.0, y0: 3.75 },
+  // Triassic: Knight's Karoo scene, and the Chinle badlands of Petrified
+  // Forest (Arizona) where much of the hall's fauna was dug up
+  { room: "triassic", file: "triassic.jpg", side: "E", at: 27, aspect: 1024 / 771 },
+  { room: "triassic", file: "triassic2.jpg", side: "W", at: -5.5, aspect: 1024 / 380 },
+  { room: "triassic", file: "triassic3.jpg", side: "W", at: 29.5, aspect: 1024 / 413 },
+  { room: "triassic", file: "triassic4.jpg", side: "S", at: -69, aspect: 1024 / 456 },
   { room: "jurassic", file: "jurassic.jpg", side: "S", at: 60.5, aspect: 1024 / 356 },
-  { room: "jurassic", file: "jurassic2.jpg", side: "N", at: 75, aspect: 1024 / 785, h: 4.4, y0: 3.7 },
+  { room: "jurassic", file: "jurassic2.jpg", side: "N", at: 75, aspect: 1024 / 785 },
+  { room: "jurassic", file: "jurassic3.jpg", side: "W", at: 27, aspect: 1024 / 804 },
+  { room: "jurassic", file: "jurassic5.jpg", side: "W", at: -9, aspect: 1024 / 685 },
   { room: "cretaceous", file: "cretaceous.jpg", side: "N", at: -79.5, aspect: 1024 / 352 },
   { room: "cretaceous", file: "cretaceous2.jpg", side: "N", at: -47.5, aspect: 1024 / 342 },
+  { room: "cretaceous", file: "cretaceous3.jpg", side: "W", at: -63, aspect: 1024 / 695 },
+  { room: "cretaceous", file: "cretaceous4.jpg", side: "E", at: -51, aspect: 1024 / 711 },
+  { room: "cretaceous", file: "cretaceous5.jpg", side: "S", at: -60, aspect: 1024 / 712 },
   { room: "marine", file: "marine.jpg", side: "N", at: 48, aspect: 1024 / 349 },
   { room: "marine", file: "marine2.jpg", side: "N", at: 72, aspect: 1024 / 351 },
+  { room: "marine", file: "marine3.jpg", side: "W", at: -51, aspect: 1024 / 717 },
+  { room: "marine", file: "marine5.jpg", side: "S", at: 75, aspect: 738 / 1024 },
+];
+
+/**
+ * Hall titles: brass letters on the wall facing the way most visitors come
+ * in (in the era halls: over the era window). at = centre along that wall,
+ * y = baseline of the title line.
+ */
+export const TITLES = [
+  { room: "triassic", side: "W", at: 12, y: 7.15, text: "TRIASSIC", sub: "252 - 201 MILLION YEARS AGO" },
+  { room: "jurassic", side: "S", at: 76, y: 7.15, text: "JURASSIC", sub: "201 - 145 MILLION YEARS AGO" },
+  { room: "cretaceous", side: "N", at: -64, y: 7.15, text: "CRETACEOUS", sub: "145 - 66 MILLION YEARS AGO" },
+  { room: "marine", side: "E", at: -70, y: 7.15, text: "MARINE REPTILES", sub: "MESOZOIC SEAS, 252 - 66 MILLION YEARS AGO" },
+  { room: "rotunda", side: "N", at: 0, y: 10.6, text: "GRAND GALLERY", sub: "THE AGE OF DINOSAURS", size: 1.7 },
+  { room: "predator", side: "W", at: -30, y: 6.2, text: "PREDATOR BAY", sub: "HUNTERS OF THE MESOZOIC" },
 ];
 
 /**
@@ -459,7 +494,29 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
   }
 
   /** Is the pilaster at (x, z) on this face behind a mural (it would cut through the frame)? */
+  /* ---------------- titles: placement ---------------- */
+  const titles = [];
+  for (const t of TITLES) {
+    const r = byId.get(t.room);
+    if (!r || r.secret) continue;
+    const b = bounds(r);
+    const alongX = t.side === "N" || t.side === "S";
+    const s = t.side === "N" || t.side === "W" ? 1 : -1;
+    const face = (t.side === "N" ? b.z0 : t.side === "S" ? b.z1 : t.side === "W" ? b.x0 : b.x1) + s * 0.2;
+    const size = t.size || TITLE_SIZE;
+    // Optimer caps average ~0.78 em wide plus tracking: a safe estimate for
+    // clearing the pilasters before the font has loaded
+    const half = Math.max(t.text.length * size * 0.86, t.sub.length * size * 0.3 * 0.86) / 2;
+    titles.push({ ...t, alongX, s, face, size, a0: t.at - half, a1: t.at + half });
+  }
+
   function pilasterHidden(x, z, s, alongX) {
+    for (const m of titles) {
+      if (m.alongX !== alongX || m.s !== s) continue;
+      if (Math.abs((alongX ? z : x) - m.face) > 0.5) continue;
+      const a = alongX ? x : z;
+      if (a > m.a0 - 0.6 && a < m.a1 + 0.6) return true;
+    }
     for (const m of murals) {
       if (m.alongX !== alongX || m.s !== s) continue;
       const across = alongX ? z : x;
@@ -513,7 +570,7 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
         metalness: 0,
         envMapIntensity: 0.15,
         emissive: 0x000000,
-        emissiveIntensity: 0.32,
+        emissiveIntensity: 0.4,
       });
       m.mat.userData.lkEnv = 0.15;
       const geos = [];
@@ -539,9 +596,6 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
       put(fillet, m.at, y1 - 0.02, 0.1, m.w + 0.02, 0.04, 0.05);
       put(fillet, m.a0 + 0.02, (y0 + y1) / 2, 0.1, 0.04, m.h, 0.05);
       put(fillet, m.a1 - 0.02, (y0 + y1) / 2, 0.1, 0.04, m.h, 0.05);
-      // picture light: a long brass hood on two arms over the top rail
-      put(fillet, m.at, y1 + fw + 0.2, 0.62, Math.min(m.w * 0.7, 7), 0.09, 0.16);
-      for (const k of [-0.3, 0.3]) put(fillet, m.at + k * Math.min(m.w * 0.7, 7), y1 + fw + 0.12, 0.32, 0.04, 0.04, 0.62);
     }
 
     // per-face details
@@ -552,7 +606,7 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
     const limeJoints = batch(keep(new THREE.MeshStandardMaterial({ color: 0x9c8e76, roughness: 1, envMapIntensity: 0.1 }), "wall"), "halls-lime-joints");
     const acoustic = batch(mats.acoustic, "halls-acoustic");
     const acousticFrame = batch(mats.acousticFrame, "halls-acoustic-frame");
-    const FRIEZE_H = 0.7;
+    const FRIEZE_H = 0.5;
     for (const f of faces) {
       const t = theme(f.room.id);
       if (!t) continue;
@@ -565,7 +619,7 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
       const face = f.alongX ? f.fz0 : f.fx0;
       if (t.frieze) {
         // a band under the cornice, running in world space so tiles meet across slabs
-        const y0 = f.h - 1.32;
+        const y0 = f.h - 1.0; // between the mural frames and the cornice
         const tile = FRIEZE_H * 4; // the tile is 4:1
         const a0 = mid - f.L / 2;
         const a1 = mid + f.L / 2;
@@ -651,6 +705,7 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
       const mesh = merged(geos, mat, `halls-frieze-${id}`);
       if (mesh) fx.add(mesh);
     }
+    buildTitles(fx);
     for (const b of [frame, fillet, course, acoustic, acousticFrame, stoneJoints, limeJoints, ...joints.values()]) {
       const mesh = b.build();
       if (mesh) fx.add(mesh);
@@ -693,6 +748,61 @@ export function createHallThemes({ WORLD, lib, keep, pbr, tex, patchWorldUV, max
         animated.push({ map, vx: l.vx, vz: l.vz });
       }
     }
+  }
+
+  /**
+   * Brass letters standing off the wall, every title in one merged mesh.
+   * The font (a 20 kB subset) is fetched once; until it arrives the walls
+   * are simply bare.
+   */
+  const letterMat = keep(
+    new THREE.MeshStandardMaterial({ color: 0xc9a262, metalness: 0.7, roughness: 0.3, envMapIntensity: 1.1, emissive: 0x24180a }),
+    "metal"
+  );
+  function buildTitles(fx) {
+    if (!titles.length || typeof fetch !== "function") return;
+    new FontLoader().load(
+      TITLE_FONT,
+      (font) => {
+        const geos = [];
+        const add = (text, size, depth, y, t) => {
+          const g = new TextGeometry(text, {
+            font,
+            size,
+            height: depth,
+            curveSegments: 5,
+            bevelEnabled: true,
+            bevelThickness: depth * 0.25,
+            bevelSize: size * 0.012,
+            bevelSegments: 1,
+          });
+          g.computeBoundingBox();
+          const bb = g.boundingBox;
+          g.translate(-(bb.min.x + bb.max.x) / 2, 0, 0);
+          const ry = t.alongX ? (t.s > 0 ? 0 : Math.PI) : t.s > 0 ? Math.PI / 2 : -Math.PI / 2;
+          g.rotateY(ry);
+          const out = 0.04; // stand-off pins
+          g.translate(t.alongX ? t.at : t.face + t.s * out, y, t.alongX ? t.face + t.s * out : t.at);
+          geos.push(g.index ? g.toNonIndexed() : g);
+        };
+        for (const t of titles) {
+          add(t.text, t.size, 0.07, t.y, t);
+          add(t.sub, t.size * 0.27, 0.035, t.y - t.size * 0.62, t);
+        }
+        const merged = mergeGeometries(geos, false);
+        for (const g of geos) g.dispose();
+        if (!merged) return;
+        const mesh = new THREE.Mesh(merged, letterMat);
+        mesh.name = "halls-titles";
+        mesh.userData.lkDone = true;
+        mesh.castShadow = false;
+        fx.add(mesh);
+      },
+      undefined,
+      () => {
+        /* no titles: the walls stay bare */
+      }
+    );
   }
 
   let paintOf = (id, r) => r.wall;
