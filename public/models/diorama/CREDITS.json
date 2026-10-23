@@ -1,0 +1,85 @@
+{
+  "description": "Assets used by the living diorama windows (public/js/diorama.js).",
+  "assets": {
+    "fern_02": {
+      "files": [
+        "fern_02.gltf",
+        "fern_02.bin",
+        "fern_02_diff.jpg",
+        "fern_02_alpha.jpg",
+        "fern_02_nor.jpg"
+      ],
+      "name": "Fern 02",
+      "authors": {
+        "Rob Tuytel": "Scanning",
+        "Rico Cilliers": "Modeling"
+      },
+      "page": "https://polyhaven.com/a/fern_02",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/fern_02/fern_02_1k.gltf",
+      "license": "CC0 1.0 Universal (public domain) - https://polyhaven.com/license",
+      "edits": "1k textures re-encoded as JPEG q80 (normal map downsized to 512 px); ARM map dropped; alpha mask kept as a separate greyscale JPEG applied at runtime"
+    },
+    "dry_ground_rocks": {
+      "files": [
+        "dry_ground_rocks_diff.jpg",
+        "dry_ground_rocks_nor.jpg"
+      ],
+      "name": "Dry Ground Rocks",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "page": "https://polyhaven.com/a/dry_ground_rocks",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_ground_rocks/dry_ground_rocks_diff_1k.jpg",
+      "license": "CC0 1.0 Universal (public domain) - https://polyhaven.com/license",
+      "edits": "1k diffuse re-encoded as JPEG q80; normal map (GL) downsized to 512 px"
+    },
+    "forest_ground_04": {
+      "files": [
+        "forest_ground_04_diff.jpg",
+        "forest_ground_04_nor.jpg"
+      ],
+      "name": "Forest Ground 04",
+      "authors": {
+        "Rob Tuytel": "Photography, Processing",
+        "Rico Cilliers": "Minor adjustment"
+      },
+      "page": "https://polyhaven.com/a/forest_ground_04",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_ground_04/forest_ground_04_diff_1k.jpg",
+      "license": "CC0 1.0 Universal (public domain) - https://polyhaven.com/license",
+      "edits": "1k diffuse re-encoded as JPEG q80; normal map (GL) downsized to 512 px"
+    },
+    "seaside_rock": {
+      "files": [
+        "seaside_rock_diff.jpg",
+        "seaside_rock_nor.jpg"
+      ],
+      "name": "Seaside Rock",
+      "authors": {
+        "Dimitrios Savva": "All"
+      },
+      "page": "https://polyhaven.com/a/seaside_rock",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/seaside_rock/seaside_rock_diff_1k.jpg",
+      "license": "CC0 1.0 Universal (public domain) - https://polyhaven.com/license",
+      "edits": "1k diffuse re-encoded as JPEG q80; normal map (GL) downsized to 512 px"
+    },
+    "palm_tree_bark": {
+      "files": [
+        "palm_tree_bark_diff.jpg",
+        "palm_tree_bark_nor.jpg"
+      ],
+      "name": "Palm Tree Bark",
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "page": "https://polyhaven.com/a/palm_tree_bark",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_tree_bark/palm_tree_bark_diff_1k.jpg",
+      "license": "CC0 1.0 Universal (public domain) - https://polyhaven.com/license",
+      "edits": "1k diffuse re-encoded as JPEG q80; normal map (GL) downsized to 512 px"
+    }
+  },
+  "reused": {
+    "backgrounds": "public/images/eras/<era>/*.jpg (CC0 Poly Haven panoramas, see public/images/eras/CREDITS.json)",
+    "animals": "public/models/real/*.glb (CC-BY-4.0, see public/models/real/manifest.json)"
+  }
+}
