@@ -35,6 +35,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import * as WORLD from "./world.js";
+import { createLiving } from "./living.js";
 
 const MANIFEST_URL = "/models/real/manifest.json";
 const LOAD_DIST = 40;
@@ -147,15 +148,16 @@ const EXHIBITS = [
     asset: "raptor",
     species: "Velociraptor mongoliensis",
     room: "predator",
-    // north-east corner of Predator Bay, facing the bay and the Grand Gallery door
+    // north-east corner of Predator Bay, facing the bay and the Grand Gallery
+    // door (a compact plinth, so the doorway's quiz kiosk stays clear)
     x: -30.5,
     z: -37.2,
     ry: 0,
-    plinth: { w: 4.6, l: 3.4, h: 0.6 },
+    plinth: { w: 3.9, l: 3.0, h: 0.6 },
     animals: [
       // the pair eye up visitors from both sides of the plaque
-      { clip: "Idle_02", speed: 0.55, length: 2, dx: -1.0, dz: 0.2, ry: 0.4, phase: 0, glow: 0.15 },
-      { clip: "Idle_02", speed: 0.5, length: 2, dx: 1.05, dz: -0.3, ry: -0.85, mirror: true, phase: 1.9, glow: 0.15 },
+      { clip: "Idle_02", speed: 0.55, length: 2, dx: -0.85, dz: 0.2, ry: 0.4, phase: 0, glow: 0.15 },
+      { clip: "Idle_02", speed: 0.5, length: 2, dx: 0.9, dz: -0.3, ry: -0.85, mirror: true, phase: 1.9, glow: 0.15 },
     ],
     sizeNote: "Life size · 2 m",
     key: { dist: 5, side: -0.3, angle: 0.55, lux: 5 },
@@ -171,9 +173,10 @@ const EXHIBITS = [
     z: 21,
     ry: Math.PI,
     plinth: { w: 3.0, l: 10.0, h: 0.45 },
-    // "Take 001" is a 74 s reel (walks, roars, bites); 5–9 s is a calm,
-    // stationary idle, played back and forth
-    animals: [{ clip: "Take 001", sub: [5.0, 9.0], speed: 0.5, length: 8.5 }],
+    // "Take 001" is a 74 s reel (walks, roars, bites); 5–7.4 s is a calm,
+    // stationary idle, played back and forth (it rears up at ~7.8 s, so the
+    // old 5–9 s window snapped into a roar every few seconds)
+    animals: [{ clip: "Take 001", sub: [5.0, 7.4], speed: 0.5, length: 8.5 }],
     sizeNote: "Life size · 8.5 m",
     key: { dist: 7.5, side: 0.35, angle: 0.62, lux: 8 },
   },
@@ -772,7 +775,7 @@ function measure(gltf, entry, spec, clip) {
 /* main entry                                                           */
 /* ------------------------------------------------------------------ */
 
-export function placeLiveModels({ scene, world, camera, quality = "high" } = {}) {
+export function placeLiveModels({ scene, world, camera, quality = "high", renderer, audio, busy, reducedMotion } = {}) {
   const q = qualityLevel(quality);
   const shadows = q >= 2;
   const mats = makeMaterials(shadows);
@@ -796,6 +799,27 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
   const report = [];
   const placed = []; // runtime exhibit state
   let disposed = false;
+  // breathing, head tracking and the T. rex show (living.js)
+  const living = createLiving({ camera, renderer, audio, busy, reducedMotion });
+  // the show borrows one key light instead of adding a light (no shader rebuilds)
+  const keyLoan = {
+    borrow(p) {
+      ensureKeys();
+      const l = keys.find((k) => k.userData.stand === p) || keys.reduce((a, b) => (b.userData.level < a.userData.level ? b : a));
+      l.userData.borrowed = true;
+      l.userData.stand = null;
+      l.userData.level = 0;
+      l.intensity = 0;
+      return l;
+    },
+    release(l) {
+      l.userData.borrowed = false;
+      l.userData.stand = null;
+      l.userData.level = 0;
+      l.intensity = 0;
+      l.penumbra = 0.55;
+    },
+  };
 
   const ready = fetch(MANIFEST_URL)
     .then((r) => (r.ok ? r.json() : null))
@@ -1130,7 +1154,9 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
             o.boundingSphere.radius *= 1.35;
           }
         });
-        p.models.push({ place, holder, mixer, spec, scale: s });
+        const rec = { place, holder, mixer, spec, scale: s, mixed: false };
+        p.models.push(rec);
+        living.attach({ p, m: rec, model, clip, keys: keyLoan });
         p.scale = s;
         p.height = Math.max(p.height || 0, (all.max.y - all.min.y) * s);
       }
@@ -1193,6 +1219,7 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
     ensureKeys();
     const fade = Math.min(1, dt * 1.5);
     for (const l of keys) {
+      if (l.userData.borrowed) continue;
       const on = l.userData.stand && want.includes(l.userData.stand);
       l.userData.level += ((on ? 1 : 0) - l.userData.level) * fade;
       if (!on && l.userData.level < 0.01) {
@@ -1202,10 +1229,10 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
     }
     for (const p of want) {
       if (keys.some((l) => l.userData.stand === p)) continue;
-      const free = keys.find((l) => !l.userData.stand);
+      const free = keys.find((l) => !l.userData.stand && !l.userData.borrowed);
       if (free) aimKey(free, p);
     }
-    for (const l of keys) l.intensity = l.userData.level * l.userData.peak;
+    for (const l of keys) if (!l.userData.borrowed) l.intensity = l.userData.level * l.userData.peak;
   }
 
   /* ---------------- scale-model vitrines ---------------- */
@@ -1570,6 +1597,7 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
 
   /* ---------------- per frame ---------------- */
   const tmp = new THREE.Vector3();
+  const lookAt = new THREE.Vector3();
   // halls you can see down a corridor (e.g. the Grand Gallery from the
   // atrium): their models load too, within SIGHT_DIST
   const exhibitRooms = new Set(EXHIBITS.map((e) => e.room));
@@ -1615,7 +1643,11 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
       const visible = distModel < HIDE_DIST;
       for (const m of p.models) {
         m.place.visible = visible;
-        if (m.mixer && distModel < PAUSE_DIST) m.mixer.update(dt);
+        m.mixed = !!m.mixer && distModel < PAUSE_DIST;
+        if (m.mixed) {
+          living.beforeMix(m);
+          m.mixer.update(dt);
+        }
       }
       if (flying && visible) {
         p.flightT += dt;
@@ -1629,6 +1661,13 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
           m.place.rotation.x = Math.cos(a * 3.1) * 0.05;
         }
       }
+    }
+    // after the mixers, so the clips never overwrite the head turn
+    if (playerPos && Number.isFinite(playerPos.x)) {
+      lookAt.set(px, (Number(playerPos.y) || 0) + (playerPos.sitting ? 1.1 : 1.5), pz);
+      living.update(dt, lookAt, here ? here.id : null, true);
+    } else if (camera) {
+      living.update(dt, camera.getWorldPosition(lookAt), here ? here.id : null, false);
     }
     updateVitrines(px, pz);
     updateKeys(dt);
@@ -1650,6 +1689,7 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
   function dispose() {
     if (disposed) return;
     disposed = true;
+    living.dispose();
     for (const p of placed) {
       for (const m of p.models) m.mixer?.stopAllAction();
       if (p.obstacle && obstacles) {
@@ -1677,6 +1717,15 @@ export function placeLiveModels({ scene, world, camera, quality = "high" } = {})
 
   return {
     update,
+    /** the T. rex show, now (debug): false when it cannot start */
+    show: () => living.show(),
+    /** true while the T. rex show runs */
+    get showing() {
+      return living.showing !== false;
+    },
+    /** breathing / head-tracking state per rig (debug) */
+    living: () => living.debug(),
+    livingRigs: () => living.rigs,
     credits,
     dispose,
     ready,

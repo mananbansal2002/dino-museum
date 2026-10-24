@@ -30,6 +30,9 @@
  *   roar(p, { distance })  another player's roar, attenuated by distance (m)
  *   chime(f, { zone })     zone-gated like roar
  *   land(impact)           heavier footstep for landing after a jump/fall
+ *   snort(size, { distance, pan })
+ *                          a large animal's short exhale + chest rumble
+ *                          (the living exhibits noticing a visitor)
  *   zone, volume, ducked   getters
  * Samples:
  *   roar(p, { kind })      "trex" | "sauropod" | "raptor" | "visitor" — picks a
@@ -1553,6 +1556,64 @@ export function createAudio() {
         decay: rand(0.12, 0.16),
       });
       o.onended = () => out.disconnect();
+    },
+
+    /**
+     * A big animal noticing you: a short nasal exhale (filtered noise) over a
+     * low chest rumble. size 0.2 (raptor) .. 1 (T. rex) sets pitch and weight.
+     * opts.distance (m) attenuates and darkens it, silent beyond opts.range
+     * (default 25 m); opts.pan -1..1.
+     */
+    snort(size = 1, opts = {}) {
+      const c = ensure();
+      if (!c || !playable() || !noisePink || !on("roars")) return;
+      const s = clamp(Number(size) || 1, 0.15, 1.2);
+      const { distance = 0, range = 25, pan = 0 } = opts || {};
+      const k = clamp(1 - Math.max(0, Number(distance) || 0) / (Number(range) || 25), 0, 1);
+      const att = Math.pow(k, 1.5);
+      if (att < 0.03) return;
+      const t = c.currentTime + 0.02;
+      const dur = 0.3 + 0.6 * s;
+      const out = voiceOut(sfx, 0.12 + 0.22 * (1 - k));
+      const pn = c.createStereoPanner();
+      pn.pan.value = clamp(Number(pan) || 0, -1, 1);
+      pn.connect(out);
+      // exhale: pink noise through a nostril band that sinks as the breath empties
+      const puff = (at, peak, len) => {
+        const src = noiseSrc(noisePink);
+        const f = (950 - 560 * s) * rand(0.9, 1.1);
+        const bp = filter("bandpass", f, 1.2);
+        bp.frequency.setValueAtTime(f, at);
+        bp.frequency.exponentialRampToValueAtTime(f * 0.68, at + len);
+        const lp = filter("lowpass", (2800 - 1300 * s) * (0.45 + 0.55 * k));
+        const g = c.createGain();
+        g.gain.setValueAtTime(0, at);
+        g.gain.linearRampToValueAtTime(peak, at + 0.035);
+        g.gain.exponentialRampToValueAtTime(peak * 0.25, at + len * 0.45);
+        g.gain.exponentialRampToValueAtTime(1e-4, at + len);
+        src.connect(bp);
+        bp.connect(lp);
+        lp.connect(g);
+        g.connect(pn);
+        src.start(at, rand(0, 3));
+        src.stop(at + len + 0.05);
+      };
+      puff(t, 0.34 * att, dur);
+      // small animals sniff twice
+      if (s < 0.5) puff(t + dur + rand(0.08, 0.14), 0.22 * att, dur * 0.8);
+      // big ones: a low chest rumble under the breath
+      if (s >= 0.5) {
+        const f0 = rand(36, 44) * (1.5 - 0.5 * s);
+        tone(pn, { freq: f0, glideTo: f0 * 0.82, t: t + 0.05, peak: 0.2 * att * s, attack: 0.18, decay: 0.7 + 0.5 * s });
+      }
+      setTimeout(() => {
+        try {
+          pn.disconnect();
+          out.disconnect();
+        } catch {
+          /* already gone */
+        }
+      }, (dur * 2 + 2) * 1000);
     },
 
     /** Soft UI tick. */

@@ -197,7 +197,24 @@ const endCrowd = loading.add("crowd", "cafe");
 async function bootAmbient() {
   // life-size and scale models: plinths now, the models stream in by distance
   await whenIdle(() => {
-    live = placeLiveModels({ scene, world, camera, quality: QUALITY });
+    live = placeLiveModels({
+      scene,
+      world,
+      camera,
+      quality: QUALITY,
+      renderer,
+      audio,
+      // the T. rex show waits while a video, screening, narration or era view has the stage
+      busy: () =>
+        audio.ducked ||
+        cinema.playing ||
+        screenEmbed.playing ||
+        videoPlayer.isOpen() ||
+        eraView.isOpen() ||
+        mediaOverlayOpen() ||
+        !!(narrator.speaking || narrator.busy),
+      reducedMotion: () => !!settings.get("reducedMotion"),
+    });
     window.__museum.live = live;
     return stageIn(scene.getObjectByName("live-models"));
   })
@@ -601,7 +618,12 @@ const atmosphere = createAtmosphere({
     x: S.joined && S.player ? S.player.state.x : null,
     z: S.joined && S.player ? S.player.state.z : null,
     busy:
-      cinema.playing || screenEmbed.playing || videoPlayer.isOpen() || eraView.isOpen() || mediaOverlayOpen(),
+      cinema.playing ||
+      screenEmbed.playing ||
+      videoPlayer.isOpen() ||
+      eraView.isOpen() ||
+      mediaOverlayOpen() ||
+      !!live?.showing, // the T. rex show
     remotes: remote.list,
     npcs: crowd?.npcs || [],
     reduced: !!settings.get("reducedMotion") || QUALITY === "low",
@@ -1905,6 +1927,8 @@ window.__museum = {
     return vendor;
   },
   openCourt,
+  /** start the Grand Gallery T. rex show now (debug) */
+  show: () => live?.show?.() ?? false,
   get quality() {
     return { tier: lookdev.quality, systems: QUALITY, auto: QPICK.auto, gpu: QPICK.gpu, probe: S.probe || null };
   },
