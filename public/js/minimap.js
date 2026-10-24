@@ -58,14 +58,13 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
 
   /**
    * Room label: shrink the 9px type to fit the room, else wrap it onto up to
-   * three lines, else leave the room unlabelled. Never wider than the room,
-   * so it never runs over a wall or off the canvas.
+   * three lines, else try the short name (no "Hall"/"Room"), else, in a tall
+   * narrow room, run it up the room sideways. Never wider than the room, so
+   * it never runs over a wall or off the canvas.
    */
-  function drawLabel(text, x0, x1, z0, z1) {
-    const maxW = x1 - x0 - 6;
-    const maxH = z1 - z0 - 6;
+  function fitLines(text, maxW, maxH) {
     const words = text.split(" ");
-    for (const size of [9, 8, 7]) {
+    for (const size of [9, 8, 7, 6, 5]) {
       bctx.font = `600 ${size}px Inter, system-ui, sans-serif`;
       const lines = [];
       for (const word of words) {
@@ -76,9 +75,35 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
       const lineH = size + 1;
       if (lines.length > 3 || lines.length * lineH > maxH) continue;
       if (lines.some((l) => bctx.measureText(l).width > maxW)) continue;
-      const cx = (x0 + x1) / 2;
-      const top = (z0 + z1) / 2 - ((lines.length - 1) * lineH) / 2;
-      lines.forEach((l, i) => bctx.fillText(l, cx, top + i * lineH));
+      return { lines, lineH };
+    }
+    return null;
+  }
+
+  function drawLabel(text, x0, x1, z0, z1) {
+    const w = x1 - x0 - 4;
+    const h = z1 - z0 - 4;
+    const cx = (x0 + x1) / 2;
+    const cy = (z0 + z1) / 2;
+    const short = text.replace(/\s+(HALL|ROOM)$/, "");
+    const names = short !== text ? [text, short] : [text];
+    for (const name of names) {
+      const fit = fitLines(name, w, h);
+      if (!fit) continue;
+      const top = cy - ((fit.lines.length - 1) * fit.lineH) / 2;
+      fit.lines.forEach((l, i) => bctx.fillText(l, cx, top + i * fit.lineH));
+      return;
+    }
+    if (h <= w) return;
+    for (const name of names) {
+      const fit = fitLines(name, h, w);
+      if (!fit) continue;
+      bctx.save();
+      bctx.translate(cx, cy);
+      bctx.rotate(-Math.PI / 2);
+      const top = -((fit.lines.length - 1) * fit.lineH) / 2;
+      fit.lines.forEach((l, i) => bctx.fillText(l, 0, top + i * fit.lineH));
+      bctx.restore();
       return;
     }
   }
@@ -101,7 +126,7 @@ export function createMinimap(canvas, { exhibits = [], revealAll = false } = {})
       bctx.strokeStyle = hexA(accent, 0.55);
       bctx.lineWidth = 1;
       bctx.strokeRect(x0 + 0.5, z0 + 0.5, x1 - x0 - 1, z1 - z0 - 1);
-      if (x1 - x0 > 46 && z1 - z0 > 22) {
+      if (x1 - x0 > 12 && z1 - z0 > 12) {
         bctx.fillStyle = hexA(accent, 0.85);
         bctx.textAlign = "center";
         bctx.textBaseline = "middle";
