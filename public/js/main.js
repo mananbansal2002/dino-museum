@@ -1517,6 +1517,39 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", sendIdleNow);
 let rosterTimer = 0;
 
+/**
+ * The Extinction Room's narration: one line per stage of the show, spoken as
+ * the show's clock passes it (show seconds, see extinction.js). Each line ends
+ * before the next cue.
+ */
+const EXTINCTION_CUES = [
+  [3, "Sixty-six million years ago, Triceratops and Tyrannosaurus roamed these floodplains of what is now Montana."],
+  [19, "High above, a rock ten kilometres wide was falling towards Earth at twenty kilometres a second."],
+  [32, "It struck the Yucatán peninsula with the force of billions of atomic bombs."],
+  [39, "Molten rock rained back down from the sky, and wildfires swept across whole continents."],
+  [46, "A blast of searing wind raced outward over the land."],
+  [53, "Dust and soot blotted out the sun. For months, the world was dark and freezing."],
+  [67, "Plants withered and the great dinosaurs starved. Only small animals that could shelter and scavenge pulled through."],
+  [78, "Three in four species vanished. From the survivors came the birds, and in time, us."],
+];
+const EXTINCTION_LINE = "extinction:";
+let extinctionClock = -1;
+function narrateExtinction() {
+  if (!extinction?.inside) {
+    if (narrator.speaking && narrator.current.startsWith(EXTINCTION_LINE)) narrator.stop();
+    extinctionClock = -1;
+    return;
+  }
+  const t = extinction.time;
+  // a new loop (or a restarted visit) starts the narration over
+  const from = t < extinctionClock ? -1 : extinctionClock;
+  for (let i = 0; i < EXTINCTION_CUES.length; i++) {
+    const [at, text] = EXTINCTION_CUES[i];
+    if (at > from && at <= t) narrator.speak(text, { id: `${EXTINCTION_LINE}${i}`, label: "Extinction Room" });
+  }
+  extinctionClock = t;
+}
+
 /** Ambient systems updated every frame; getters, as most are created late. */
 const AMBIENT = [
   ["vendors", () => vendor],
@@ -1606,6 +1639,7 @@ function animate() {
     // the Extinction Room's show has its own sound and captions: a hall welcome
     // still running from the doorway stops as you walk in
     if (extinction?.inside && narrator.speaking && narrator.current.startsWith("hall:")) narrator.stop();
+    narrateExtinction();
     narrator.tick(roomAt(S.player.state.x, S.player.state.z)?.id, { quiet: guideQuiet });
     // a talk over an open exhibit card or popup: it makes room for the subtitles
     const guideCard = narrator.speaking && (ui.isCardOpen() || ui.isModalOpen());
